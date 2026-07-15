@@ -25,6 +25,9 @@ A dedicated conda env **`smolvla`** (your `cadgrasp` env was left untouched):
 
 - `lerobot 0.4.4` (`pip install "lerobot[smolvla]"`), `torch 2.10` (MPS), `transformers 4.57`
 - Backbone `HuggingFaceTB/SmolVLM2-500M-Video-Instruct`, downloaded on first load (~1.8 GB, cached)
+- For video rendering: `mujoco`, `imageio-ffmpeg`, and the SO-101 arm model from
+  MuJoCo Menagerie, sparse-checked-out into `demo/menagerie/robotstudio_so101/`
+  (both `demo/menagerie/` and `output/` are gitignored)
 
 ## The checkpoint's interface (`smolvla_base`)
 
@@ -82,6 +85,34 @@ do force control. To get real force behaviour you need one of:
 
 The `--task force` preset still runs and prints the position chunk you'd feed into (a).
 
+## Videos → `output/`
+
+`render_task.py` turns a prediction into an MP4 of an **SO-101 arm** (MuJoCo
+Menagerie `robotstudio_so101`, whose 6 joints map 1:1 to SmolVLA's 6 action dims)
+playing back the predicted joint trajectory:
+
+```bash
+conda run -n smolvla python smolvla_examples/render_task.py --task all      # -> output/{grasp,poke,insert,force}.mp4
+conda run -n smolvla python smolvla_examples/render_task.py --task grasp
+conda run -n smolvla python smolvla_examples/render_task.py --instruction "stack the two cubes" --name stack
+```
+
+Videos land in `output/` (gitignored) as ~5 s 640×480 h264 clips with the
+instruction overlaid. The action values are read straight into the joints as
+radian targets, clamped to each joint's limit.
+
+**What the video is:** an honest playback of the *shape* of the trajectory the VLA
+predicted. **What it is not:** a task being solved — `smolvla_base` isn't fine-tuned
+and this arm isn't the exact robot the (nonexistent) training data came from, so the
+motion is illustrative. Fine-tune to make it real; this is the visualization harness.
+
+First run needs the arm model (one-time, ~gitignored):
+```bash
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/google-deepmind/mujoco_menagerie demo/menagerie
+cd demo/menagerie && git sparse-checkout set robotstudio_so101
+```
+
 ## Next steps (if you want this to actually *do* something)
 
 1. **Close the loop in MuJoCo (Tier B).** You already have MuJoCo + Menagerie in the
@@ -102,6 +133,7 @@ The `--task force` preset still runs and prints the position chunk you'd feed in
   frame from the checkpoint's own feature spec, run one forward pass.
 - `check_setup.py` — env sanity check + one forward pass.
 - `run_task.py` — the grasp / poke / insert / force examples (and free-form instructions).
+- `render_task.py` — renders a prediction as an SO-101 arm MP4 into `output/`.
 
 ## References
 
