@@ -1,0 +1,28 @@
+# Project planning doc (private)
+cad_grasp.md
+
+# Dataset (downloaded, not version-controlled)
+dataset/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Demo build artifacts (generated meshes + renders)
+demo/assets/
+demo/out/
+gripper_examples/out/
+gen_gripper/out/
+
+# SmolVLA rendered videos (generated artifacts)
+output/
+
+# Third-party robot models (fetch via MuJoCo Menagerie)
+demo/menagerie/
+
+# Downloaded reference papers
+papers/
+
+# macOS
+.DS_Store
