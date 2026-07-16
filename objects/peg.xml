@@ -1,0 +1,12 @@
+<mujoco model="peg">
+  <!-- Object A: the cylindrical peg to be inserted.
+       radius 8 mm, half-length 30 mm  (=> 16 mm dia, 60 mm tall).
+       Geometry only (no joint/pos); the scene builder places it and adds a
+       free joint + weld so it can be held by the gripper. -->
+  <worldbody>
+    <body name="peg" pos="0 0 0">
+      <geom name="peg" type="cylinder" size="0.008 0.03" rgba="0.85 0.18 0.18 1"
+            mass="0.02" friction="1 0.02 0.001" condim="4"/>
+    </body>
+  </worldbody>
+</mujoco>

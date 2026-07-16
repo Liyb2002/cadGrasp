@@ -1,0 +1,17 @@
+<mujoco model="box_with_hole">
+  <!-- Object B: a box with a square socket (the "hole").
+       footprint 50x50 mm, total height 40 mm.
+       square opening 22 mm across, 34 mm deep, on a 6 mm floor.
+       The 16 mm peg drops in with ~3 mm clearance per side.
+       Body origin is at the BOTTOM CENTER, so pos.z = table height seats it.
+       Built from convex boxes so MuJoCo gets real socket-wall collisions. -->
+  <worldbody>
+    <body name="box" pos="0 0 0">
+      <geom name="box_floor"   type="box" pos="0 0 0.003"   size="0.025 0.025 0.003" rgba="0.30 0.32 0.38 1"/>
+      <geom name="box_wall_px" type="box" pos="0.018 0 0.023"  size="0.007 0.025 0.017" rgba="0.45 0.48 0.55 1"/>
+      <geom name="box_wall_nx" type="box" pos="-0.018 0 0.023" size="0.007 0.025 0.017" rgba="0.45 0.48 0.55 1"/>
+      <geom name="box_wall_py" type="box" pos="0 0.018 0.023"  size="0.011 0.007 0.017" rgba="0.45 0.48 0.55 1"/>
+      <geom name="box_wall_ny" type="box" pos="0 -0.018 0.023" size="0.011 0.007 0.017" rgba="0.45 0.48 0.55 1"/>
+    </body>
+  </worldbody>
+</mujoco>

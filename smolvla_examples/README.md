@@ -134,6 +134,10 @@ cd demo/menagerie && git sparse-checkout set robotstudio_so101
 - `check_setup.py` — env sanity check + one forward pass.
 - `run_task.py` — the grasp / poke / insert / force examples (and free-form instructions).
 - `render_task.py` — renders a prediction as an SO-101 arm MP4 into `output/`.
+- `insertion_scene.py` + `insert_expert.py` — a real peg-in-hole insertion task
+  (objects in `../objects/`, 10 random layouts, scripted IK expert). See
+  [`INSERTION.md`](INSERTION.md). This is the honest path to a VLA that can insert:
+  the expert generates the demos you'd fine-tune SmolVLA on.
 
 ## References
 
