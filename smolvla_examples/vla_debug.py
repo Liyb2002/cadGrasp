@@ -20,15 +20,18 @@ Run:
 import argparse
 import json
 import os
+import sys
 
 import mujoco
 import numpy as np
 import torch
 from PIL import Image, ImageDraw
 
-import insertion_scene as S
+# the insertion task modules now live under tasks/insertion/
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tasks", "insertion"))
+import scene as S
 import shape_gen as G
-from insert_expert import READY, joint_addrs
+from expert import READY, joint_addrs
 from smolvla_runner import build_frame, load_smolvla, predict_chunk, select_device
 
 JOINT_NAMES = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]

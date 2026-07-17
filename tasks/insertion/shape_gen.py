@@ -29,8 +29,8 @@ import xml.etree.ElementTree as ET
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)
-SAMPLES_DIR = os.path.join(REPO, "objects", "samples")
+REPO = os.path.dirname(os.path.dirname(HERE))
+SAMPLES_DIR = os.path.join(REPO, "objects", "insertion", "samples")
 
 # name -> cross-section sides (0 => round, swept as a 32-gon)
 SHAPES = {"round": 0, "triangle": 3, "square": 4, "pentagon": 5, "hexagon": 6, "octagon": 8}

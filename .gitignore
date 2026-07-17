@@ -18,14 +18,17 @@ gen_gripper/out/
 # SmolVLA rendered videos (generated artifacts)
 output/
 
-# Generated per-sample plug/socket shapes (deterministic; regenerate via shape_gen.py)
-objects/samples/
+# Generated per-sample insertion shapes (deterministic; regenerate via tasks/insertion/shape_gen.py)
+objects/insertion/samples/
 
 # Third-party robot models (fetch via MuJoCo Menagerie)
 demo/menagerie/
 
 # Downloaded reference papers
 papers/
+
+# Private grant/research proposals (NEVER commit)
+proposals/
 
 # macOS
 .DS_Store

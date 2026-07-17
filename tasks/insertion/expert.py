@@ -25,7 +25,7 @@ import mujoco
 import numpy as np
 from PIL import Image, ImageDraw
 
-import insertion_scene as S
+import scene as S
 import shape_gen as G
 
 ARM_JOINTS = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"]

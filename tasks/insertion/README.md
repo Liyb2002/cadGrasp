@@ -25,7 +25,7 @@ N-gon for triangle/square/…/octagon variety. Boss and socket share `n`, radius
 (+0.15 mm clearance) and yaw, so they're congruent — an exact fit. When seated,
 the boss part's flat face meets the socket's top face and the two halves become
 one continuous prism. Each spec is a deterministic function of `(seed, i)`;
-viewable per-sample MJCF is written to `objects/samples/` (gitignored).
+viewable per-sample MJCF is written to `objects/insertion/samples/` (gitignored).
 
 ## ⚠️ Who is driving — read this
 
@@ -60,18 +60,17 @@ the VLA on the 10 random holes) is a change of trajectory source, nothing else.
 
 ## Files
 
-- `../objects/peg.xml`, `../objects/box_with_hole.xml` — the original fixed
-  cylinder + square-socket pair (still used by `insertion_scene.build_model`).
-- `../objects/samples/sample_XX.xml` — the 10 generated boss+socket pairs
+- `../../objects/insertion/boss_socket.xml` — a committed demo boss+socket pair.
+- `../../objects/insertion/samples/sample_XX.xml` — generated boss+socket pairs
   (viewable standalone; gitignored, written by `shape_gen.py`).
 - `shape_gen.py` — parametric boss/socket generator (surface-of-revolution
   meshes; shapes, sizes, placement).
-- `insertion_scene.py` — composes SO-101 + a sample's boss + socket parts into one
-  model (`build_model_spec`); `--preview` renders a static frame.
-- `insert_expert.py` — the scripted IK expert + video rendering (per-sample
-  grasp/insert heights derived from each shape's dimensions).
-- `vla_debug.py` — dump SmolVLA's exact input/output for one observation
-  (`output/insertion/debug/panel.png` + `io.json`).
+- `scene.py` — composes SO-101 + a sample's boss + socket parts into one model
+  (`build_model_spec`).
+- `expert.py` — the scripted IK expert + video rendering (per-sample grasp/insert
+  heights derived from each shape's dimensions).
+- `../../smolvla_examples/vla_debug.py` — dump SmolVLA's exact input/output for
+  one observation (`output/insertion/debug/panel.png` + `io.json`).
 
 Every object stays within the arm's reachable band (r ∈ [0.16, 0.20] m, ±40°) —
 the SO-101 can't reach both close and high, and each object is approached from
@@ -81,11 +80,10 @@ above.
 
 ```bash
 # all 10 random layouts -> output/insertion/sample_00..09.mp4
-conda run -n smolvla python smolvla_examples/insert_expert.py --n 10 --seed 0
+conda run -n smolvla python tasks/insertion/expert.py --n 10 --seed 0
 
-# one layout, or a static scene preview
-conda run -n smolvla python smolvla_examples/insert_expert.py --sample 3
-conda run -n smolvla python smolvla_examples/insertion_scene.py --seed 0   # -> output/insertion/_preview.png
+# one layout
+conda run -n smolvla python tasks/insertion/expert.py --sample 3
 ```
 
 ## See the VLA's input & output
