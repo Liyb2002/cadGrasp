@@ -1,8 +1,17 @@
 # Peg-in-hole insertion (cadGrasp)
 
-A real, working insertion task in MuJoCo: a cylindrical **peg (A)** and a **box
-with a hole (B)** are placed at 10 random positions, and the SO-101 arm grasps
-the peg and inserts it. Videos → `output/insertion/sample_00.mp4 … sample_09.mp4`.
+A real, working insertion task in MuJoCo. Each of **10 samples has its own
+matched plug + socket shape** — round, triangle, square, pentagon, hexagon,
+octagon — at randomized size, colour, position and yaw. The SO-101 arm grasps
+the plug and inserts it into the matching socket.
+Videos → `output/insertion/sample_00.mp4 … sample_09.mp4`.
+
+The shapes are generated parametrically (`shape_gen.py`): the plug is a convex
+prism (or cylinder) and the socket is a ring of convex walls forming the same
+N-gon hole, sized with clearance so the plug drops in. Each sample's spec is a
+deterministic function of `(seed, i)`, so `--sample 3` and `--n 10` agree on
+sample 3. Viewable per-sample MJCF is written to `objects/samples/` (gitignored,
+regenerate any time).
 
 ## ⚠️ Who is driving — read this
 
@@ -37,12 +46,19 @@ the VLA on the 10 random holes) is a change of trajectory source, nothing else.
 
 ## Files
 
-- `../objects/peg.xml` — object A: 16 mm × 60 mm cylinder.
-- `../objects/box_with_hole.xml` — object B: 50 mm box with a 22 mm square socket,
-  built from convex walls so the hole is a real collision cavity.
-- `insertion_scene.py` — composes SO-101 + peg + box into one model, samples
-  reachable random layouts, `--preview` renders a static frame.
-- `insert_expert.py` — the scripted IK expert + video rendering.
+- `../objects/peg.xml`, `../objects/box_with_hole.xml` — the original fixed
+  cylinder + square-socket pair (still used by `insertion_scene.build_model`).
+- `../objects/samples/sample_XX.xml` — the 10 generated plug+socket pairs
+  (viewable standalone; gitignored, written by `shape_gen.py`).
+- `shape_gen.py` — parametric plug/socket generator (shapes, sizes, placement).
+- `insertion_scene.py` — composes SO-101 + a sample's plug + socket into one
+  model (`build_model_spec`); `--preview` renders a static frame.
+- `insert_expert.py` — the scripted IK expert + video rendering (per-sample
+  grasp/insert heights derived from each shape's dimensions).
+
+Every object stays within the arm's reachable band (r ∈ [0.16, 0.20] m, ±40°) —
+the SO-101 can't reach both close and high, and each object is approached from
+above.
 
 ## Run
 

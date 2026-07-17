@@ -97,6 +97,69 @@ def build_model(box_xy, peg_pos, peg_free=True):
     return model, data, info
 
 
+def _scene_skeleton():
+    """Shared scene head: include arm, gravity, visuals, ground. Returns (root, asset, worldbody)."""
+    m = ET.Element("mujoco", {"model": "insertion"})
+    ET.SubElement(m, "include", {"file": "so101.xml"})
+    ET.SubElement(m, "option", {"gravity": "0 0 -9.81"})
+    visual = ET.SubElement(m, "visual")
+    ET.SubElement(visual, "headlight", {"diffuse": "0.6 0.6 0.6", "ambient": "0.3 0.3 0.3", "specular": "0 0 0"})
+    ET.SubElement(visual, "global", {"azimuth": "160", "elevation": "-20"})
+    asset = ET.SubElement(m, "asset")
+    ET.SubElement(asset, "texture", {"type": "skybox", "builtin": "gradient",
+                                     "rgb1": "0.3 0.5 0.7", "rgb2": "0 0 0", "width": "512", "height": "3072"})
+    ET.SubElement(asset, "texture", {"type": "2d", "name": "groundplane", "builtin": "checker", "mark": "edge",
+                                     "rgb1": "0.2 0.3 0.4", "rgb2": "0.1 0.2 0.3", "markrgb": "0.8 0.8 0.8",
+                                     "width": "300", "height": "300"})
+    ET.SubElement(asset, "material", {"name": "groundplane", "texture": "groundplane",
+                                      "texuniform": "true", "texrepeat": "5 5", "reflectance": "0.2"})
+    wb = ET.SubElement(m, "worldbody")
+    ET.SubElement(wb, "light", {"pos": "0 0 3.5", "dir": "0 0 -1", "directional": "true"})
+    ET.SubElement(wb, "geom", {"name": "floor", "size": "0 0 0.05", "pos": "0 0 0",
+                               "type": "plane", "material": "groundplane"})
+    return m, asset, wb
+
+
+def build_model_spec(spec, peg_free=True):
+    """Build a scene from a shape_gen spec: SO-101 + generated socket + generated plug."""
+    import shape_gen as G
+
+    m, asset, wb = _scene_skeleton()
+    hx, hy = spec["hole_xy"]
+    px, py = spec["peg_xy"]
+    peg_half = spec["length"] / 2.0
+
+    p_assets, p_geoms = G.peg_elements(spec)
+    s_assets, s_geoms = G.socket_elements(spec)
+    for a in p_assets + s_assets:
+        asset.append(a)
+
+    socket = ET.SubElement(wb, "body", {"name": "box", "pos": f"{hx:.5f} {hy:.5f} 0",
+                                        "quat": G._yaw_quat(spec["hole_yaw"])})
+    for g in s_geoms:
+        socket.append(g)
+
+    peg = ET.SubElement(wb, "body", {"name": "peg", "pos": f"{px:.5f} {py:.5f} {peg_half:.5f}",
+                                     "quat": G._yaw_quat(spec["peg_yaw"])})
+    if peg_free:
+        ET.SubElement(peg, "freejoint", {"name": "peg_free"})
+    for g in p_geoms:
+        peg.append(g)
+
+    with open(SCENE_TMP, "w") as f:
+        f.write(ET.tostring(m, encoding="unicode"))
+    model = mujoco.MjModel.from_xml_path(SCENE_TMP)
+    data = mujoco.MjData(model)
+    info = {
+        "site_ee": mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "gripperframe"),
+        "hole_top": np.array([hx, hy, G.hole_top_z(spec)]),
+        "box_xy": np.array([hx, hy]),
+        "peg_half": peg_half,
+        "floor": spec["floor"],
+    }
+    return model, data, info
+
+
 def _rand_xy(rng):
     r = rng.uniform(REACH_MIN, REACH_MAX)
     a = rng.uniform(ANGLE_MIN, ANGLE_MAX)

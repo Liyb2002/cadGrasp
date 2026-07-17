@@ -25,11 +25,10 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 import insertion_scene as S
+import shape_gen as G
 
 ARM_JOINTS = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"]
-PEG_HALF = S.PEG_HALF_LEN
-GRASP_SITE_Z = 0.052           # gripper-site height when grasping the standing peg
-PEG_BELOW_SITE = GRASP_SITE_Z - PEG_HALF   # vertical offset: peg center below the site
+READY = np.array([0.0, -0.6, 1.2, 0.8, 0.0])   # good downward-reach IK seed
 
 
 def joint_addrs(model):
@@ -87,38 +86,44 @@ def overlay(frame, title, sub):
     return np.asarray(img)
 
 
-READY = np.array([0.0, -0.6, 1.2, 0.8, 0.0])   # good downward-reach seed
-INSERT_SITE_Z = S.HOLE_TOP_Z + 0.018            # tool height that seats the peg on the hole floor
-
-
-def run_sample(hole_xy, peg_xy, out_path, width=640, height=480, fps=30, seg_frames=26):
-    peg_start = (peg_xy[0], peg_xy[1], S.TABLE_Z + PEG_HALF)
-    model, data, info = S.build_model(hole_xy, peg_start, peg_free=True)
+def run_sample(spec, out_path, width=640, height=480, fps=30, seg_frames=26):
+    model, data, info = S.build_model_spec(spec, peg_free=True)
     dof, qpos_i, grip_q, peg_q = joint_addrs(model)
     lo, hi = joint_limits(model)
     sid = info["site_ee"]
+    peg_half = info["peg_half"]
+    length = spec["length"]
+    floor = info["floor"]
+    hole_top = info["hole_top"][2]
+
+    grasp_site_z = length - 0.010            # grasp the standing peg near its top
+    peg_below_site = grasp_site_z - peg_half  # peg-center offset below the tool while carried
+    insert_site_z = floor + length - 0.006   # seats peg bottom ~on the hole floor, tool above the rim
 
     # ready pose: arm folded down, gripper open
     data.qpos[qpos_i] = READY
     data.qpos[grip_q] = 1.2  # open
-    set_peg(data, peg_q, peg_start[:2], PEG_HALF, grasped=False)
+    px, py = spec["peg_xy"]
+    hx, hy = info["hole_top"][0], info["hole_top"][1]
+    set_peg(data, peg_q, (px, py), peg_half, grasped=False)
     mujoco.mj_forward(model, data)
 
-    px, py = peg_start[0], peg_start[1]
-    hx, hy = info["hole_top"][0], info["hole_top"][1]
+    # Transit height: clear the socket rim, but stay low enough to remain reachable
+    # (the small SO-101 can't reach high z at the near/far radii).
+    transit_z = max(hole_top, length) + 0.055
     # (target_pos, label, grasped_after, grip_value)
     waypoints = [
-        ([px, py, 0.14], "approach peg", False, 1.2),
-        ([px, py, GRASP_SITE_Z], "descend to peg", False, 1.2),
-        ([px, py, GRASP_SITE_Z], "grasp", True, 0.1),
-        ([px, py, 0.16], "lift", True, 0.1),
-        ([hx, hy, 0.16], "move over hole", True, 0.1),
-        ([hx, hy, 0.10], "align above hole", True, 0.1),
-        ([hx, hy, INSERT_SITE_Z], "INSERT", True, 0.1),
+        ([px, py, length + 0.035], "approach plug", False, 1.2),
+        ([px, py, grasp_site_z], "descend to plug", False, 1.2),
+        ([px, py, grasp_site_z], "grasp", True, 0.1),
+        ([px, py, transit_z], "lift", True, 0.1),
+        ([hx, hy, transit_z], "move over socket", True, 0.1),
+        ([hx, hy, hole_top + 0.04], "align above socket", True, 0.1),
+        ([hx, hy, insert_site_z], "INSERT", True, 0.1),
     ]
 
     frames = []
-    title = f"SO-101 scripted expert  |  insert peg into hole  |  hole=({hx:.2f}, {hy:.2f})"
+    title = f"scripted expert | {spec['shape']} plug->socket | hole=({hx:.2f},{hy:.2f})"
     q_prev = data.qpos[qpos_i].copy()
     grip_prev = data.qpos[grip_q]
     grasped = False
@@ -140,10 +145,10 @@ def run_sample(hole_xy, peg_xy, out_path, width=640, height=480, fps=30, seg_fra
             mujoco.mj_forward(model, data)
             site_xy = data.site_xpos[sid][:2]
             if grasped:
-                center_z = data.site_xpos[sid][2] - PEG_BELOW_SITE
+                center_z = data.site_xpos[sid][2] - peg_below_site
                 set_peg(data, peg_q, None, center_z, grasped=True, site_xy=site_xy)
             else:
-                set_peg(data, peg_q, peg_start[:2], PEG_HALF, grasped=False)
+                set_peg(data, peg_q, (px, py), peg_half, grasped=False)
             mujoco.mj_forward(model, data)
             renderer.update_scene(data, cam)
             frames.append(overlay(renderer.render(), title, label))
@@ -177,21 +182,20 @@ def main():
 
     out_dir = os.path.join(S.REPO, "output", "insertion")
     os.makedirs(out_dir, exist_ok=True)
-    layouts = S.sample_layouts(max(args.n, args.sample + 1), args.seed)
+    specs = G.sample_specs(max(args.n, args.sample + 1), args.seed, write=True)
 
     # build one model first just to init the renderer
-    hole0, peg0 = layouts[0]
-    m0, _, _ = S.build_model(hole0, (peg0[0], peg0[1], S.TABLE_Z + PEG_HALF))
+    m0, _, _ = S.build_model_spec(specs[0])
     renderer = mujoco.Renderer(m0, height=args.height, width=args.width)
     cam = S.preview_camera()
 
     idxs = range(args.n) if args.n > 1 else [args.sample]
     for i in idxs:
-        hole_xy, peg_xy = layouts[i]
+        spec = specs[i]
         out = os.path.join(out_dir, f"sample_{i:02d}.mp4")
-        errs, info = run_sample(hole_xy, peg_xy, out, args.width, args.height)
+        errs, info = run_sample(spec, out, args.width, args.height)
         maxerr = max(e for _, e in errs)
-        print(f"sample {i:02d}  hole=({info['hole_top'][0]:.3f},{info['hole_top'][1]:.3f})  "
+        print(f"sample {i:02d}  {spec['shape']:9s} hole=({info['hole_top'][0]:.3f},{info['hole_top'][1]:.3f})  "
               f"max_ik_pos_err={maxerr*1000:.1f}mm  -> {out}")
     renderer.close()
 
