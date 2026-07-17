@@ -21,9 +21,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 SAMPLES_DIR = os.path.join(REPO, "objects", "samples")
 
-# name -> number of sides (0 => round, approximated by a many-sided ring)
+# name -> number of sides (0 => round, approximated by a many-sided prism/ring)
 SHAPES = {"round": 0, "triangle": 3, "square": 4, "pentagon": 5, "hexagon": 6, "octagon": 8}
 ROUND_SEGMENTS = 24
+
+# Assembly clearance: the socket hole is the SAME polygon as the plug, just this
+# much larger in radius. 0.15 mm is a snug, exact-shape fit (and avoids coplanar
+# z-fighting between plug faces and socket walls). The plug must be inserted at
+# the socket's yaw so the corners line up.
+FIT_CLEARANCE = 0.00015
 
 # Reachable placement envelope for the small SO-101. The arm can't reach both
 # close AND high, and every object is approached from above, so the inner radius
@@ -62,7 +68,7 @@ def sample_specs(n, seed=0, write=True):
         shape = roster[i % len(roster)]
         r_peg = float(rng.uniform(0.007, 0.011))
         length = float(rng.uniform(0.052, 0.072))
-        clearance = float(rng.uniform(0.003, 0.006))
+        clearance = FIT_CLEARANCE  # exact-shape fit
         depth = float(rng.uniform(0.028, 0.044))
         wall_t = float(rng.uniform(0.006, 0.010))
         floor = 0.006
@@ -98,33 +104,32 @@ def _nsides(spec):
 
 
 def peg_elements(spec, mesh_name="peg_mesh"):
-    """Return (list of <asset> nodes, list of <geom> nodes) for the plug, centered at body origin."""
+    """Return (assets, geoms) for the plug: an N-gon prism (round => a 24-gon).
+
+    Vertices at circumradius r_peg, angles 2*pi*j/N + pi/N. The socket hole is the
+    same polygon, so plug and hole are congruent (an exact fit at matching yaw).
+    """
     h = spec["length"] / 2.0
     r = spec["r_peg"]
-    assets, geoms = [], []
-    if spec["n"] == 0:
-        geoms.append(ET.Element("geom", {
-            "name": "peg", "type": "cylinder", "size": f"{r:.5f} {h:.5f}",
-            "rgba": spec["peg_rgba"], "mass": "0.02", "friction": "1 0.02 0.001", "condim": "4"}))
-    else:
-        N = spec["n"]
-        verts = []
-        for j in range(N):
-            a = 2 * math.pi * j / N + math.pi / N
-            x, y = r * math.cos(a), r * math.sin(a)
-            verts += [f"{x:.5f} {y:.5f} {-h:.5f}", f"{x:.5f} {y:.5f} {h:.5f}"]
-        assets.append(ET.Element("mesh", {"name": mesh_name, "vertex": "  ".join(verts)}))
-        geoms.append(ET.Element("geom", {
-            "name": "peg", "type": "mesh", "mesh": mesh_name,
-            "rgba": spec["peg_rgba"], "mass": "0.02", "friction": "1 0.02 0.001", "condim": "4"}))
+    N = _nsides(spec)
+    verts = []
+    for j in range(N):
+        a = 2 * math.pi * j / N + math.pi / N
+        x, y = r * math.cos(a), r * math.sin(a)
+        verts += [f"{x:.5f} {y:.5f} {-h:.5f}", f"{x:.5f} {y:.5f} {h:.5f}"]
+    assets = [ET.Element("mesh", {"name": mesh_name, "vertex": "  ".join(verts)})]
+    geoms = [ET.Element("geom", {
+        "name": "peg", "type": "mesh", "mesh": mesh_name,
+        "rgba": spec["peg_rgba"], "mass": "0.02", "friction": "1 0.02 0.001", "condim": "4"})]
     return assets, geoms
 
 
 def socket_elements(spec):
     """Return (assets=[], geoms=[...]) for the socket: a floor plate + a ring of walls forming the hole."""
     N = _nsides(spec)
-    R_in = spec["r_peg"] + spec["clearance"]          # inradius of the hole (wall-to-center)
     wall_t, depth, floor = spec["wall_t"], spec["depth"], spec["floor"]
+    # Hole is the SAME polygon as the plug (inradius = plug inradius) + tiny clearance.
+    R_in = spec["r_peg"] * math.cos(math.pi / N) + spec["clearance"]
     edge_half = R_in * math.tan(math.pi / N)
     R_out = R_in / math.cos(math.pi / N) + wall_t     # footprint reach
 

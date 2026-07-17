@@ -139,8 +139,9 @@ def build_model_spec(spec, peg_free=True):
     for g in s_geoms:
         socket.append(g)
 
+    # Plug is oriented to the socket's yaw so their polygons line up (exact fit).
     peg = ET.SubElement(wb, "body", {"name": "peg", "pos": f"{px:.5f} {py:.5f} {peg_half:.5f}",
-                                     "quat": G._yaw_quat(spec["peg_yaw"])})
+                                     "quat": G._yaw_quat(spec["hole_yaw"])})
     if peg_free:
         ET.SubElement(peg, "freejoint", {"name": "peg_free"})
     for g in p_geoms:

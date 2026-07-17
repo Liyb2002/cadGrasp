@@ -17,6 +17,7 @@ Run:
 """
 
 import argparse
+import math
 import os
 
 import imageio.v2 as imageio
@@ -68,13 +69,17 @@ def ik_solve(model, data, sid, target_pos, dof_idx, qpos_idx, lo, hi,
     return np.linalg.norm(target_pos - data.site_xpos[sid])
 
 
-def set_peg(data, peg_q, xy, center_z, grasped, site_xy=None):
-    """Place the peg: standing at xy on the floor, or held vertically below the gripper."""
+def set_peg(data, peg_q, xy, center_z, grasped, site_xy=None, yaw=0.0):
+    """Place the peg: standing at xy on the floor, or held vertically below the gripper.
+
+    yaw (about z) is kept fixed at the socket's yaw so the plug's polygon lines up
+    with the hole's polygon for an exact fit.
+    """
     if grasped:
         data.qpos[peg_q:peg_q + 3] = [site_xy[0], site_xy[1], center_z]
     else:
         data.qpos[peg_q:peg_q + 3] = [xy[0], xy[1], center_z]
-    data.qpos[peg_q + 3:peg_q + 7] = [1, 0, 0, 0]  # upright
+    data.qpos[peg_q + 3:peg_q + 7] = [math.cos(yaw / 2), 0, 0, math.sin(yaw / 2)]  # upright, yaw
 
 
 def overlay(frame, title, sub):
@@ -105,7 +110,8 @@ def run_sample(spec, out_path, width=640, height=480, fps=30, seg_frames=26):
     data.qpos[grip_q] = 1.2  # open
     px, py = spec["peg_xy"]
     hx, hy = info["hole_top"][0], info["hole_top"][1]
-    set_peg(data, peg_q, (px, py), peg_half, grasped=False)
+    yaw = spec["hole_yaw"]
+    set_peg(data, peg_q, (px, py), peg_half, grasped=False, yaw=yaw)
     mujoco.mj_forward(model, data)
 
     # Transit height: clear the socket rim, but stay low enough to remain reachable
@@ -146,9 +152,9 @@ def run_sample(spec, out_path, width=640, height=480, fps=30, seg_frames=26):
             site_xy = data.site_xpos[sid][:2]
             if grasped:
                 center_z = data.site_xpos[sid][2] - peg_below_site
-                set_peg(data, peg_q, None, center_z, grasped=True, site_xy=site_xy)
+                set_peg(data, peg_q, None, center_z, grasped=True, site_xy=site_xy, yaw=yaw)
             else:
-                set_peg(data, peg_q, (px, py), peg_half, grasped=False)
+                set_peg(data, peg_q, (px, py), peg_half, grasped=False, yaw=yaw)
             mujoco.mj_forward(model, data)
             renderer.update_scene(data, cam)
             frames.append(overlay(renderer.render(), title, label))

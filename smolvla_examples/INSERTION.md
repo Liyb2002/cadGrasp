@@ -6,10 +6,12 @@ octagon — at randomized size, colour, position and yaw. The SO-101 arm grasps
 the plug and inserts it into the matching socket.
 Videos → `output/insertion/sample_00.mp4 … sample_09.mp4`.
 
-The shapes are generated parametrically (`shape_gen.py`): the plug is a convex
-prism (or cylinder) and the socket is a ring of convex walls forming the same
-N-gon hole, sized with clearance so the plug drops in. Each sample's spec is a
-deterministic function of `(seed, i)`, so `--sample 3` and `--n 10` agree on
+The shapes are generated parametrically (`shape_gen.py`). The plug is a convex
+N-gon prism (round = a 24-gon, so it reads as round). The socket hole is the
+**same polygon, congruent to the plug** — hole inradius = plug inradius + a
+0.15 mm assembly clearance — so it's an exact-shape fit, not a loose hole. The
+plug is inserted at the socket's yaw so their corners line up. Each sample's spec
+is a deterministic function of `(seed, i)`, so `--sample 3` and `--n 10` agree on
 sample 3. Viewable per-sample MJCF is written to `objects/samples/` (gitignored,
 regenerate any time).
 
