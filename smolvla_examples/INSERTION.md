@@ -57,6 +57,8 @@ the VLA on the 10 random holes) is a change of trajectory source, nothing else.
   model (`build_model_spec`); `--preview` renders a static frame.
 - `insert_expert.py` — the scripted IK expert + video rendering (per-sample
   grasp/insert heights derived from each shape's dimensions).
+- `vla_debug.py` — dump SmolVLA's exact input/output for one observation
+  (`output/insertion/debug/panel.png` + `io.json`).
 
 Every object stays within the arm's reachable band (r ∈ [0.16, 0.20] m, ±40°) —
 the SO-101 can't reach both close and high, and each object is approached from
@@ -72,6 +74,25 @@ conda run -n smolvla python smolvla_examples/insert_expert.py --n 10 --seed 0
 conda run -n smolvla python smolvla_examples/insert_expert.py --sample 3
 conda run -n smolvla python smolvla_examples/insertion_scene.py --seed 0   # -> output/insertion/_preview.png
 ```
+
+## See the VLA's input & output
+
+`vla_debug.py` renders the 3 camera views SmolVLA consumes for one scene
+observation, feeds them (+ the 6-D joint state + instruction) to `smolvla_base`,
+and writes `output/insertion/debug/`:
+
+- `panel.png` — inputs (3 views + instruction + state) on top, the predicted
+  50×6 action chunk plotted below, all in one image.
+- `camera{1,2,3}_*.png` — the raw 256×256 RGB inputs.
+- `action_chunk.png` — the 6 joint-target trajectories.
+- `io.json` — instruction, state, the full 50×6 chunk, per-joint stats.
+
+```bash
+conda run -n smolvla python smolvla_examples/vla_debug.py --sample 0
+```
+
+(The action chunk is base-model, untrained — this is to *see the I/O format*, not
+a competent insertion.)
 
 Each video: ~7 s, 640×480, showing approach → grasp → lift → align → **insert**,
 with the hole position (random per sample) in the overlay.
