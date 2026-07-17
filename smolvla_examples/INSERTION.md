@@ -5,28 +5,27 @@ boss/socket pair** built the "cut cylinder" way, at randomized shape, size,
 colour, position and yaw. The SO-101 arm grasps the boss part and inserts its
 boss into the socket part. Videos → `output/insertion/sample_00.mp4 … 09.mp4`.
 
-**How the shapes are made (`shape_gen.py`).** Cut a solid across the middle → two
-halves with flat mating faces. Put a **boss** (male stub) on one half's face and a
-matching **socket** (female recess) on the other; sharing shape/size, they fit by
-construction — that's the joint. **Body and joint shapes are independent:**
-
-- **body**: cylinder | cuboid | triangle/pentagon/hexagon/octagon prism — size varies a lot
-- **joint**: cylinder (round peg) | cuboid (square peg) — size varies a lot
-
-So a sample can be a cuboid body with a round joint, a hexagonal body with a
-square joint, etc. Each part is a real solid built by **CSG** (trimesh +
-manifold), so the socket is a genuine recessed hole:
+**How the shapes are made (`shape_gen.py`).** Take a cylinder and cut it across
+the middle → two halves with flat mating faces. Put a **boss** (male stub) on one
+half's face and a matching **socket** (female recess) on the other. Because they
+share the same radius/shape, the halves fit by construction — that's the joint:
 
 ```
-  boss part  = body  UNION  boss-stub   (arm carries it, boss points DOWN)
-  socket part = body  MINUS  hole        (sits on the table)
+ boss part (arm carries it, boss DOWN)      socket part (on the table)
+      ┌───────────┐  body Hb                     ┌───────────┐  top face
+      └────┐ ┌────┘  (mates here)                │    ┌─┐    │  hole depth d
+           │ │  boss, length d                   │    └─┘    │
+           └─┘                                    └───────────┘  height Hs
 ```
 
-emitted as an inline MuJoCo `vertex+face` mesh. Boss and socket share joint
-shape/size (+0.15 mm clearance) and yaw, so the fit is exact; when seated the
-boss part's flat face meets the socket's top face. Each spec is a deterministic
-function of `(seed, i)`; viewable per-sample MJCF is written to `objects/samples/`
-(gitignored).
+Each part is a **surface of revolution** swept from a 2D `(radius, z)` profile, so
+the socket is a genuine recessed hole in a solid part (not a ring of walls).
+Sweeping with `n` segments sets the cross-section: round = a 32-gon, or a true
+N-gon for triangle/square/…/octagon variety. Boss and socket share `n`, radius
+(+0.15 mm clearance) and yaw, so they're congruent — an exact fit. When seated,
+the boss part's flat face meets the socket's top face and the two halves become
+one continuous prism. Each spec is a deterministic function of `(seed, i)`;
+viewable per-sample MJCF is written to `objects/samples/` (gitignored).
 
 ## ⚠️ Who is driving — read this
 
