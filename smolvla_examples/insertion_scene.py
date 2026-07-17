@@ -121,13 +121,20 @@ def _scene_skeleton():
 
 
 def build_model_spec(spec, peg_free=True):
-    """Build a scene from a shape_gen spec: SO-101 + generated socket + generated plug."""
+    """Build a scene from a shape_gen spec: SO-101 + socket part + boss part.
+
+    The boss part (moved by the arm) has its boss pointing down, standing on the
+    boss tip so its body center is at z = d + Hb/2. The socket part sits on the
+    floor. `info` carries the motion heights the expert needs.
+    """
     import shape_gen as G
 
     m, asset, wb = _scene_skeleton()
     hx, hy = spec["hole_xy"]
     px, py = spec["peg_xy"]
-    peg_half = spec["length"] / 2.0
+    Hb, Hs, d = spec["Hb"], spec["Hs"], spec["d"]
+    stand_center = d + Hb / 2.0          # boss-part body center when standing (boss tip on floor)
+    grasp_z = d + Hb - G.GRASP_INSET     # tool height that grips the body near its top
 
     p_assets, p_geoms = G.peg_elements(spec)
     s_assets, s_geoms = G.socket_elements(spec)
@@ -139,8 +146,8 @@ def build_model_spec(spec, peg_free=True):
     for g in s_geoms:
         socket.append(g)
 
-    # Plug is oriented to the socket's yaw so their polygons line up (exact fit).
-    peg = ET.SubElement(wb, "body", {"name": "peg", "pos": f"{px:.5f} {py:.5f} {peg_half:.5f}",
+    # Boss part oriented to the socket's yaw so their cross-sections line up.
+    peg = ET.SubElement(wb, "body", {"name": "peg", "pos": f"{px:.5f} {py:.5f} {stand_center:.5f}",
                                      "quat": G._yaw_quat(spec["hole_yaw"])})
     if peg_free:
         ET.SubElement(peg, "freejoint", {"name": "peg_free"})
@@ -153,10 +160,15 @@ def build_model_spec(spec, peg_free=True):
     data = mujoco.MjData(model)
     info = {
         "site_ee": mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "gripperframe"),
-        "hole_top": np.array([hx, hy, G.hole_top_z(spec)]),
+        "hole_top": np.array([hx, hy, Hs]),         # socket top face
         "box_xy": np.array([hx, hy]),
-        "peg_half": peg_half,
-        "floor": spec["floor"],
+        "stand_center": stand_center,               # body center standing
+        "grasp_z": grasp_z,
+        "peg_below_site": grasp_z - stand_center,   # body center offset below the tool while carried
+        "insert_site_z": Hs + Hb - G.GRASP_INSET,   # tool height that seats the boss on the hole floor
+        "approach_z": d + Hb + 0.05,
+        "transit_z": max(Hs, d + Hb) + 0.05,
+        "align_z": Hs + 0.05,
     }
     return model, data, info
 
@@ -181,10 +193,10 @@ def sample_layouts(n, seed=0):
 
 def preview_camera():
     cam = mujoco.MjvCamera()
-    cam.lookat[:] = [0.13, 0.0, 0.06]
-    cam.distance = 0.72
+    cam.lookat[:] = [0.15, 0.0, 0.04]
+    cam.distance = 0.55
     cam.azimuth = 150.0
-    cam.elevation = -23.0
+    cam.elevation = -20.0
     return cam
 
 

@@ -96,14 +96,9 @@ def run_sample(spec, out_path, width=640, height=480, fps=30, seg_frames=26):
     dof, qpos_i, grip_q, peg_q = joint_addrs(model)
     lo, hi = joint_limits(model)
     sid = info["site_ee"]
-    peg_half = info["peg_half"]
-    length = spec["length"]
-    floor = info["floor"]
-    hole_top = info["hole_top"][2]
-
-    grasp_site_z = length - 0.010            # grasp the standing peg near its top
-    peg_below_site = grasp_site_z - peg_half  # peg-center offset below the tool while carried
-    insert_site_z = floor + length - 0.006   # seats peg bottom ~on the hole floor, tool above the rim
+    stand_center = info["stand_center"]
+    peg_below_site = info["peg_below_site"]
+    grasp_site_z = info["grasp_z"]
 
     # ready pose: arm folded down, gripper open
     data.qpos[qpos_i] = READY
@@ -111,25 +106,22 @@ def run_sample(spec, out_path, width=640, height=480, fps=30, seg_frames=26):
     px, py = spec["peg_xy"]
     hx, hy = info["hole_top"][0], info["hole_top"][1]
     yaw = spec["hole_yaw"]
-    set_peg(data, peg_q, (px, py), peg_half, grasped=False, yaw=yaw)
+    set_peg(data, peg_q, (px, py), stand_center, grasped=False, yaw=yaw)
     mujoco.mj_forward(model, data)
 
-    # Transit height: clear the socket rim, but stay low enough to remain reachable
-    # (the small SO-101 can't reach high z at the near/far radii).
-    transit_z = max(hole_top, length) + 0.055
     # (target_pos, label, grasped_after, grip_value)
     waypoints = [
-        ([px, py, length + 0.035], "approach plug", False, 1.2),
-        ([px, py, grasp_site_z], "descend to plug", False, 1.2),
+        ([px, py, info["approach_z"]], "approach part", False, 1.2),
+        ([px, py, grasp_site_z], "descend to part", False, 1.2),
         ([px, py, grasp_site_z], "grasp", True, 0.1),
-        ([px, py, transit_z], "lift", True, 0.1),
-        ([hx, hy, transit_z], "move over socket", True, 0.1),
-        ([hx, hy, hole_top + 0.04], "align above socket", True, 0.1),
-        ([hx, hy, insert_site_z], "INSERT", True, 0.1),
+        ([px, py, info["transit_z"]], "lift", True, 0.1),
+        ([hx, hy, info["transit_z"]], "move over socket", True, 0.1),
+        ([hx, hy, info["align_z"]], "align above socket", True, 0.1),
+        ([hx, hy, info["insert_site_z"]], "INSERT boss into socket", True, 0.1),
     ]
 
     frames = []
-    title = f"scripted expert | {spec['shape']} plug->socket | hole=({hx:.2f},{hy:.2f})"
+    title = f"scripted expert | {spec['shape']} boss->socket | hole=({hx:.2f},{hy:.2f})"
     q_prev = data.qpos[qpos_i].copy()
     grip_prev = data.qpos[grip_q]
     grasped = False
@@ -154,7 +146,7 @@ def run_sample(spec, out_path, width=640, height=480, fps=30, seg_frames=26):
                 center_z = data.site_xpos[sid][2] - peg_below_site
                 set_peg(data, peg_q, None, center_z, grasped=True, site_xy=site_xy, yaw=yaw)
             else:
-                set_peg(data, peg_q, (px, py), peg_half, grasped=False, yaw=yaw)
+                set_peg(data, peg_q, (px, py), stand_center, grasped=False, yaw=yaw)
             mujoco.mj_forward(model, data)
             renderer.update_scene(data, cam)
             frames.append(overlay(renderer.render(), title, label))

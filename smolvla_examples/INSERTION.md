@@ -1,19 +1,31 @@
 # Peg-in-hole insertion (cadGrasp)
 
-A real, working insertion task in MuJoCo. Each of **10 samples has its own
-matched plug + socket shape** — round, triangle, square, pentagon, hexagon,
-octagon — at randomized size, colour, position and yaw. The SO-101 arm grasps
-the plug and inserts it into the matching socket.
-Videos → `output/insertion/sample_00.mp4 … sample_09.mp4`.
+A real, working insertion task in MuJoCo. Each of **10 samples is a matched
+boss/socket pair** built the "cut cylinder" way, at randomized shape, size,
+colour, position and yaw. The SO-101 arm grasps the boss part and inserts its
+boss into the socket part. Videos → `output/insertion/sample_00.mp4 … 09.mp4`.
 
-The shapes are generated parametrically (`shape_gen.py`). The plug is a convex
-N-gon prism (round = a 24-gon, so it reads as round). The socket hole is the
-**same polygon, congruent to the plug** — hole inradius = plug inradius + a
-0.15 mm assembly clearance — so it's an exact-shape fit, not a loose hole. The
-plug is inserted at the socket's yaw so their corners line up. Each sample's spec
-is a deterministic function of `(seed, i)`, so `--sample 3` and `--n 10` agree on
-sample 3. Viewable per-sample MJCF is written to `objects/samples/` (gitignored,
-regenerate any time).
+**How the shapes are made (`shape_gen.py`).** Take a cylinder and cut it across
+the middle → two halves with flat mating faces. Put a **boss** (male stub) on one
+half's face and a matching **socket** (female recess) on the other. Because they
+share the same radius/shape, the halves fit by construction — that's the joint:
+
+```
+ boss part (arm carries it, boss DOWN)      socket part (on the table)
+      ┌───────────┐  body Hb                     ┌───────────┐  top face
+      └────┐ ┌────┘  (mates here)                │    ┌─┐    │  hole depth d
+           │ │  boss, length d                   │    └─┘    │
+           └─┘                                    └───────────┘  height Hs
+```
+
+Each part is a **surface of revolution** swept from a 2D `(radius, z)` profile, so
+the socket is a genuine recessed hole in a solid part (not a ring of walls).
+Sweeping with `n` segments sets the cross-section: round = a 32-gon, or a true
+N-gon for triangle/square/…/octagon variety. Boss and socket share `n`, radius
+(+0.15 mm clearance) and yaw, so they're congruent — an exact fit. When seated,
+the boss part's flat face meets the socket's top face and the two halves become
+one continuous prism. Each spec is a deterministic function of `(seed, i)`;
+viewable per-sample MJCF is written to `objects/samples/` (gitignored).
 
 ## ⚠️ Who is driving — read this
 
@@ -50,10 +62,11 @@ the VLA on the 10 random holes) is a change of trajectory source, nothing else.
 
 - `../objects/peg.xml`, `../objects/box_with_hole.xml` — the original fixed
   cylinder + square-socket pair (still used by `insertion_scene.build_model`).
-- `../objects/samples/sample_XX.xml` — the 10 generated plug+socket pairs
+- `../objects/samples/sample_XX.xml` — the 10 generated boss+socket pairs
   (viewable standalone; gitignored, written by `shape_gen.py`).
-- `shape_gen.py` — parametric plug/socket generator (shapes, sizes, placement).
-- `insertion_scene.py` — composes SO-101 + a sample's plug + socket into one
+- `shape_gen.py` — parametric boss/socket generator (surface-of-revolution
+  meshes; shapes, sizes, placement).
+- `insertion_scene.py` — composes SO-101 + a sample's boss + socket parts into one
   model (`build_model_spec`); `--preview` renders a static frame.
 - `insert_expert.py` — the scripted IK expert + video rendering (per-sample
   grasp/insert heights derived from each shape's dimensions).
