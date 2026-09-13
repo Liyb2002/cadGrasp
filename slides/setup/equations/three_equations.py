@@ -219,7 +219,7 @@ def main() -> None:
       c=MUTED)
     t(0.026, r"for every push", fs=26)
 
-    fig.savefig(OUT, facecolor=PAPER)
+    fig.savefig(OUT, facecolor=PAPER, edgecolor=PAPER, transparent=False)
     plt.close(fig)
     a = plt.imread(OUT)
     ink = (a[:, :, :3] < 0.96).any(axis=2)

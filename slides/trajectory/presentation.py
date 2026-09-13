@@ -59,8 +59,8 @@ def main():
     fig.text(.05, .38, r'$\mathrm{Sweep}(S,a)\cap\{y<0\}=\varnothing$', fontsize=25)
     fig.text(.05, .23, 'S: the complete rigid support     W: the workpiece', fontsize=18)
     fig.text(.05, .16, 'a: insertion direction; withdrawal moves along -a.', fontsize=17, color=S.MUTED)
-    ax = fig.add_axes([.57, .10, .41, .74]); ax.imshow(images[1]); ax.axis('off')
-    fig.savefig(HERE/'sweep_eq.png', facecolor='white'); plt.close(fig)
+    ax = fig.add_axes([.57, .10, .41, .74], facecolor='white'); ax.imshow(images[1]); ax.axis('off')
+    fig.savefig(HERE/'sweep_eq.png', facecolor='white', edgecolor='white', transparent=False); plt.close(fig)
     S.record(HERE/'sweep_demo.json', trajectory_replayed=True,
              withdrawal_motion=path['motion'], depicted_withdrawal_amount=start,
              full_withdrawal_amount=path['final_withdrawal_amount'],

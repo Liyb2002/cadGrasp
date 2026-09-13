@@ -60,7 +60,7 @@ def main():
     text(.5, .090, 'Every round: gravity-only joint feasibility + a common head direction are required. '
          'Working-load coverage grows greedily; at most 3 heads.', 15)
     text(.5, .043, 'No uplift assumes one massless, unanchored support. Step 5 checks full support equilibrium and the complete assembly trajectory.', 15)
-    fig.savefig(OUT, facecolor=PAPER)
+    fig.savefig(OUT, facecolor=PAPER, edgecolor=PAPER, transparent=False)
     plt.close(fig)
     print(OUT)
 

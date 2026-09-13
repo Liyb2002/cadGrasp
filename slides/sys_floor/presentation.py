@@ -126,9 +126,9 @@ def resultant():
     fig.text(.055, .13, 'The floor contact hull must contain p for every load.', fontsize=17)
     fig.text(.055, .085, 'Necessary for tipping resistance; friction and yaw need joint checks.',
              fontsize=14, color=S.MUTED)
-    ax = fig.add_axes([.50, .10, .48, .74])
+    ax = fig.add_axes([.50, .10, .48, .74], facecolor='white')
     ax.imshow(picture); ax.axis('off')
-    fig.savefig(HERE / 'row3.png', facecolor='white')
+    fig.savefig(HERE / 'row3.png', facecolor='white', edgecolor='white', transparent=False)
     plt.close(fig)
     S.record(HERE / 'row3.json', q_m=q.tolist(), force_push_mg=push.tolist(),
              floor_point_m=p.tolist(), normal_mg=float(normal),

@@ -64,7 +64,7 @@ def main() -> None:
     text(0.055, r"for every push   ·   $|F_{\rm push}| = 0.5\,mg$",
          fs=SUB, color=MUTED)
 
-    fig.savefig(OUT, facecolor=PAPER)
+    fig.savefig(OUT, facecolor=PAPER, edgecolor=PAPER, transparent=False)
     plt.close(fig)
     pixels = plt.imread(OUT)
     ink = (pixels[:, :, :3] < 0.96).any(axis=2)

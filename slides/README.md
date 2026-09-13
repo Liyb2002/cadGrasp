@@ -5,6 +5,8 @@ A1-f/pose_2, A1-f/pose_3 and C5/pose_2. The other current illustrations use B/po
 `tools/slide_scene.py` centralizes the white canvas, faceted grey body, muted green
 working surface, Y-up camera `[0.8, 0.12, -1]`, and finite ground plane. The ground
 margin is 13% of the object's maximum extent; depicted floor data can enlarge it.
+Formula figures explicitly export with an opaque pure-white (`#FFFFFF`)
+canvas and axes background, including the floor and insertion equation panels.
 
 The [working-area schematic](setup/working_area.png) explains the green patch:
 12 red arrows show possible process forces at different positions and directions.

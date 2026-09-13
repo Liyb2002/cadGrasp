@@ -178,7 +178,7 @@ def draw(data, ico):
              ha="center", fontsize=12.5, color=C.MUTED)
     fig.text(.5, .025, "Finite sampled demand · separate displays do not test joint feasibility",
              ha="center", fontsize=11.5, color=C.MUTED)
-    fig.savefig(OUT, facecolor=C.PAPER)
+    fig.savefig(OUT, facecolor=C.PAPER, edgecolor=C.PAPER, transparent=False)
     plt.close(fig)
     return ids
 

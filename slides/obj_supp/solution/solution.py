@@ -44,7 +44,7 @@ def force_components(index):
 
 def main():
     fig = plt.figure(figsize=(18, 13), dpi=180, facecolor=PAPER)
-    ax = fig.add_axes([0, 0, 1, 1])
+    ax = fig.add_axes([0, 0, 1, 1], facecolor=PAPER)
     ax.set(xlim=(0, 1), ylim=(0, 1))
     ax.axis("off")
 
@@ -108,7 +108,7 @@ def main():
          r"$i=0$: floor contact", 18, MUTED)
     text(.5, .037, "Each force contributes to both force balance and moment balance.",
          18, MUTED)
-    fig.savefig(OUT, facecolor=PAPER)
+    fig.savefig(OUT, facecolor=PAPER, edgecolor=PAPER, transparent=False)
     plt.close(fig)
     print(OUT)
 
