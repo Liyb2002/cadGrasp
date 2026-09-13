@@ -1,4 +1,4 @@
-"""Current B/pose_2 floor diagrams, with independently computed Y-up landings."""
+"""Five-case floor overview, with independently computed Y-up landings."""
 from pathlib import Path
 import sys
 import numpy as np
@@ -64,7 +64,31 @@ def floor_cloud(name='B', pose='pose_2'):
              baseline_floor_points_reproduced=True,
              claim='Sampled aggregate floor locations; not full bearing or a continuous boundary certificate')
     print(HERE / f'{stem}.png', flush=True)
-    return page
+    return picture
+
+
+def floor_overview(pictures):
+    """One shared title and legend, with three cases above two centred cases."""
+    page = Image.new('RGB', (2400, 1680), S.PAPER)
+    draw = ImageDraw.Draw(page)
+    S.text(draw, (1200, 65), 'Where the load reaches the floor', 58)
+    for i, (picture, (name, pose)) in enumerate(zip(pictures, S.PRESENTATION_CASES)):
+        row, column = divmod(i, 3)
+        left = column*800 + (400 if row else 0)
+        top = 140 + row*690
+        # Use the scene itself: individual page titles and footers are shared here.
+        panel = picture.resize((720, 720), Image.Resampling.LANCZOS)
+        page.paste(panel, (left+40, top))
+        S.text(draw, (left+400, top+40),
+               f'{name} / {pose.replace("_", " ")}', 34, S.MUTED)
+    S.text(draw, (1200, 1560),
+           'Green: working area     Orange: required floor-resultant locations', 34)
+    S.text(draw, (1200, 1620),
+           '32,768 sampled loads per case  |  Gravity + process force from 0 to 0.5 mg',
+           29, S.MUTED)
+    path = HERE/'on_the_floor.png'
+    page.save(path)
+    print(path, flush=True)
 
 
 def resultant():
@@ -113,6 +137,6 @@ def resultant():
 
 
 if __name__ == '__main__':
-    pages = [floor_cloud(name, pose) for name, pose in S.PRESENTATION_CASES]
-    S.gallery(HERE/'on_the_floor.png', pages, 'Required floor loads at five target poses')
+    pictures = [floor_cloud(name, pose) for name, pose in S.PRESENTATION_CASES]
+    floor_overview(pictures)
     resultant()

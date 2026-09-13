@@ -4,6 +4,9 @@ The current [five landing clouds](on_the_floor.png) and B/pose_2 [resultant diag
 share the workpiece, camera, colours and compact floor of `head_total_force.png`.
 Run `python slides/render.py --only floor` in the cadgrasp environment.
 
+`on_the_floor.png` combines the five scenes into one figure: three above, two
+centred below, with a shared title and legend and an object/pose label per scene.
+
 `presentation.py` reads saved paired loads for B/pose_2, B/pose_3, A1-f/pose_2,
 A1-f/pose_3 and C5/pose_2 without changing baseline outputs. Each case writes
 `on_the_floor_{object}_{pose}.png` and matching provenance JSON. It independently
