@@ -1,7 +1,7 @@
 """Additional, recorded LP formulations for an unresolved Step3 solve.
 
 Only invoked on solver errors. All successful reactions are checked in the
-original six equations; unknown status is never a negative feasibility verdict.
+original equations; unknown status is never a negative feasibility verdict.
 """
 from pathlib import Path
 import sys
@@ -20,7 +20,7 @@ def recover(full,target):
     attempts=[]
     # Positive row/column rescaling preserves the equations and x >= 0.
     rows=1/np.maximum(np.max(np.abs(full),axis=0),1e-15)
-    for row_scale in [np.ones(6),rows]:
+    for row_scale in [np.ones(full.shape[1]),rows]:
         columns=np.maximum(np.linalg.norm(full*row_scale,axis=1),1e-30)
         matrix=(full*row_scale/columns[:,None]).T
         rhs=target*row_scale
@@ -49,6 +49,13 @@ def recover(full,target):
             ids=np.flatnonzero(x>0)
             return dict(indices=ids.tolist(),coefficients=x[ids].tolist(),residual=residual,precise=None),dict(status='feasible',attempts=attempts)
     except RuntimeError as error:attempts.append(dict(method='nnls_proposal',error=str(error)))
+    # Match the base solver's explicit status-2 verdict, requiring agreement
+    # between at least two formulations here. Unknown statuses do not count;
+    # any reported primal success without a verified witness stays unresolved.
+    statuses=[a['status'] for a in attempts if 'status' in a]
+    if statuses.count(2)>=2 and 0 not in statuses:
+        return None,dict(status='infeasible_numeric',attempts=attempts,
+                         agreeing_infeasible_formulations=statuses.count(2))
     raise RuntimeError('Additional LP formulations remain unresolved: '+str(attempts))
 
 

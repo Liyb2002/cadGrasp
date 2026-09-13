@@ -32,7 +32,7 @@ def arrow(ink, start, end, width=5):
 
 def object_panel(domain, contacts, direction, basis, size):
     scale = float(domain.mesh.extents.max())
-    centers = np.array([c['center_m'] for c in contacts])
+    centers = np.array([c['center_m'] for c in contacts]).reshape(-1, 3)
     ends = centers+.24*scale*direction if direction is not None else centers
     floor = R.floor_triangles(domain)
     bounds = np.vstack([domain.mesh.vertices, floor.reshape(-1, 3), ends])@basis.T
@@ -44,6 +44,8 @@ def object_panel(domain, contacts, direction, basis, size):
     body_colors[domain.work_ids] = R.GREEN
     body, ids = R.raster(domain.mesh.triangles, body_colors, focus, basis, width, size)
     base.paste(Image.blend(base, body, .50), mask=Image.fromarray(np.uint8(ids >= 0)*255))
+    if not contacts:
+        return base, dict(basis=basis.tolist(), focus_m=focus.tolist(), width_m=float(width))
     patches = np.concatenate([c['triangles_m'] for c in contacts])
     colors = np.concatenate([np.tile(COLORS[j % len(COLORS)], (len(c['triangles_m']), 1))
                              for j, c in enumerate(contacts)])
@@ -95,8 +97,6 @@ def run(name):
     schedule = I.check_report(out/'schedule.json')
     directions = I.check_report(out/'insertion_directions.json')
     contacts = I.read_contacts(out/'final_contacts.npz')
-    if not contacts:
-        raise ValueError('No final contacts are available to highlight')
     selected = [c['candidate_id'] for c in contacts]
     assert selected == schedule['selected_ids'] == directions['selected_ids']
     for contact, record in zip(contacts, directions['contacts']):
@@ -113,11 +113,18 @@ def run(name):
         assert record['direction_id'] in common['ids']
         representative = all_vectors[record['direction_id']]
         np.testing.assert_array_equal(representative, record['vector'])
+    # The empty intersection retains the global catalogue algebraically. It is
+    # not a certified exit for a selected design when no contact was selected.
+    if not contacts:
+        vectors = np.empty((0, 3))
+        representative = None
+        record = None
     domain = ContinuousNeeds.read(source)
     page = Image.new('RGB', (2460, 1120), R.PAPER)
     ink = ImageDraw.Draw(page)
     ink.text((35, 24), 'Selected contacts and common withdrawal', font=R.font(38), fill=R.INK)
-    ink.text((35, 83), 'Colored patches: final contact surfaces. Teal arrows: the same certified withdrawal direction.',
+    ink.text((35, 83), 'Colored patches: final contact surfaces. Teal arrows: the same certified withdrawal direction.'
+             if contacts else 'No contacts selected. The workpiece is shown without support patches or withdrawal arrows.',
              font=R.font(25), fill=MUTED)
     views = []
     for x, basis, label in [(10, VIEW, 'Overall view'),
@@ -127,10 +134,12 @@ def run(name):
         ink.text((x+25, 143), label, font=R.font(27), fill=R.INK)
         views.append(view)
     page.paste(direction_panel(vectors, representative, 730), (1710, 230))
-    ink.text((1735, 143), 'Common feasible directions', font=R.font(27), fill=R.INK)
-    ink.text((1750, 875), 'Each dot is a certified direction.\nSame orientation as the overall view.',
+    ink.text((1735, 143), 'Common feasible directions' if contacts else 'No selected support design', font=R.font(27), fill=R.INK)
+    ink.text((1750, 875), 'Each dot is a certified direction.\nSame orientation as the overall view.'
+             if contacts else 'No support direction is certified.\nSee schedule.json for the stopping reason.',
              font=R.font(22), fill=MUTED, spacing=10)
-    ink.text((35, 1018), 'Contact faces are shown through the translucent workpiece. Insertion reverses the arrows.',
+    ink.text((35, 1018), 'Contact faces are shown through the translucent workpiece. Insertion reverses the arrows.'
+             if contacts else 'Scheduler stopped without selecting a contact. This is an unsuccessful search result.',
              font=R.font(25), fill=R.INK)
     ink.text((35, 1060), 'Directions apply to the selected heads; frame and base checks belong to the connection stage.',
              font=R.font(23), fill=MUTED)
@@ -139,6 +148,7 @@ def run(name):
     I.save(out/'selected_contacts_directions_views.json', dict(
         complete=True, object=name, pose=pose_name(), selected_ids=selected,
         common_directions=common, displayed_direction_vectors=vectors.tolist(),
+        withdrawal_applicable_to_selected_design=bool(contacts),
         arrow_withdrawal_direction=record, insertion_reverses_arrows=True,
         contacts_match_saved_direction_geometry=True, views=views,
         contact_colors_rgb={c['candidate_id']: COLORS[j % len(COLORS)].tolist() for j, c in enumerate(contacts)},

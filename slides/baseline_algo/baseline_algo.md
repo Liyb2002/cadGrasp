@@ -62,6 +62,10 @@ python slides/baseline_algo/step3_scheculer/check_tests.py
 
 本次完整重跑了 [B/pose_1](output/B/pose_1/) 与 [B/pose_2](output/B/pose_2/)。接触块分别仍为 C089/C153 和 C139/C024/C011，共同退出方向分别仍有 60 和 48 个。换轴前后的支撑表面比较记录在各自 Step5 的 `coordinate_equivalence.json`，其参考数据为同目录的 `coordinate_reference.npz`。表面距离同时检查双方顶点和三角形中心，不将离散比较冒充连续 Hausdorff 距离证明。
 
-其他已有结果只迁移坐标和画布，`coordinate_migration.algorithms_reexecuted=false` 明确标识其历史状态；旧代码指纹不冒充本次运行的验证。使用它们继续计算时，应按当前代码重新生成相关阶段。
+其余 10 组也已按当前 Y-up 代码从 Step1 重跑到 Step5：A1-f、C5 的 pose_1–4，以及 B 的 pose_3–4。它们均完成执行和结果审计，但没有新增完整设计通过：7 组构造出支撑并通过整件插入检查，连续承载未通过；A1-f/pose_1 未在当前方向与形状菜单中找到完整框架；B/pose_4、C5/pose_4 未选出支撑头。各自 Step5 的 `results.md`、失败原因图和 `batch_run.json` 保存具体结果及补跑记录。
+
+A1-f/pose_3 使用 `step3_scheculer/strict_lp_retry.py` 补跑：重试支持包含第七维约束的原始方程，反力解仍检查原始残差；数值不可行结论要求至少两个重试形式明确返回不可行，未知状态不当作不可行。该姿态的 Step3 连续覆盖通过，Step5 整件插入通过，连续承载未通过。两个未选出头的 pose_4 现在也能生成 Step3 结果图，且不把空集合的形式共同方向画成有效设计方向。
+
+上述当前阶段报告使用本次代码与输入指纹。其他保留的历史辅助产物若标有 `coordinate_migration.algorithms_reexecuted=false`，仍只表示坐标和画布迁移，不作为本次重新验证的证据。
 
 研究问题与模型约定见 [problem_statement.md](../problem_statement.md)。
