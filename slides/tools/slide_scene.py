@@ -1,4 +1,4 @@
-"""Shared presentation scene: saved B/pose_2 geometry, Y-up, compact floor.
+"""Shared presentation scenes: saved case geometry, Y-up, compact floor.
 
 Only read baseline inputs. Rendering never invokes a baseline stage or rebuilds
 the setup catalogue. Colours, camera and floor match head_total_force.png.
@@ -33,27 +33,38 @@ VIEW = np.array([.8, .12, -1.])
 FLOOR_MARGIN = .13
 CAMERA_MARGIN = 1.32
 LOAD_FACE = 213
+PRESENTATION_CASES = (('B', 'pose_2'), ('B', 'pose_3'),
+                      ('A1-f', 'pose_2'), ('A1-f', 'pose_3'), ('C5', 'pose_2'))
 
 
-def load():
-    domain = ContinuousNeeds.read(CASE / 'step_1_needs/needs.json')
-    assert domain.data['object'] == 'B' and domain.data['pose_id'] == 'pose_2'
+def case_path(domain):
+    return BASE/'output'/domain.data['object']/domain.data['pose_id']
+
+
+def case_label(domain):
+    return f"{domain.data['object']} / {domain.data['pose_id'].replace('_', ' ')}"
+
+
+def load(name='B', pose='pose_2'):
+    domain = ContinuousNeeds.read(BASE/'output'/name/pose/'step_1_needs/needs.json')
+    assert domain.data['object'] == name and domain.data['pose_id'] == pose
     assert np.allclose(domain.gravity, [0., -1., 0.])
-    assert LOAD_FACE in domain.work_ids
     return domain
 
 
 def samples(domain=None):
     domain = load() if domain is None else domain
-    data = json.loads((CASE / 'step_1_needs/samples.json').read_text())
-    digest = hashlib.sha256((CASE/'step_1_needs/needs.json').read_bytes()).hexdigest()
+    case = case_path(domain)
+    data = json.loads((case / 'step_1_needs/samples.json').read_text())
+    digest = hashlib.sha256((case/'step_1_needs/needs.json').read_bytes()).hexdigest()
     assert data['provenance']['physical_domain_sha256'] == digest
     assert np.allclose(data['moment_origin_m'], domain.com, atol=1e-12, rtol=0)
     q = np.asarray(data['pt_m'])
     force = np.asarray(data['force_push_mg'])
     wrench = np.asarray(data['need_wrench'])
     assert np.allclose(wrench, demand(q, force, domain.com), atol=1e-12, rtol=0)
-    return dict(q=q, push=force, wrench=wrench, seed=data['seed'])
+    return dict(q=q, push=force, wrench=wrench, seed=data['seed'],
+                faces=domain.work_ids[np.asarray(data['work_face_index'], int)])
 
 
 def floor(domain, points=()):
@@ -79,11 +90,11 @@ class Camera:
         return R.project(np.asarray(points), self.focus, self.basis, self.width, self.size)
 
 
-def camera(domain, size=1100, extra=(), ground_points=()):
+def camera(domain, size=1100, extra=(), ground_points=(), view=None):
     cloud = [domain.mesh.vertices, floor(domain, ground_points).reshape(-1, 3)]
     if len(extra):
         cloud.append(np.asarray(extra).reshape(-1, 3))
-    basis = R.axes(VIEW)
+    basis = R.axes(VIEW if view is None else view)
     bounds = np.array([(np.vstack(cloud)@basis.T).min(0), (np.vstack(cloud)@basis.T).max(0)])
     return Camera(bounds.mean(0)@basis, basis,
                   CAMERA_MARGIN*float(np.max(bounds[1, :2]-bounds[0, :2])), size)
@@ -132,10 +143,12 @@ def text(draw, xy, message, size=28, color=INK, anchor='mm'):
     draw.text(xy, message, font=R.font(size), fill=color, anchor=anchor)
 
 
-def applied_force(image, cam, domain, label=True):
-    point = domain.mesh.triangles_center[LOAD_FACE]
+def applied_force(image, cam, domain, label=True, point=None, direction=None, length=None):
+    point = domain.mesh.triangles_center[LOAD_FACE] if point is None else np.asarray(point)
+    direction = np.array([0., -1., 0.]) if direction is None else np.asarray(direction)
+    length = .045 if length is None else length
     end = cam.project(point)[:2]
-    start = cam.project(point+[0., .045, 0.])[:2]
+    start = cam.project(point-length*direction)[:2]
     draw = ImageDraw.Draw(image)
     arrow(draw, start, end)
     if label:
@@ -143,11 +156,79 @@ def applied_force(image, cam, domain, label=True):
     return point
 
 
-def record(path, **fields):
-    source = CASE / 'step_1_needs/needs.json'
-    result = dict(object='B', pose='pose_2', coordinate_system='Y-up; floor y=0',
+def record(path, domain=None, **fields):
+    domain = load() if domain is None else domain
+    source = case_path(domain) / 'step_1_needs/needs.json'
+    result = dict(object=domain.data['object'], pose=domain.data['pose_id'], coordinate_system='Y-up; floor y=0',
                   camera_vector=VIEW.tolist(), floor_margin_fraction=FLOOR_MARGIN,
                   camera_margin=CAMERA_MARGIN,
                   source=str(source.relative_to(SLIDES)),
                   source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(), **fields)
     Path(path).write_text(json.dumps(result, indent=2)+'\n')
+
+
+def gallery(path, pages, title):
+    """Five readable, equally sized panels in two rows, without blank cases."""
+    cell_w, cell_h = 750, 725
+    page = Image.new('RGB', (3*cell_w, 2*cell_h+100), PAPER)
+    draw = ImageDraw.Draw(page)
+    text(draw, (page.width/2, 50), title, 43)
+    for i, panel in enumerate(pages):
+        thumb = panel.copy()
+        thumb.thumbnail((cell_w, cell_h))
+        row, column = divmod(i, 3)
+        offset = cell_w//2 if row == 1 and len(pages) == 5 else 0
+        page.paste(thumb, (column*cell_w+offset+(cell_w-thumb.width)//2,
+                           100+row*cell_h+(cell_h-thumb.height)//2))
+    page.save(path)
+
+
+def working_forces(domain, cam, count=12):
+    """Select visible, spatially spread real process loads for an illustration."""
+    sample = samples(domain)
+    _, _, face_ids = render(domain, cam=cam)
+    uv = cam.project(sample['q'])[:, :2]
+    pixels = np.rint(uv).astype(int)
+    inside = ((pixels >= 0) & (pixels < cam.size)).all(axis=1)
+    candidates = np.flatnonzero(inside)
+    x, y = pixels[candidates].T
+    candidates = candidates[face_ids[y, x] == sample['faces'][candidates]+2]
+    magnitude = np.linalg.norm(sample['push'], axis=1)
+    directions = sample['push']/np.maximum(magnitude[:, None], 1e-20)
+    projected_length = np.linalg.norm(directions@cam.basis[:2].T, axis=1)
+    candidates = candidates[(magnitude[candidates] > .15) & (projected_length[candidates] > .3)]
+    if not len(candidates):
+        raise ValueError(f'No visible work loads for {case_label(domain)}; choose a surface-facing camera')
+    features = np.c_[uv[candidates]/cam.size, .025*directions[candidates]]
+    chosen = [int(np.argmin(uv[candidates, 1]))]
+    nearest = np.linalg.norm(features-features[chosen[0]], axis=1)
+    for _ in range(min(count, len(candidates))-1):
+        index = int(np.argmax(nearest))
+        chosen.append(index)
+        nearest = np.minimum(nearest, np.linalg.norm(features-features[index], axis=1))
+    ids = candidates[chosen]
+    return dict(sample_indices=ids.tolist(), points=sample['q'][ids],
+                directions=directions[ids], force_push_mg=sample['push'][ids])
+
+
+def force_parts(domain, cam, example):
+    """Depth-tested 3-D arrows; every tip lands on its real working surface."""
+    import trimesh
+    extent = float(domain.mesh.extents.max())
+    parts = []
+    for q, direction in zip(example['points'], example['directions']):
+        out = -direction
+        length = .22*extent/max(.55, np.linalg.norm(direction@cam.basis[:2].T))
+        tip = q+1e-5*extent*out
+        tail = tip+length*out
+        neck = tip+.024*extent*out
+        stem = trimesh.creation.cylinder(radius=.0022*extent, segment=[tail, neck], sections=8)
+        screen = direction@cam.basis[:2].T
+        screen /= np.linalg.norm(screen)
+        along = screen@cam.basis[:2]
+        across = np.array([-screen[1], screen[0]])@cam.basis[:2]
+        head = trimesh.Trimesh(vertices=[tip, tip-.027*extent*along+.011*extent*across,
+                                        tip-.027*extent*along-.011*extent*across],
+                               faces=[[0, 1, 2]], process=False)
+        parts.extend([(stem, RED), (head, RED)])
+    return parts

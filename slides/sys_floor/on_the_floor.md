@@ -1,11 +1,13 @@
-# Floor loads: B / pose 2
+# Floor loads: five object/pose examples
 
-The current [landing cloud](on_the_floor_B.png) and [resultant diagram](row3.png)
+The current [five landing clouds](on_the_floor.png) and B/pose_2 [resultant diagram](row3.png)
 share the workpiece, camera, colours and compact floor of `head_total_force.png`.
 Run `python slides/render.py --only floor` in the cadgrasp environment.
 
-`presentation.py` reads the saved B/pose_2 paired loads without changing baseline
-outputs. It independently recomputes all 32,768 landings and checks them against
+`presentation.py` reads saved paired loads for B/pose_2, B/pose_3, A1-f/pose_2,
+A1-f/pose_3 and C5/pose_2 without changing baseline outputs. Each case writes
+`on_the_floor_{object}_{pose}.png` and matching provenance JSON. It independently
+recomputes all 32,768 landings per case and checks them against
 Step4's corresponding rows (the saved array also begins with a gravity-only row).
 Hidden floor points are occluded by the workpiece. The cloud is sampled, not a
 continuous boundary certificate.
@@ -19,8 +21,8 @@ weighted application point defines the resultant line. No intersection of skew
 resistance; friction and yaw still require a joint bearing check.
 
 `on_the_floor.py` and `row3.py` now render the current diagrams by default.
-Their earlier algorithms remain available with `--legacy`; the numbers and
-coordinate conventions below describe those earlier experiments only.
+Old figures were deleted. The numbers and coordinate conventions below describe
+earlier experiments only; they do not describe the current images.
 
 ## Historical experiments
 

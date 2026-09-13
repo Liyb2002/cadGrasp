@@ -32,12 +32,12 @@ def landings(q, push, com):
     return p, normal
 
 
-def floor_cloud():
-    domain = S.load()
+def floor_cloud(name='B', pose='pose_2'):
+    domain = S.load(name, pose)
     sample = S.samples(domain)
     points, normal = landings(sample['q'], sample['push'], domain.com)
-    saved = np.load(S.CASE / 'step4_floor_contact/floor_contact.npz')
-    assert np.allclose(points[:, [0, 2]], saved['floor_demands_xz_m'][1:1+len(points)], atol=1e-10, rtol=0)
+    with np.load(S.case_path(domain) / 'step4_floor_contact/floor_contact.npz') as saved:
+        assert np.allclose(points[:, [0, 2]], saved['floor_demands_xz_m'][1:1+len(points)], atol=1e-10, rtol=0)
     picture, cam, ids = S.render(domain, size=1200, ground_points=points)
     draw = ImageDraw.Draw(picture)
     projected = cam.project(points)
@@ -51,16 +51,20 @@ def floor_cloud():
     page = Image.new('RGB', (1500, 1460), S.PAPER)
     draw = ImageDraw.Draw(page)
     S.text(draw, (750, 64), 'Where the load reaches the floor', 44)
-    S.text(draw, (750, 120), 'B / pose 2', 30, S.MUTED)
+    S.text(draw, (750, 120), S.case_label(domain), 30, S.MUTED)
     page.paste(picture, (150, 160))
     S.text(draw, (750, 1340), 'Orange: required floor-resultant locations', 27)
     S.text(draw, (750, 1398), '32,768 sampled loads  |  Gravity + process force from 0 to 0.5 mg', 25, S.MUTED)
-    page.save(HERE / 'on_the_floor_B.png')
-    S.record(HERE / 'on_the_floor_B.json', sample_count=len(points),
+    stem = f'on_the_floor_{name}_{pose}'
+    page.save(HERE / f'{stem}.png')
+    if (name, pose) == ('B', 'pose_2'):
+        page.save(HERE/'on_the_floor_B.png')
+    S.record(HERE / f'{stem}.json', domain=domain, sample_count=len(points),
              visible_points=shown, minimum_normal_mg=float(normal.min()),
              baseline_floor_points_reproduced=True,
              claim='Sampled aggregate floor locations; not full bearing or a continuous boundary certificate')
-    print(HERE / 'on_the_floor_B.png', flush=True)
+    print(HERE / f'{stem}.png', flush=True)
+    return page
 
 
 def resultant():
@@ -109,5 +113,6 @@ def resultant():
 
 
 if __name__ == '__main__':
-    floor_cloud()
+    pages = [floor_cloud(name, pose) for name, pose in S.PRESENTATION_CASES]
+    S.gallery(HERE/'on_the_floor.png', pages, 'Required floor loads at five target poses')
     resultant()

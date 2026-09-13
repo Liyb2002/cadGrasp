@@ -25,7 +25,7 @@ the actual contact surfaces from their outward side, with the floor omitted
 and a fixed scale for each contact across rows; main views share the same camera. `area_B_pose2.json` records the measured ratio, per-row areas, counts and
 independently replayed primal/dual checks; `area_B_pose2.npz` stores the masks.
 
-The original A1/C5 figures and tip-1 experimental data remain historical records.
+The original A1/C5 figures were deleted; tip-1 experimental data remain historical records.
 `area.py` defaults to this current presentation; `area.py --legacy ...` explicitly
 runs the earlier search/integration workflow and may overwrite its old images.
 The historical B numbers below do not describe the current `area_B.png`.
@@ -34,8 +34,7 @@ The historical B numbers below do not describe the current `area_B.png`.
 
 # Area：三个物体，每个四种支撑方案
 
-2026-09-06。只保留三张正式图：[A1-f](area_A1-f.png)、[B 兔子](area_B.png)、
-[C5 椅子](area_C5.png)。每张图四行：一块高价值小支撑、同中心接触面积三倍、
+2026-09-06。原三张正式图（A1-f、B 兔子、C5 椅子）已删除或替换。旧版每张图四行：一块高价值小支撑、同中心接触面积三倍、
 两块支撑、三块支撑。第二行只扩大第一块；第三行从第一行加第二块，第四行再加第三块。
 第三、四行均逐块编号并展示实际接触区近景。图中不标大小、面积、面积倍数或方案文字；
 只保留辨认接触区的编号和 **Covered** 百分比，不标面积或样本分数。
@@ -49,9 +48,9 @@ The historical B numbers below do not describe the current `area_B.png`.
 
 | 物体 | 一块小支撑 | 接触面积 ×3 | 两块支撑 | 三块支撑 |
 |---|---:|---:|---:|---:|
-| [A1-f](area_A1-f.png) | 0.004–0.032% | 0.049–0.109% | 17.43–18.25% | 99.62–99.75% |
-| [B](area_B.png) | 2.23–2.56% | 40.94–41.99% | 100% | 100% |
-| [C5](area_C5.png) | 3.40–3.80% | 13.45–14.20% | 100% | 100% |
+| A1-f（旧图已删除） | 0.004–0.032% | 0.049–0.109% | 17.43–18.25% | 99.62–99.75% |
+| B（历史结果） | 2.23–2.56% | 40.94–41.99% | 100% | 100% |
+| C5（旧图已删除） | 3.40–3.80% | 13.45–14.20% | 100% | 100% |
 
 百分比由下面的确定性几何积分计算。小于 0.1% 时保留三位百分数小数，避免把正覆盖
 舍入成 0%。数值积分误差与加密前后的差值保存在结果文件中，不作为图上的 confidence。

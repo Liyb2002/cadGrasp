@@ -10,7 +10,7 @@
 The English figure groups **force demand**, **moment demand**, and **no uplift**
 into one mechanics block (01–03). Common insertion remains a separate geometric
 block (04). The force and moment form one paired demand in R6, retaining the
-notation and unbroken equations from [the supplied reference](pasted-movie.png):
+notation and unbroken equations from the earlier supplied reference (the old screenshot has been removed):
 
 \[
 \operatorname{demand}(F_{\rm push},\mathrm{pt})=(F_D,\tau_D)\in\mathbb R^6,
