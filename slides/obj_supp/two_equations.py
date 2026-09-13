@@ -33,7 +33,7 @@ def main() -> None:
          fs=36)
     for y, label, cells in (
         (0.840, "the supports", (r"$F_{\rm supp}$  what it presses with",
-                                 r"$r_{\rm supp}$  its arm", r"$\hat{y}$  up")),
+                                 r"$r_{\rm supp}$  its arm", r"$\hat{z}$  up")),
         (0.775, "the process", (r"$F_{\rm push}$  the push, one vector",
                                 r"$r_{\rm push}$  its arm", r"$q$  where it lands")),
     ):
@@ -41,7 +41,7 @@ def main() -> None:
         for x, cell in zip(columns[1:], cells):
             text(y, cell, x=x, ha="left", fs=SUB, color=MUTED)
 
-    text(0.710, r"$mg$  the workpiece's weight, so gravity is $-mg\,\hat{y}$   ·   "
+    text(0.710, r"$mg$  the workpiece's weight, so gravity is $-mg\,\hat{z}$   ·   "
          r"$c$  the centre of mass, which both arms are measured from",
          x=label_x, ha="left", fs=SUB, color=MUTED)
     text(0.645, r"$F_{\rm supp}$ points along the skin's own inward normal   ·   "
@@ -51,7 +51,7 @@ def main() -> None:
     for y, label, equation in (
         (0.490, "force",
          r"$\int_{\rm supp\_obj}\; F_{\rm supp} \; dA \;=\;"
-         r" -\left( -mg\,\hat{y} \;+\; F_{\rm push} \right)$"),
+         r" -\left( -mg\,\hat{z} \;+\; F_{\rm push} \right)$"),
         (0.300, "torque",
          r"$\int_{\rm supp\_obj}\; r_{\rm supp} \times F_{\rm supp}"
          r" \; dA \;=\; -\left( r_{\rm push} \times F_{\rm push} \right)$"),

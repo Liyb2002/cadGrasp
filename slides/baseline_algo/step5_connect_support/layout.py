@@ -26,7 +26,7 @@ def ground_check(plans,required,pivot,scale):
     return dict(passed=bool(np.all(violation<=scale*1e-9)),
         covered_hull_vertices=int(np.sum(violation<=scale*1e-9)),hull_vertex_count=len(required),
         maximum_outside_distance_m=max(0.,float(violation.max())),
-        supplied_hull_xz_m=points[hull.vertices].tolist(),tolerance_m=scale*1e-9)
+        supplied_hull_xy_m=points[hull.vertices].tolist(),tolerance_m=scale*1e-9)
 
 
 def pads_separate(plans,tolerance):
@@ -176,7 +176,7 @@ def connection_options(mesh, contact, heads, ring, candidates, work, routers, re
         if not found:rejections['No routed connector at this sampled angle'] += 1
         for anchor,route in found:
             plan = dict(candidate_id=contact['candidate_id'],bearing_deg=float(angle),
-                direction=router.direction,anchor_xz_m=np.asarray(anchor),
+                direction=router.direction,anchor_xy_m=np.asarray(anchor),
                 ground_height_m=ring['height_m'],expansion=ring['expansion'],
                 connection_length_m=route['record']['length_m'],routing=route['record'],
                 construction='Retained contact backing with finite-width routed bars to an independently chosen ring anchor')
@@ -207,8 +207,8 @@ def search(mesh,contacts,directions,required,pivot,depth,center=None,expansions=
             angle=candidates[len(candidates)//2];basis=G.frame(angle)
             _,solid=S.union_parts(parts,scale)
             plan=dict(candidate_id=contact['candidate_id'],direction=basis[0],bearing_deg=angle,
-                      ground_polygons_xz_m=[],ground_corners_m=np.empty((0,3)),ground_area_m2=0.,
-                      construction='head_only',anchor_xz_m=COORD.floor(contact['center_m']),backing_depth_factor=backing['selected_depth_factor'])
+                      ground_polygons_xy_m=[],ground_corners_m=np.empty((0,3)),ground_area_m2=0.,
+                      construction='head_only',anchor_xy_m=COORD.floor(contact['center_m']),backing_depth_factor=backing['selected_depth_factor'])
             modules.append(dict(plan=plan,parts=parts,labels=[f'contact_head_{i:03d}' for i in range(len(parts))],joined=joined,solid=solid))
         status='contact_surfaces_block_work_volume' if not surface_precheck['passed'] else 'no_feasible_contact_backing'
         error='Actual contact interfaces meet the reserved volume' if not surface_precheck['passed'] else 'No clear backing in the tested thickness menu'
@@ -233,13 +233,13 @@ def search(mesh,contacts,directions,required,pivot,depth,center=None,expansions=
         print('  ring scale',expansion,'connection options',trial['option_counts'],flush=True)
         if any(not group for group in options):continue
         proposals=ranked_proposals(options)
-        diameter=float(np.ptp(ring['outer_xz_m'],axis=0).max())
+        diameter=float(np.ptp(ring['outer_xy_m'],axis=0).max())
         for proposal in proposals:
             if trial['full_assembly_attempts']>=assembly_budget:break
             plans=[p['plan'] for p in proposal]
             for weights in cut_weights(len(contacts),diameter):
                 if trial['full_assembly_attempts']>=assembly_budget:break
-                groups=R.partition(ring,[p['anchor_xz_m'] for p in plans],weights)
+                groups=R.partition(ring,[p['anchor_xy_m'] for p in plans],weights)
                 if groups is None:trial['partition_rejections']+=1;continue
                 if not ground_order_possible(groups,plans,scale):trial['ground_order_rejections']+=1;continue
                 modules=[];failure=None;installation=None

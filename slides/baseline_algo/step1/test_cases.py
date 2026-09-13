@@ -59,17 +59,17 @@ class ExportedTargetsTests(unittest.TestCase):
                 data = setup_geometry('B')
                 domain = ContinuousNeeds(data)
                 self.assertEqual(data['pose_id'], pose)
-                self.assertGreaterEqual(domain.mesh.vertices[:, 1].min(), -1e-10)
+                self.assertGreaterEqual(domain.mesh.vertices[:, 2].min(), -1e-10)
                 fraction = data['geometry']['work_area_m2'] / data['geometry']['total_area_m2']
                 self.assertTrue(.08 <= fraction <= .15)
-                self.assertTrue((-domain.normals[:, 1] > .35).all())
+                self.assertTrue((-domain.normals[:, 2] > .35).all())
                 report = json.loads((ROOT/'slides/setup/poses/B'/pose/'setup.json').read_text())
                 self.assertEqual(report['checks']['work_components'], 1)
                 with np.load(ROOT / data['provenance']['setup_snapshot']) as z:
                     contact = z['floor_contact_m']
                 distances = np.linalg.norm(domain.mesh.vertices - contact, axis=1)
                 self.assertLess(distances.min(), 1e-9)
-                self.assertLess(abs(contact[1]), 1e-10)
+                self.assertLess(abs(contact[2]), 1e-10)
 
     def test_two_ear_targets_have_distinct_tilts_and_contact_different_ears(self):
         reports = [json.loads((ROOT/f'slides/setup/poses/B/pose_{n}/setup.json').read_text())
@@ -77,8 +77,8 @@ class ExportedTargetsTests(unittest.TestCase):
         self.assertEqual([r['checks']['floor_contact_raw_vertex_ids'] for r in reports], [[8], [70]])
         gravity = [r['checks']['gravity_in_mesh_frame'] for r in reports]
         self.assertLess(np.dot(*gravity), np.cos(np.deg2rad(20)))
-        # Both targets place the high-z ear ends below the body.
-        self.assertTrue(all(g[2] > .7 for g in gravity))
+        # Both targets place the high-y ear ends below the body.
+        self.assertTrue(all(g[1] > .7 for g in gravity))
         self.assertNotEqual(reports[0]['work_face_ids'], reports[1]['work_face_ids'])
 
     def test_pose_one_preserves_original_transform_work_mask_and_pivot(self):

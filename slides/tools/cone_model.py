@@ -54,13 +54,13 @@ CONE_HALF_DEG = 30.0        # THE process cone: half-angle about the local
 
 def frame(n):
     """An orthonormal pair square to each unit normal, branch-free (Duff et al.)."""
-    n = np.asarray(n)[:, [0, 2, 1]]
+    n = np.asarray(n)
     sg = np.copysign(1.0, n[:, 2])
     a = -1.0 / (sg + n[:, 2])
     b = n[:, 0] * n[:, 1] * a
     e1 = np.stack([1.0 + sg * n[:, 0] ** 2 * a, sg * b, -sg * n[:, 0]], 1)
     e2 = np.stack([b, sg + n[:, 1] ** 2 * a, -n[:, 1]], 1)
-    return e1[:, [0, 2, 1]], e2[:, [0, 2, 1]]
+    return e1, e2
 
 
 def cone_pushes(part, T, inside, n_points, n_dirs, seed, half_deg):

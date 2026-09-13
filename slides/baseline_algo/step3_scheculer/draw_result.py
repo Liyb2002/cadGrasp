@@ -15,7 +15,7 @@ from step3_scheculer import contacts as I
 COLORS = np.array([[49, 127, 195], [245, 139, 37], [146, 101, 180]], float)
 TEAL = '#258778'
 MUTED = '#65706c'
-VIEW = R.axes([.68, .8, -1.])
+VIEW = R.axes([.68, -1., .8])
 
 
 def arrow(ink, start, end, width=5):
@@ -128,7 +128,7 @@ def run(name):
              font=R.font(25), fill=MUTED)
     views = []
     for x, basis, label in [(10, VIEW, 'Overall view'),
-                            (850, R.axes([1., .45, .35]), 'Contact-side view')]:
+                            (850, R.axes([1., .35, .45]), 'Contact-side view')]:
         panel, view = object_panel(domain, contacts, representative, basis, 840)
         page.paste(panel, (x, 170))
         ink.text((x+25, 143), label, font=R.font(27), fill=R.INK)

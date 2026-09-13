@@ -45,7 +45,7 @@ def anchors(ring, contact, angle, count=6):
     hit = R.ray_exit(ring, p, -COORD.floor(G.frame(angle)[0]))
     if hit is not None:
         choices.append(hit[0])
-    xy = ring['inner_xz_m']
+    xy = ring['inner_xy_m']
     projected = []
     for first, second in zip(xy, np.roll(xy, -1, axis=0)):
         delta = second-first
@@ -78,7 +78,7 @@ class Router:
         key = np.asarray(part.vertices, np.float64).tobytes()
         if key not in self.cache:
             self.checks += 1
-            if part.vertices[:,1].min() <= self.scale*1e-10:
+            if part.vertices[:,2].min() <= self.scale*1e-10:
                 self.rejections['object_sweep_or_floor'] += 1
                 self.cache[key] = False
             elif self.work is not None and not self.work.check_parts([part])['passed']:
@@ -110,15 +110,15 @@ class Router:
         step = .075*self.scale
         low = np.minimum(self.mesh.bounds[0], np.minimum(start, target))-.12*self.scale
         high = np.maximum(self.mesh.bounds[1], np.maximum(start, target))+.12*self.scale
-        low[1] = self.radius+self.scale*1e-9
-        high[1] = max(start[1], target[1])+.12*self.scale
+        low[2] = self.radius+self.scale*1e-9
+        high[2] = max(start[2], target[2])+.12*self.scale
         axes = [np.linspace(a, b, max(2, int(np.ceil((b-a)/step))+1)) for a, b in zip(low, high)]
         grid = np.array(np.meshgrid(*axes, indexing='ij')).reshape(3, -1).T
         # A short withdrawal waypoint gives the thin head joint room to widen.
         starters = [start-self.direction*d*self.scale for d in [.025, .05, .1]]
         landmarks = []
         for rear in starters:
-            landmarks.extend([rear, np.array([rear[0], target[1], rear[2]]),
+            landmarks.extend([rear, np.array([rear[0], rear[1], target[2]]),
                               np.array([target[0], rear[1], rear[2]]),
                               np.array([rear[0], rear[1], target[2]])])
         sparse = np.vstack([start, target, landmarks])
@@ -185,11 +185,11 @@ class Router:
             for distance in [.03, .08, .16]:
                 rear = start-distance*self.scale*self.direction
                 paths.append([start, rear, target])
-                low = rear.copy(); low[1] = target[1]
+                low = rear.copy(); low[2] = target[2]
                 paths.append([start, rear, low, target])
                 for side in [-1., 1.]:
                     around = rear+side*.12*self.scale*self.basis[1]
-                    down = around.copy(); down[1] = target[1]
+                    down = around.copy(); down[2] = target[2]
                     paths.append([start, rear, around, down, target])
             for points in paths:
                 parts = self.polyline(points, start_radius)

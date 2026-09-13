@@ -6,12 +6,12 @@
 
 ## 1. 按独立支撑约束同一组反力
 
-固定姿态和接触设计 `S`。加工力作用于 `pt`，质心为 `c`，向上单位向量为 `y_hat`。以下方程使用 SI 单位；代码将力除以工件重量 `mg`，力矩相应除以 `mg`。
+固定姿态和接触设计 `S`。加工力作用于 `pt`，质心为 `c`，向上单位向量为 `z_hat`。以下方程使用 SI 单位；代码将力除以工件重量 `mg`，力矩相应除以 `mg`。
 
 \[
  b(pt,F_{\rm push})=
  \begin{bmatrix}
- mg\hat y-F_{\rm push}\\
+ mg\hat z-F_{\rm push}\\
  -(pt-c)\times F_{\rm push}
  \end{bmatrix}.
 \]
@@ -21,7 +21,7 @@
 无自重、无锚固、未与其他支撑连接时，该支撑的竖直平衡要求
 
 \[
-R_j=\sum_{i\in I_j}\lambda_i n_{i,y}\ge0.
+R_j=\sum_{i\in I_j}\lambda_i n_{i,z}\ge0.
 \]
 
 `R_j` 是地板对该支撑的总法向力。该不等式是一项必要条件，可以在尚未构造底座时检查；不能替代逐块的完整力矩、摩擦与插入验证。若多个接触区连成一个共同实体，应按该实体分组。
@@ -31,7 +31,7 @@ R_j=\sum_{i\in I_j}\lambda_i n_{i,y}\ge0.
 \[
 \chi_S(b)=\mathbf 1\!\left[
 \exists\lambda\ge0:\quad G_S\lambda=b,\quad
-\sum_{i\in I_j}\lambda_i n_{i,y}\ge0\quad\forall j
+\sum_{i\in I_j}\lambda_i n_{i,z}\ge0\quad\forall j
 \right].
 \]
 
@@ -61,10 +61,10 @@ R_j=\sum_{i\in I_j}\lambda_i n_{i,y}\ge0.
 
 局部负竖直法向不必直接删除。同一独立实体内部的向上、向下反力可以组合，只要其总竖直分量非负。对于全部内法向严格向下的整块，不等式迫使其所有反力为零。
 
-如果希望保留现有六维锥分类器，可将每块受限的供给锥单独转换为生成元：保留 `n_y >= 0` 的原始生成元，并对同一块中每个 `y_p > 0`、`y_m < 0` 的生成元对加入
+如果希望保留现有六维锥分类器，可将每块受限的供给锥单独转换为生成元：保留 `n_z >= 0` 的原始生成元，并对同一块中每个 `z_p > 0`、`z_m < 0` 的生成元对加入
 
 \[
-\widetilde g_{pm}=(-y_m)g_p+y_p g_m.
+\widetilde g_{pm}=(-z_m)g_p+z_p g_m.
 \]
 
 这些组合的总竖直力为零。对负竖直载荷逐一分配该块内的正竖直载荷，再保留剩余正载荷，即可分解任何满足逐块条件的非负反力解。此转换与单块的一条竖直不等式等价；配对必须限于同一实体，生成元数可能按正负项数量的乘积增长。因此直接带不等式的 LP 是更直接的初始实现。
@@ -74,14 +74,14 @@ R_j=\sum_{i\in I_j}\lambda_i n_{i,y}\ge0.
 需求竖直分量满足
 
 \[
- b_y=mg-F_{{\rm push},y}\in[0.5mg,1.5mg],
+ b_z=mg-F_{{\rm push},z}\in[0.5mg,1.5mg],
 \]
 
 因为 `|F_push| <= 0.5mg`。因此所有任务都需要净向上的接触合力；向上的加工力可以通过减小原有向上支撑反力来平衡，无需自动增加向下夹紧力。能否同时满足水平力与力矩，仍由接触几何决定。
 
-逐块非向下约束使全部供给落在 `F_y >= 0` 半空间中，所以不可能正张成整个 `R^6`。目标应写成固定设计对给定连续载荷域的覆盖，不能写成任意扰动力矩的 force closure。Force closure 的全六维定义参照 [Modern Robotics 12.2.3](https://modernrobotics.northwestern.edu/nu-gm-book-resource/12-2-3-force-closure/)。
+逐块非向下约束使全部供给落在 `F_z >= 0` 半空间中，所以不可能正张成整个 `R^6`。目标应写成固定设计对给定连续载荷域的覆盖，不能写成任意扰动力矩的 force closure。Force closure 的全六维定义参照 [Modern Robotics 12.2.3](https://modernrobotics.northwestern.edu/nu-gm-book-resource/12-2-3-force-closure/)。
 
-本次实验采用更严格的 **每个接触反力都没有向下分量**，即仅允许 `n_y >= 0` 的反力生成元：
+本次实验采用更严格的 **每个接触反力都没有向下分量**，即仅允许 `n_z >= 0` 的反力生成元：
 
 | 物体 | 原已选组合在该限制下的采样覆盖 | 全部合格候选池的采样覆盖 | 连续外包盒证书 |
 |---|---:|---:|---|

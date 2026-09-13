@@ -22,15 +22,15 @@ def make(required,expansion,scale,center=None,width_fraction=.025,height_fractio
     offsets=np.sum(normals*(inner-center),axis=1)+width
     outer=np.array([np.linalg.solve(normals[[i-1,i]],offsets[[i-1,i]])+center for i in range(len(inner))])
     strips=[np.array([inner[i],outer[i],outer[(i+1)%len(inner)],inner[(i+1)%len(inner)]]) for i in range(len(inner))]
-    return dict(center_xz_m=center,expansion=float(expansion),inner_xz_m=inner,outer_xz_m=outer,
-                edge_strips_xz_m=strips,width_m=width,height_m=height,
+    return dict(center_xy_m=center,expansion=float(expansion),inner_xy_m=inner,outer_xy_m=outer,
+                edge_strips_xy_m=strips,width_m=width,height_m=height,
                 area_m2=float(Polygon(outer).area-Polygon(inner).area))
 
 
 def ray_exit(ring,point,withdrawal):
     """Farthest forward ray intersection, including rays starting outside the hull."""
     point=np.asarray(point,float);direction=np.asarray(withdrawal,float)
-    vertices=ring['inner_xz_m'];hits=[]
+    vertices=ring['inner_xy_m'];hits=[]
     for p,q in zip(vertices,np.roll(vertices,-1,axis=0)):
         matrix=np.column_stack([direction,p-q])
         if abs(np.linalg.det(matrix))<1e-14*np.linalg.norm(q-p):continue
@@ -61,7 +61,7 @@ def partition(ring,anchors,weights=None):
     The full ring is partitioned, rather than independently placing disconnected
     pads. Requiring each anchor inside its cell preserves the head-to-ring join.
     """
-    center=ring['center_xz_m'];seeds=np.asarray(anchors)-center
+    center=ring['center_xy_m'];seeds=np.asarray(anchors)-center
     weights=np.zeros(len(seeds)) if weights is None else np.asarray(weights,float)
     groups=[]
     for i,seed in enumerate(seeds):
@@ -74,7 +74,7 @@ def partition(ring,anchors,weights=None):
             if seed@n>b+1e-13:return None
             constraints.append((n,b))
         polygons=[]
-        for strip in ring['edge_strips_xz_m']:
+        for strip in ring['edge_strips_xy_m']:
             polygon=strip-center
             for n,b in constraints:
                 polygon=clip(polygon,n,b)
@@ -92,11 +92,11 @@ def partition(ring,anchors,weights=None):
 
 
 def polygons_of(plan):
-    return [Polygon(p) for p in plan['ground_polygons_xz_m']]
+    return [Polygon(p) for p in plan['ground_polygons_xy_m']]
 
 
 def check(ring,plans,scale):
-    expected=Polygon(ring['outer_xz_m']).difference(Polygon(ring['inner_xz_m']))
+    expected=Polygon(ring['outer_xy_m']).difference(Polygon(ring['inner_xy_m']))
     polygons=[p for plan in plans for p in polygons_of(plan)]
     supplied=unary_union(polygons)
     missing=float(expected.difference(supplied).area)
@@ -104,7 +104,7 @@ def check(ring,plans,scale):
     owners=[unary_union(polygons_of(p)) for p in plans]
     overlaps=[float(a.intersection(b).area) for a,b in combinations(owners,2)]
     tolerance=1e-10*scale**2
-    closed=np.vstack([ring['inner_xz_m'],ring['inner_xz_m'][0]])
+    closed=np.vstack([ring['inner_xy_m'],ring['inner_xy_m'][0]])
     uncovered=float(LineString(closed).difference(supplied.buffer(scale*1e-9)).length)
     return dict(passed=bool(len(plans)>0 and missing<=tolerance and extra<=tolerance and
                            max(overlaps,default=0.)<=tolerance and uncovered<=scale*1e-8),
@@ -116,4 +116,4 @@ def check(ring,plans,scale):
 
 def record(ring):
     return {key:(value.tolist() if isinstance(value,np.ndarray) else value)
-            for key,value in ring.items() if key!='edge_strips_xz_m'}
+            for key,value in ring.items() if key!='edge_strips_xy_m'}

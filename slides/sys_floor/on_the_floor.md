@@ -15,9 +15,9 @@ Step4's corresponding rows (the saved array also begins with a gravity-only row)
 Hidden floor points are occluded by the workpiece. The cloud is sampled, not a
 continuous boundary certificate.
 
-World coordinates are Y-up. About the floor origin, let
-`W = -mg e_y + F_push`, `M = c x (-mg e_y) + q x F_push`, and `N = -W_y`.
-For positive N the required floor point is `p = (-M_z/N, 0, M_x/N)`.
+World coordinates are Z-up. About the floor origin, let
+`W = -mg e_z + F_push`, `M = c x (-mg e_z) + q x F_push`, and `N = -W_z`.
+For positive N the required floor point is `p = (M_y/N, -M_x/N, 0)`.
 The illustration's downward process force and gravity are parallel; their
 weighted application point defines the resultant line. No intersection of skew
 3-D force lines is assumed. Convex-hull containment is necessary for tipping

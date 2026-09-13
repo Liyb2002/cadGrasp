@@ -15,7 +15,7 @@ notation and unbroken equations from the earlier supplied reference (the old scr
 \[
 \operatorname{demand}(F_{\rm push},\mathrm{pt})=(F_D,\tau_D)\in\mathbb R^6,
 \qquad
-(F_D,\tau_D)=\left(mg\hat y-F_{\rm push},\;-(\mathrm{pt}-c)\times F_{\rm push}\right).
+(F_D,\tau_D)=\left(mg\hat z-F_{\rm push},\;-(\mathrm{pt}-c)\times F_{\rm push}\right).
 \]
 
 `F_push` is the applied process force, `pt` its location in the work region,
@@ -32,7 +32,7 @@ encloses the following conditions in one box to show their shared unknowns:
 \]
 
 \[
-\sum_{\rm heads}F_{\rm supp}\cdot\hat y\geq0.
+\sum_{\rm heads}F_{\rm supp}\cdot\hat z\geq0.
 \]
 
 The external demand remains six-dimensional. No uplift restricts the feasible
@@ -114,7 +114,7 @@ Both fields now use the **32,768 paired B/pose_2 samples** already saved in
 `baseline_algo/output/B/pose_2/step_1_needs/samples.json`. Positions are sampled
 by work-surface area, directions in the reachable 30-degree inward cone, and
 magnitudes uniformly between zero and 0.5 mg (`seed=20260907`). The saved
-six-dimensional demand is checked by direct substitution in the Y-up equations.
+six-dimensional demand is checked by direct substitution in the Z-up equations.
 No pose search, temporary object copy or historical tip-1 table is used.
 
 - Force directions are displayed at **-F_D/|F_D|**, preserving the original

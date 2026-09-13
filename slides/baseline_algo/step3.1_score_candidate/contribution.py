@@ -35,7 +35,7 @@ def context(name):
     with np.load(source) as z:
         floor = z['floor_contact_m'].copy()
     scale = np.r_[np.ones(3), np.ones(3)/domain.mesh.extents.max()]
-    assert domain.k == .5 and np.array_equal(domain.gravity, [0, -1, 0])
+    assert domain.k == .5 and np.array_equal(domain.gravity, [0, 0, -1])
     return domain, data, report, SimpleNamespace(scale=scale), floor
 
 
@@ -164,7 +164,7 @@ def verify_classification(full, targets, accepted):
             normal = float(weights[slack].sum())
             if head_z < -2e-8 or abs(head_z-normal) > 2e-8:
                 raise RuntimeError('Accepted sample violates the shared no-uplift equation')
-            passive = dict(head_force_on_workpiece_y_mg=head_z,
+            passive = dict(head_force_on_workpiece_z_mg=head_z,
                 workpiece_force_on_support_z_mg=-head_z, support_floor_normal_mg=normal,
                 passed=True, original_workpiece_floor_force_excluded=True)
         records.append(dict(sample_index=int(i), feasible=bool(accepted[i]), witness=witness,

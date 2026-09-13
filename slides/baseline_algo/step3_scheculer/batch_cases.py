@@ -36,24 +36,6 @@ def read(path):
     return json.loads(path.read_text()) if path.exists() else {}
 
 
-class ProposalFolder:
-    """Route existing geometry writers to flat proposal_* files in Step5."""
-    def __init__(self, folder):
-        self.folder = Path(folder)
-
-    def __truediv__(self, filename):
-        if Path(filename).name != filename:
-            raise ValueError('Proposal artifacts must be flat filenames')
-        return self.folder / ('proposal.json' if filename == 'proposal.json' else 'proposal_' + filename)
-
-    def mkdir(self, **kwargs):
-        self.folder.mkdir(**kwargs)
-
-    def iterdir(self):
-        return (p for p in self.folder.iterdir()
-                if p.name == 'proposal.json' or p.name.startswith('proposal_'))
-
-
 def summarize_case(case, step):
     """Index current evidence; this does not rerun or replace the stage auditor."""
     folder = stage_folder(case, step)
@@ -90,7 +72,7 @@ def summarize_case(case, step):
              'support.stl', 'insertion.mp4', 'failure_viewer.html', 'failure.png', 'failure_directions.png',
              'failure.mp4', 'failed_shape_mm.stl', 'failure.json', 'bearing_failure.png',
              'bearing_failure.json', 'connectivity_failure.png', 'connectivity_failure.json',
-             'support_mm.stl', 'proposal.json', 'proposal_insertion.mp4',
+             'support_mm.stl',
              'schedule.png','schedule_views.json','withdrawal_directions.png','withdrawal_direction_views.json']
     row['evidence'] = [name for name in files if (folder / name).is_file()]
     if step == 5:
@@ -165,7 +147,8 @@ def run_case(case, first, last, resume=False, connection_edge_budget=2000,
     record.update(command=command, log=log.name,
                   execution_environment={key: env[key] for key in
                       ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS',
-                       'VECLIB_MAXIMUM_THREADS', 'CADGRASP_SCORE_WORKERS') if key in env})
+                       'VECLIB_MAXIMUM_THREADS', 'CADGRASP_SCORE_WORKERS',
+                       'CADGRASP_DIRECTION_WORKERS') if key in env})
     save(ledger, record)
     try:
         with log.open('w') as stream:

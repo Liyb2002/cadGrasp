@@ -14,33 +14,33 @@ from step1.cases import pose_name
 class WrenchMechanics(unittest.TestCase):
     def test_hand_calculated_lever_and_gravity(self):
         # 20 mm along +x, half-weight push along -y gives -10 mg*mm about z.
-        result = demand([.02, 0, 0], [0, 0, -.5], np.zeros(3))
-        assert_allclose(result, COORD.wrench([0, .5, 1, 0, 0, .01]), atol=1e-15)
+        result = demand([.02, 0, 0], [0, -.5, 0], np.zeros(3))
+        assert_allclose(result, np.asarray([0, .5, 1, 0, 0, .01]), atol=1e-15)
 
     def test_reverse_force_does_not_reverse_gravity(self):
-        down = demand([.1, 0, 0], [0, -.5, 0], np.zeros(3))
-        up = demand([.1, 0, 0], [0, .5, 0], np.zeros(3))
-        assert_allclose(down, COORD.wrench([0, 0, 1.5, 0, -.05, 0]))
-        assert_allclose(up, COORD.wrench([0, 0, .5, 0, .05, 0]))
+        down = demand([.1, 0, 0], [0, 0, -.5], np.zeros(3))
+        up = demand([.1, 0, 0], [0, 0, .5], np.zeros(3))
+        assert_allclose(down, np.asarray([0, 0, 1.5, 0, -.05, 0]))
+        assert_allclose(up, np.asarray([0, 0, .5, 0, .05, 0]))
 
     def test_same_line_of_action_gives_same_pair(self):
-        f = COORD.polar(np.array([.3, .4, 0]))
-        q, c = COORD.polar(np.array([.1, -.02, .07])), COORD.polar(np.array([.01, .02, .03]))
+        f = np.asarray(np.array([.3, .4, 0]))
+        q, c = np.asarray(np.array([.1, -.02, .07])), np.asarray(np.array([.01, .02, .03]))
         assert_allclose(demand(q, f, c), demand(q+7*f, f, c), atol=2e-16)
 
     def test_translation_and_rotation_covariance(self):
-        q, f, c = COORD.polar(np.array([.02, -.03, .04])), COORD.polar(np.array([.3, .4, 0])), COORD.polar(np.array([.04, .02, -.01]))
-        offset = COORD.polar(np.array([.7, -1, 2]))
+        q, f, c = np.asarray(np.array([.02, -.03, .04])), np.asarray(np.array([.3, .4, 0])), np.asarray(np.array([.04, .02, -.01]))
+        offset = np.asarray(np.array([.7, -1, 2]))
         assert_allclose(demand(q+offset, f, c+offset), demand(q, f, c), atol=1e-15)
         # Rotation preserving handedness; rotate gravity too for a frame change.
         R = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]])
         w = demand(q, f, c)
-        rotated = demand(R@q, R@f, R@c, R@COORD.polar(np.array([0., 0., -1.])))
+        rotated = demand(R@q, R@f, R@c, R@np.asarray(np.array([0., 0., -1.])))
         assert_allclose(rotated, np.r_[R@w[:3], R@w[3:]], atol=1e-15)
 
     def test_independent_moment_about_another_origin(self):
-        q, c, o = COORD.polar(np.array([.2, .3, .4])), COORD.polar(np.array([.03, -.01, .02])), COORD.polar(np.array([-.2, .1, 0]))
-        f, g = COORD.polar(np.array([.3, 0, -.4])), COORD.polar(np.array([0, 0, -1]))
+        q, c, o = np.asarray(np.array([.2, .3, .4])), np.asarray(np.array([.03, -.01, .02])), np.asarray(np.array([-.2, .1, 0]))
+        f, g = np.asarray(np.array([.3, 0, -.4])), np.asarray(np.array([0, 0, -1]))
         w = demand(q, f, c)
         # Shift the equivalent reaction wrench from COM to o, then balance each
         # physical external force at its own application point about o.
@@ -174,7 +174,7 @@ class ExportedContinuousDomain(unittest.TestCase):
                 magnitudes = np.array([0., .0713, .25, .4991, .5])
                 values = d.evaluate(0, .23, .41, .12, 1.7, magnitude_mg=magnitudes)
                 assert_allclose(np.linalg.norm(values['force_push_mg'], axis=1), magnitudes, atol=1e-15)
-                gravity = np.array(COORD.wrench([0., 0., 1., 0., 0., 0.]))
+                gravity = np.array(np.asarray([0., 0., 1., 0., 0., 0.]))
                 assert_allclose(values['need_wrench'][0], gravity, atol=1e-15)
                 fraction = (magnitudes/.5)[:, None]
                 assert_allclose(values['need_wrench'],
@@ -184,7 +184,7 @@ class ExportedContinuousDomain(unittest.TestCase):
         d = self.domains['B']
         with patch.object(d.mesh.ray, 'intersects_any', return_value=np.array([True, True])):
             values = d.evaluate(0, .2, .3, .1, .2, magnitude_mg=[0., .25])
-        assert_allclose(values['need_wrench'][0], COORD.wrench([0., 0., 1., 0., 0., 0.]))
+        assert_allclose(values['need_wrench'][0], np.asarray([0., 0., 1., 0., 0., 0.]))
         self.assertEqual(values['reachable'].tolist(), [False, False])
         self.assertEqual(values['tool_reachable'].tolist(), [False, False])
 

@@ -23,7 +23,7 @@ import trimesh
 from scipy.optimize import linprog
 
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 from PIL import Image, ImageDraw
 
 from common import mat_to_quat_wxyz, obj_path, read_json, write_json
@@ -77,12 +77,12 @@ def analyse(mesh: trimesh.Trimesh, T: np.ndarray, n_dist: int, n_cand: int,
 
     # disturbances: every push except on the patch already resting on the ground
     pd, push_d = surface(n_dist, seed)
-    free = pd[:, 1] > CONTACT_EPS
+    free = pd[:, 2] > CONTACT_EPS
     pd, push_d = pd[free], push_d[free]
 
     # candidate contacts: anywhere on the surface, plus the ground contact itself
     pc, push_c = surface(n_cand, seed + 991 if cand_seed is None else cand_seed)
-    ground = pc[:, 1] <= CONTACT_EPS
+    ground = pc[:, 2] <= CONTACT_EPS
     push_c[ground] = np.array([0.0, 0.0, 1.0])       # the floor can only push up
 
     W = wrenches(pc, push_c, ref, scale)
@@ -152,12 +152,12 @@ def render_contacts(name: str, T: np.ndarray, contacts: list[dict], px: int,
     cam.distance = 1.8 * float(np.linalg.norm(hi - lo)) / 2 / np.tan(
         np.deg2rad(model.vis.global_.fovy / 2))
 
-    with YUpRenderer(model, px, px, max_geom=2000) as r:
+    with Renderer(model, px, px, max_geom=2000) as r:
         r.update_scene(data, camera=cam)
         scn = r.scene
         for c in contacts:
             p, u = np.asarray(c["p"]), np.asarray(c["push"])
-            rgba = np.array(PRESSES_DOWN if u[1] < DOWNWARD else PUSHES_UP, np.float32)
+            rgba = np.array(PRESSES_DOWN if u[2] < DOWNWARD else PUSHES_UP, np.float32)
             for kind, a, b, w in ((mujoco.mjtGeom.mjGEOM_ARROW, p - u * L, p, ARROW_WIDTH),
                                   (mujoco.mjtGeom.mjGEOM_SPHERE, p, p, 0.0)):
                 if scn.ngeom >= scn.maxgeom:
@@ -194,7 +194,7 @@ def build_sheet(name: str, records: list[dict], px: int) -> None:
         for c, az in enumerate((135.0, 315.0)):
             sheet.paste(render_contacts(name, T, rec["contacts"], px, az),
                         (label_w + c * px, y))
-        n_down = sum(1 for c in rec["contacts"] if c["push"][1] < DOWNWARD)
+        n_down = sum(1 for c in rec["contacts"] if c["push"][2] < DOWNWARD)
         dr.text((10, y + int(px * 0.14)),
                 f"placement {rec['placement']}, {rec['pivot']} pivot\n"
                 f"tipped {rec['tip_deg']:.0f} deg\n\n"

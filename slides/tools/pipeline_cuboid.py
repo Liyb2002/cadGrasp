@@ -50,7 +50,7 @@ import shutil
 
 import matplotlib
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import coordinates as COORD
 import trimesh
@@ -160,8 +160,8 @@ def separation(a, b):
 def frame(u):
     """A right-handed frame whose third axis is u."""
     u = np.asarray(u, float) / np.linalg.norm(u)
-    a = np.array([0.0, 1.0, 0.0]) if abs(u[1]) < 0.9 else np.array([1.0, 0.0, 0.0])
-    e1 = -np.cross(a, u)
+    a = np.array([0.0, 0.0, 1.0]) if abs(u[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
+    e1 = np.cross(a, u)
     e1 /= np.linalg.norm(e1)
     return np.column_stack([e1, np.cross(u, e1), u])
 
@@ -184,8 +184,8 @@ def bracket(p, u, part, clear=CLEAR, reach=0.15, step=0.0005):
     s, post, f = 0.0, None, None
     for s in np.arange(0.0, reach, step):
         f = p - (PAD_T + s) * u
-        top = max(f[1], 1e-4)
-        post = obb([f[0], 0.5 * top, f[2]], I, [POST_W, 0.5 * top, POST_W])
+        top = max(f[2], 1e-4)
+        post = obb([f[0], f[1], 0.5 * top], I, [POST_W, POST_W, 0.5 * top])
         if separation(post, part) >= clear:
             break
     out = [pad]
@@ -255,7 +255,7 @@ def solid_shot(name, T, parts, solids, px, cam, tmp, rel, tag):
         f.unlink(missing_ok=True)
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
-    with YUpRenderer(model, px, px, max_geom=3000) as r:
+    with Renderer(model, px, px, max_geom=3000) as r:
         r.update_scene(data, camera=cam)
         return Image.fromarray(r.render())
 
@@ -330,7 +330,7 @@ def solve(name, pose, k, seed, n_points, n_dirs, mesh, examples, ico, tiles, tre
     keep = np.linalg.norm(targets, axis=1) > 1e-9
     targets, pw, pu = targets[keep], pw[keep], pu[keep]
 
-    on_floor = (part.triangles_center @ R.T + t)[:, 1] <= CONTACT_EPS
+    on_floor = (part.triangles_center @ R.T + t)[:, 2] <= CONTACT_EPS
     off = np.flatnonzero(~inside & ~on_floor)
     push = -(part.face_normals[off] @ R.T)
     push /= np.linalg.norm(push, axis=1, keepdims=True)
@@ -490,19 +490,19 @@ def page(name, pose, S, px, tmp, rel, out_dir):
         # the post always ends on the floor, so the only piece whose height off
         # the ground says anything is the pad: on a contact tucked under the part
         # it is the pad, not the post, that has to fit in the gap
-        floor_z.append(float((pieces[0]["c"] - np.abs(pieces[0]["R"]) @ pieces[0]["h"])[1]))
+        floor_z.append(float((pieces[0]["c"] - np.abs(pieces[0]["R"]) @ pieces[0]["h"])[2]))
     # what demo_solid would have built: the same pad, a post dropped straight down
     naive = []
     for i in range(len(chosen)):
         q = pts[i] - PAD_T * us[i]
-        top = max(q[1], 1e-4)
-        naive.append(separation(obb([q[0], 0.5 * top, q[2]], np.eye(3),
-                                    [POST_W, 0.5 * top, POST_W]), box))
+        top = max(q[2], 1e-4)
+        naive.append(separation(obb([q[0], q[1], 0.5 * top], np.eye(3),
+                                    [POST_W, POST_W, 0.5 * top]), box))
 
     V = np.asarray(mesh.vertices) @ T[:3, :3].T + T[:3, 3]
     lo, hi = V.min(axis=0), V.max(axis=0)
-    mid = COORD.lift_floor(COORD.floor(lo+hi)/2, .46*hi[1])
-    span = 1.34 * max(float(np.linalg.norm(COORD.floor(hi-lo))), float(hi[1]))
+    mid = COORD.lift_floor(COORD.floor(lo+hi)/2, .46*hi[2])
+    span = 1.34 * max(float(np.linalg.norm(COORD.floor(hi-lo))), float(hi[2]))
     # the close-up goes to the pad squeezed nearest the ground, because that is
     # the one a reader will not believe until they see it. Seen ACROSS the wedge
     # rather than into it: the gap under a tipped part is a triangle, and a
@@ -513,7 +513,7 @@ def page(name, pose, S, px, tmp, rel, out_dir):
     # way: side on, its own near face hides the gap entirely, and from above
     # there is no gap to see. Everything but that one support is left out for the
     # same reason -- the other posts stand between the eye and it.
-    tight = int(np.argmin(pts[:, 1])) if len(pts) else 0
+    tight = int(np.argmin(pts[:, 2])) if len(pts) else 0
     at = pts[tight]
     opens = -COORD.floor(us[tight])                     # the way the wedge widens
     close = 0.75 * span
@@ -522,9 +522,9 @@ def page(name, pose, S, px, tmp, rel, out_dir):
               "the same view as the balls"),
              (mid, span, AZIM, -ELEV, range(len(pts)), "and from behind"),
              (at, close, float(np.degrees(np.arctan2(-opens[1], -opens[0]))),
-              -float(np.degrees(np.arcsin(min(1.0, at[1] / dist)))), [tight],
+              -float(np.degrees(np.arcsin(min(1.0, at[2] / dist)))), [tight],
               f"into the gap: {tight + 1} alone, "
-              f"{1000 * at[1]:.1f} mm of headroom")]
+              f"{1000 * at[2]:.1f} mm of headroom")]
     solid_shots = []
     for j, (at, sp, az, el, show, cap_) in enumerate(views):
         cam, proj = camera(at, sp, az, el, px)
@@ -660,7 +660,7 @@ def main() -> None:
               f"{r['faces_eaten_by_region']} face(s), restore them and the same design "
               f"answers {100 * r['answered_if_faces_restored']:.1f}%")
         for i, s in enumerate(r["supports"]):
-            print(f"          {i + 1}: pad {1000 * s['p'][1]:5.1f} mm up, "
+            print(f"          {i + 1}: pad {1000 * s['p'][2]:5.1f} mm up, "
                   f"standoff {1000 * s['standoff_m']:5.1f} mm, pad touches at "
                   f"{1000 * s['pad_separation_m']:+.3f} mm, rest of it clears by "
                   f"{1000 * s['clearance_m']:+5.2f} mm, lowest point "

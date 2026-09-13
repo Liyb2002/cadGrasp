@@ -24,7 +24,7 @@ from __future__ import annotations
 import argparse
 
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import trimesh
 from PIL import Image, ImageDraw
@@ -112,7 +112,7 @@ def gun_directions(rng, n_passes: int) -> list:
         while True:
             u = rng.normal(size=3)
             u /= np.linalg.norm(u)
-            if u[1] > GUN_MIN_ELEVATION:               # the gun is above the part
+            if u[2] > GUN_MIN_ELEVATION:               # the gun is above the part
                 break
         dirs.append(u)
     return dirs
@@ -198,7 +198,7 @@ def spot_region(occluder, T, rng, target_fraction, target_edge) -> dict:
 def describe(mesh, T, mask) -> dict:
     area = mesh.area_faces
     n = mesh.face_normals @ T[:3, :3].T
-    up = area[mask & (n[:, 1] > 0)].sum() / max(area[mask].sum(), 1e-12)
+    up = area[mask & (n[:, 2] > 0)].sum() / max(area[mask].sum(), 1e-12)
     idx = np.flatnonzero(mask)
     pairs = mesh.face_adjacency
     keep = mask[pairs[:, 0]] & mask[pairs[:, 1]]
@@ -256,7 +256,7 @@ def render(name, T, parts, guns, px, azimuth) -> Image.Image:
     cam.lookat[:] = (lo + hi) / 2
     cam.distance = 1.7 * size / 2 / np.tan(np.deg2rad(model.vis.global_.fovy / 2))
 
-    with YUpRenderer(model, px, px, max_geom=200) as r:
+    with Renderer(model, px, px, max_geom=200) as r:
         r.update_scene(data, camera=cam)
         if guns is not None:
             scn, mid = r.scene, (lo + hi) / 2

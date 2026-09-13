@@ -15,7 +15,7 @@ from step5_connect_support.test_whole_assembly import contacts
 
 class FailureVisualTests(unittest.TestCase):
     def setUp(self):
-        self.mesh=trimesh.creation.box([1., 1., 1.]);self.mesh.apply_translation([0, 1., 0])
+        self.mesh=trimesh.creation.box([1., 1., 1.]);self.mesh.apply_translation([0, 0, 1.])
         self.domain=SimpleNamespace(mesh=self.mesh,work_ids=np.array([],int),com=self.mesh.center_mass)
         self.contacts=contacts(self.mesh)
         self.parts,self.labels=X.make_heads(self.mesh,self.contacts,.01)
@@ -38,7 +38,7 @@ class FailureVisualTests(unittest.TestCase):
         scene=X.SweptScene(self.mesh,np.array([1.,0,0]),.02)
         events=[];scene.failure_callback=lambda *a:events.append(a)
         scene.context_parts=self.parts;scene.context_labels=self.labels;scene.context_stage='loose_frame'
-        member=trimesh.creation.box([.1, .1, .1]);member.apply_translation([0, 1, 0])
+        member=trimesh.creation.box([.1, .1, .1]);member.apply_translation([0, 0, 1])
         self.assertFalse(scene.clear(member))
         self.assertEqual(len(events),1)
         self.assertEqual(events[0][0],'loose_frame')
@@ -46,7 +46,7 @@ class FailureVisualTests(unittest.TestCase):
         np.testing.assert_array_equal(events[0][1][-1].vertices,member.vertices)
 
     def test_insufficient_clearance_is_distinct_from_material_collision(self):
-        member=trimesh.creation.box([.1, .1, .1]);member.apply_translation([-.551, 1, 0])
+        member=trimesh.creation.box([.1, .1, .1]);member.apply_translation([-.551, 0, 1])
         event,intersection=F.clearance_event(self.domain,[member],['frame_candidate'],[-1.,0,0],.02,0)
         self.assertEqual(event['witness_kind'],'reserved_clearance_intersection')
         self.assertEqual(event['object_collision_parts'],[])

@@ -55,16 +55,16 @@ def design(contacts, pressure_centers, mesh, expansion=1.):
         else:
             raise RuntimeError('No separated four-pad footprint in the finite layout search')
         occupied.extend(polygons)
-        feet.append(dict(candidate_id=contact['candidate_id'], pads_xz_m=pads,
-                         hull_xz_m=rectangle(center-radii-half_pad, center+radii+half_pad),
+        feet.append(dict(candidate_id=contact['candidate_id'], pads_xy_m=pads,
+                         hull_xy_m=rectangle(center-radii-half_pad, center+radii+half_pad),
                          pad_side_m=2*half_pad, bearing_area_m2=16*half_pad**2,
-                         center_xz_m=center, extent_xz_m=2*(radii+half_pad),
+                         center_xy_m=center, extent_xy_m=2*(radii+half_pad),
                          construction='four separately located bearing squares owned by this support'))
     return feet
 
 
 def check(feet, mesh):
-    groups = [(j, Polygon(p)) for j, foot in enumerate(feet) for p in foot['pads_xz_m']]
+    groups = [(j, Polygon(p)) for j, foot in enumerate(feet) for p in foot['pads_xy_m']]
     overlap = max([a.intersection(b).area for k, (_, a) in enumerate(groups)
                    for _, b in groups[k+1:]], default=0.)
     envelope = box(*COORD.floor(mesh.bounds[0]), *COORD.floor(mesh.bounds[1]))
@@ -76,6 +76,6 @@ def check(feet, mesh):
 
 
 def serializable(feet):
-    return [{k: ([p.tolist() for p in v] if k == 'pads_xz_m' else
+    return [{k: ([p.tolist() for p in v] if k == 'pads_xy_m' else
                  v.tolist() if isinstance(v, np.ndarray) else v)
              for k, v in foot.items()} for foot in feet]

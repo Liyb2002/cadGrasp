@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import trimesh
 from PIL import Image, ImageDraw, ImageFont
@@ -50,7 +50,7 @@ def render_object(name: str, px: int) -> list[Image.Image]:
     out_dir = d / "renders"
     out_dir.mkdir(exist_ok=True)
     imgs = []
-    with YUpRenderer(model, px, px) as renderer:
+    with Renderer(model, px, px) as renderer:
         for p in poses:
             mujoco.mj_resetData(model, data)
             data.qpos[:3] = p["pos"]

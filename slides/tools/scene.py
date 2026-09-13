@@ -17,7 +17,7 @@ CONDIM = 6
 
 TEMPLATE = """<mujoco model="{name}">
   <compiler meshdir="." angle="radian"/>
-  <option gravity="0 -9.81 0" timestep="0.002" integrator="implicitfast"/>
+  <option gravity="0 0 -9.81" timestep="0.002" integrator="implicitfast"/>
   <visual>
     <global offwidth="1200" offheight="1200"/>
     <quality shadowsize="4096" offsamples="8"/>
@@ -32,11 +32,11 @@ TEMPLATE = """<mujoco model="{name}">
 {assets}
   </asset>
   <worldbody>
-    <light name="key" pos="0.5 1.4 -0.6" dir="-0.35 -1 0.42" directional="true" castshadow="true"
+    <light name="key" pos="0.5 -0.6 1.4" dir="-0.35 0.42 -1" directional="true" castshadow="true"
            diffuse="0.7 0.7 0.7"/>
-    <geom name="ground" type="plane" quat="0.7071067811865476 -0.7071067811865476 0 0" size="2 2 0.05" material="floor" friction="{friction}"
+    <geom name="ground" type="plane" size="2 2 0.05" material="floor" friction="{friction}"
           condim="{condim}"/>
-    <body name="obj" pos="0 {drop_z} 0">
+    <body name="obj" pos="0 0 {drop_z}">
       <freejoint name="root"/>
       <inertial pos="{com}" mass="{mass}" fullinertia="{inertia}"/>
       <geom name="visual" type="mesh" mesh="visual" material="part"

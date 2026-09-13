@@ -113,7 +113,7 @@ def low_shadow(world: trimesh.Trimesh, h: float) -> Polygon:
     the slice is the difference between a fixture that may cross under a leaning
     part and one that may not.
     """
-    low = world.slice_plane([0, h, 0], [0, -1, 0], cap=True)
+    low = world.slice_plane([0, 0, h], [0, 0, -1], cap=True)
     tri = COORD.floor(low.triangles)
     return unary_union([Polygon(t) for t in tri if
                         abs(np.cross(t[1] - t[0], t[2] - t[0])) > 1e-12]).buffer(0)
@@ -228,7 +228,7 @@ def build_piece(walls, plate2d, h=PLATE_H) -> trimesh.Trimesh:
     if plate2d is not None and not plate2d.is_empty:
         for g in (plate2d.geoms if plate2d.geom_type == "MultiPolygon" else [plate2d]):
             if g.area > 1e-8:
-                solids.append(COORD.mesh(trimesh.creation.extrude_polygon(g, h)))
+                solids.append(trimesh.creation.extrude_polygon(g, h))
     out = trimesh.boolean.union(solids, engine="manifold")
     out.process(validate=True)
     return out
@@ -253,10 +253,10 @@ def under_part(poly, world: trimesh.Trimesh, h=PLATE_H, step=0.002):
         return 0.0, float("inf")
     org = COORD.lift_floor(q,h+1e-5)
     loc, ray, _ = world.ray.intersects_location(
-        org, np.tile([0, 1.0, 0], (len(org), 1)), multiple_hits=False)
+        org, np.tile([0, 0, 1.0], (len(org), 1)), multiple_hits=False)
     if not len(loc):
         return 0.0, float("inf")
-    return float(len(np.unique(ray)) * step ** 2) * 1e4, float(loc[:, 1].min() - h) * 1e3
+    return float(len(np.unique(ray)) * step ** 2) * 1e4, float(loc[:, 2].min() - h) * 1e3
 
 
 def foot_polygon(w: trimesh.Trimesh, h=PLATE_H) -> Polygon:
@@ -267,7 +267,7 @@ def foot_polygon(w: trimesh.Trimesh, h=PLATE_H) -> Polygon:
     footprint the shadow of its top, which is where it is not.
     """
     v = np.asarray(w.vertices)
-    low = COORD.floor(v[v[:, 1] <= h + 1e-9])
+    low = COORD.floor(v[v[:, 2] <= h + 1e-9])
     if len(low) < 3:
         low = COORD.floor(v)
     return MultiPoint(low).convex_hull

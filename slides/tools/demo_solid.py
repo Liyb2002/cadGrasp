@@ -23,7 +23,7 @@ import argparse
 import shutil
 
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import trimesh
 from PIL import Image
@@ -79,9 +79,9 @@ def pad_column(p, u, r=PAD_R, n=PAD_N):
     th = np.linspace(0, 2 * np.pi, n, endpoint=False)
     top = p + r * (np.cos(th)[:, None] * e1 + np.sin(th)[:, None] * e2)
     bot = top.copy()
-    bot[:, 1] = FLOOR
-    if top[:, 1].min() <= FLOOR + 1e-6:        # already on the ground, nothing to drop
-        bot[:, 1] = FLOOR - 0.002
+    bot[:, 2] = FLOOR
+    if top[:, 2].min() <= FLOOR + 1e-6:        # already on the ground, nothing to drop
+        bot[:, 2] = FLOOR - 0.002
     V = np.vstack([top, bot])
     F = []
     for i in range(n):
@@ -138,10 +138,10 @@ def main() -> None:
         # frame the part AND its columns: the props run to the floor, so the
         # subject is taller than the part's own box
         cam.azimuth, cam.elevation = 118.0, -24.0
-        cam.lookat[:] = [(lo[0]+hi[0])/2, hi[1]*.45, (lo[2]+hi[2])/2]
-        span = max(float(np.linalg.norm(COORD.floor(hi-lo))), hi[1] * 1.35)
+        cam.lookat[:] = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, hi[2] * 0.45]
+        span = max(float(np.linalg.norm(COORD.floor(hi-lo))), hi[2] * 1.35)
         cam.distance = 1.25 * span / 2 / np.tan(np.deg2rad(22.5))
-        with YUpRenderer(model, args.size, args.size) as r:
+        with Renderer(model, args.size, args.size) as r:
             r.update_scene(data, camera=cam)
             shots.append(Image.fromarray(r.render()))
         print(f"pose {pose}: {len(sup)} props   "

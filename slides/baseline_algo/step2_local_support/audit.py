@@ -18,22 +18,22 @@ def run(name):
     analyzer=P.WC.D.Analyzer(mesh,report['normal_depth_m'])
     object_clearance=P.G.Clearance(mesh,mesh.extents.max()*1e-9)
     target=P.AREA_FRACTION*mesh.area;checks=[];direction_checks=[]
-    # Independent geometric formulation: signed ZX area / true 3D area is n_y.
+    # Independent geometric formulation: signed XY area / true 3D area is n_z.
     # Check every candidate, including rejected ones; never use a mean normal.
     for index,row in enumerate(report['patches']):
         a,b=data.offsets[index:index+2];faces=np.unique(data.source_faces[a:b])
         triangles=mesh.triangles[faces]
         first=triangles[:,1]-triangles[:,0];second=triangles[:,2]-triangles[:,0]
-        projected=first[:,2]*second[:,0]-first[:,0]*second[:,2]
+        projected=first[:,0]*second[:,1]-first[:,1]*second[:,0]
         magnitude=np.linalg.norm(np.cross(first,second),axis=1)
         nz=projected/magnitude
         passed=bool(len(nz) and np.all(np.isfinite(nz)))
         assert passed==row['bearing_direction_check']['passed'],(name,row['id'],'normal direction mismatch')
         if data.valid[index]:assert passed,(name,row['id'],'invalid normal geometry')
         if len(nz):
-            np.testing.assert_allclose(nz.max(),row['bearing_direction_check']['maximum_outward_normal_y'],atol=1e-14)
+            np.testing.assert_allclose(nz.max(),row['bearing_direction_check']['maximum_outward_normal_z'],atol=1e-14)
         direction_checks.append(dict(id=row['id'],passed=passed,source_faces_checked=len(faces),
-                                     maximum_outward_normal_y=float(nz.max()) if len(nz) else None))
+                                     maximum_outward_normal_z=float(nz.max()) if len(nz) else None))
     for index in np.flatnonzero(data.valid):
         a,b=data.offsets[index:index+2];tri=data.triangles[a:b];source=data.source_faces[a:b]
         row=report['patches'][index]
@@ -46,7 +46,7 @@ def run(name):
         assert abs(actual-row['area_m2'])<target*1e-10
         assert np.linalg.norm(tri-data.centers_m[index],axis=2).max()<=data.radius_m[index]*(1+1e-9)
         assert not np.isin(source,domain.work_ids).any()
-        assert tri[:,:,1].min()>=P.FLOOR_CLEARANCE_M-1e-12
+        assert tri[:,:,2].min()>=P.FLOOR_CLEARANCE_M-1e-12
         oriented=np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0])
         assert np.all(np.einsum('ij,ij->i',oriented,mesh.face_normals[source]) >= -mesh.area*1e-14), 'Contact winding opposes its source surface'
         assert (mesh.face_normals[source]@mesh.face_normals[data.center_faces[index]]).min()>=np.cos(np.deg2rad(P.MAX_NORMAL_ANGLE_DEG))-P.NORMAL_DOT_TOL
@@ -75,7 +75,7 @@ def run(name):
         # the process-access constraint is omitted.
         heads=analyzer.heads(dict(triangles_m=tri,source_faces=source,triangle_areas_m2=P.areas(tri)))
         for head in heads:
-            assert head.vertices[:,1].min()>=-object_clearance.tol,(name,row['id'],'head enters floor')
+            assert head.vertices[:,2].min()>=-object_clearance.tol,(name,row['id'],'head enters floor')
             assert object_clearance.obstruction(head.vertices)==-1,(name,row['id'],'head enters object')
         work_check=checker.check_parts(heads)
         assert work_check['passed'],(name,row['id'],'exported head fails work-volume clearance',work_check)

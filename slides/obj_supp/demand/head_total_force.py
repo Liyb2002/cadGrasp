@@ -89,9 +89,9 @@ def run():
     top_heads,_=S.joined_heads(domain.mesh,[top],depth)
     top_n=domain.mesh.face_normals[top['center_face']]
     top_a=top['center_m']+.5*depth*top_n
-    top_b=top_a+np.array([0.,.015,0.])
-    top_c=np.array([.107,top_b[1],.020])
-    top_d=np.array([.107,.156,.020])
+    top_b=top_a+np.array([0.,0.,.015])
+    top_c=np.array([.107,.020,top_b[2]])
+    top_d=np.array([.107,.020,.156])
     top_parts=top_heads+[
         trimesh.creation.cylinder(radius=.005,segment=[top_a,top_b],sections=20),
         trimesh.creation.cylinder(radius=.005,segment=[top_b,top_c],sections=20),
@@ -116,8 +116,8 @@ def run():
     added_heads,_=S.joined_heads(domain.mesh,[added],depth)
     n=domain.mesh.face_normals[added['center_face']]
     a=added['center_m']+.5*depth*n
-    b=np.array([.109,.121,-.011])
-    c=np.array([.106,.121,.039])
+    b=np.array([.109,-.011,.121])
+    c=np.array([.106,.039,.121])
     extra=added_heads+[
         trimesh.creation.cylinder(radius=.005,segment=[a,b],sections=20),
         trimesh.creation.cylinder(radius=.005,segment=[b,c],sections=20),
@@ -133,7 +133,7 @@ def run():
         blue_lips.append({'candidate_id':key,'radius_m':radius,'depth_m':.007,
                           'scope':'Illustrative widened contact lip, not a recomputed contact patch'})
     extent=np.vstack([domain.mesh.vertices,SC.floor(domain).reshape(-1,3)]+[parts[i].vertices for i in selected])
-    # Preserve the original view after migrating the world coordinates to Y-up.
+    # Preserve the original view after migrating the world coordinates to Z-up.
     view_vector=SC.VIEW.tolist()
     basis=R.axes(view_vector)
     bounds=np.vstack([(extent@basis.T).min(0),(extent@basis.T).max(0)])
@@ -148,7 +148,7 @@ def run():
     load_face=SC.LOAD_FACE
     assert load_face in domain.work_ids
     load_point=domain.mesh.triangles_center[load_face]
-    load_direction=np.array([0.,-1.,0.])
+    load_direction=np.array([0.,0.,-1.])
     load_arrow_length=.045
     for panel,ids in enumerate([upper_only,selected]):
         x=40+1200*panel;y=182
@@ -175,7 +175,7 @@ def run():
                   font=R.font(25),fill=APPLIED,anchor='rm')
         for key,color,force_length in [('C023',HIGH,.036)]+([('C139',LOW,.026),('C151',LOW,.034)] if panel else []):
             h=contacts[key];p=h['center_m'];n=domain.mesh.face_normals[h['center_face']]
-            assert n[1]>0 if key=='C023' else n[1]<0
+            assert n[2]>0 if key=='C023' else n[2]<0
             # Workpiece force ON the support is along the outward surface normal.
             start=R.project(p,focus,basis,width,size)[:2]+[x,y]
             end=R.project(p+force_length*n,focus,basis,width,size)[:2]+[x,y]

@@ -25,7 +25,7 @@ def contacts(mesh):
 
 class WholeConnectionTests(unittest.TestCase):
     def setUp(self):
-        self.mesh = trimesh.creation.box([1., 1., 1.]); self.mesh.apply_translation([0, 1., 0])
+        self.mesh = trimesh.creation.box([1., 1., 1.]); self.mesh.apply_translation([0, 0, 1.])
         self.contacts = contacts(self.mesh)
         self.required = np.array([[-.7, -.7], [.7, -.7], [.7, .7], [-.7, .7]])
         self.records = [dict(candidate_id=c['candidate_id'], certified_directions=D.normalize(isolated=[0.])) for c in self.contacts]
@@ -44,7 +44,7 @@ class WholeConnectionTests(unittest.TestCase):
         check, _ = A.footprint(parts, np.zeros(3), self.required, 1.)
         self.assertTrue(check['passed'])
         # Put an obstacle down to the floor so it intersects a reverse sweep.
-        grounded = trimesh.creation.box([1., 1., 1.]); grounded.apply_translation([0, .5, 0])
+        grounded = trimesh.creation.box([1., 1., 1.]); grounded.apply_translation([0, 0, .5])
         self.assertFalse(M.sweep_check(grounded, parts, np.array([-1., 0, 0]))['passed'])
 
     def test_two_heads_and_common_base_form_one_swept_solid(self):
@@ -69,7 +69,7 @@ class WholeConnectionTests(unittest.TestCase):
     def test_mixed_direction_heads_share_one_body_reaction_certificate(self):
         from step4_floor_contact import equilibrium as Q
         from step4_floor_contact.audit import replay
-        mesh = trimesh.creation.box([.2, .2, .2]); mesh.apply_translation([0, .5, 0])
+        mesh = trimesh.creation.box([.2, .2, .2]); mesh.apply_translation([0, 0, .5])
         heads = []
         for i, triangle in enumerate(mesh.triangles):
             center = triangle.mean(axis=0)
@@ -77,11 +77,11 @@ class WholeConnectionTests(unittest.TestCase):
         domain = SimpleNamespace(mesh=mesh, com=mesh.center_mass)
         p, n, _ = Q.contact_rays(domain, heads, np.zeros(3))
         weights = np.random.default_rng(774).uniform(.01, .02, (12, len(p)))
-        weights[:, n[:, 1] > 0] += .1
+        weights[:, n[:, 2] > 0] += .1
         loads = weights@Q.wrench(p, n, domain.com)
         # Constructed wrench-polytope test; not a CAD machining-domain verdict.
         floor = dict(original_pivot_m=np.zeros(3), load_wrenches=loads, continuous_outer_load_wrenches=loads)
-        base = dict(pads_xz_m=[[[-1, -1], [1, -1], [1, 1], [-1, 1]]])
+        base = dict(pads_xy_m=[[[-1, -1], [1, -1], [1, 1], [-1, 1]]])
         report, arrays = A.bearing(domain, heads, floor, base)
         self.assertTrue(report['continuous_passed'], report)
         self.assertEqual(report['body_count'], 1)

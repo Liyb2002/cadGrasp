@@ -29,7 +29,7 @@ def equal_area_layers():
             polygons={}
             for i in range(layers):
                 z=1.+i*gap
-                vertices=np.array([[0.,z,0.],[1.,z,0.],[1.,z,1.],[0.,z,1.]])
+                vertices=np.array([[0.,0.,z],[1.,0.,z],[1.,1.,z],[0.,1.,z]])
                 polygons[2*i]=vertices[[0,1,2]]
                 polygons[2*i+1]=vertices[[0,2,3]]
             _,faces=S.surface_centers(polygons)
@@ -43,6 +43,8 @@ def equal_area_layers():
 
 def chair_regions(domain,data,polygons):
     """Explicit diagnostic bins, not a semantic chair segmentation."""
+    # C5's original CAD mesh has its long axis along local Y. This is a
+    # body-coordinate diagnostic; the installed world and floor remain Z-up.
     T=np.asarray(domain.data['frame']['T_world_mesh']);rotation=T[:3,:3]
     normals=domain.mesh.face_normals@rotation
     groups=normal_groups(normals)
@@ -50,16 +52,16 @@ def chair_regions(domain,data,polygons):
     total=sum(S.area(p) for p in polygons.values())
     result=[];empty_pieces=[]
     for low,high in ((0.,.018),(.018,.03),(.03,.04),(.04,.061)):
-        bound0=low+T[:3,3]@rotation[:,2];bound1=high+T[:3,3]@rotation[:,2]
+        bound0=low+T[:3,3]@rotation[:,1];bound1=high+T[:3,3]@rotation[:,1]
         for group,label in enumerate(('+X','-X','+Y','-Y','+Z','-Z')):
             clipped=[]
             for f,p in polygons.items():
                 if groups[f]!=group:continue
-                p=S.clip(p,rotation[:,2],bound0,upper=False)
-                if len(p):p=S.clip(p,rotation[:,2],bound1,upper=True)
+                p=S.clip(p,rotation[:,1],bound0,upper=False)
+                if len(p):p=S.clip(p,rotation[:,1],bound1,upper=True)
                 if len(p)>=3 and S.area(p)>0:clipped.append(p)
             area=sum(S.area(p) for p in clipped)
-            membership=(centers[:,2]>=low)&(centers[:,2]<high)&(groups[data.center_faces]==group)
+            membership=(centers[:,1]>=low)&(centers[:,1]<high)&(groups[data.center_faces]==group)
             count=int(membership.sum())
             result.append(dict(local_height_mm=[1000*low,1000*high],dominant_normal=label,
                                eligible_area_percent=100*area/total,center_count=count,
@@ -71,8 +73,8 @@ def chair_regions(domain,data,polygons):
 
 def draw_chair(domain,data,report,highlight):
     T=np.asarray(domain.data['frame']['T_world_mesh'])
-    views=[D.axes([.6,.55,-.9]),D.axes([-.6,.65,.9]),
-           D.axes(T[:3,:3]@np.array([1.,.12,.25])),D.axes(T[:3,:3]@np.array([-1.,-.12,.25]))]
+    views=[D.axes([.6, -.9, .55]),D.axes([-.6, .9, .65]),
+           D.axes(T[:3,:3]@np.array([1.,.25,.12])),D.axes(T[:3,:3]@np.array([-1.,.25,-.12]))]
     titles=['Existing view 1','Existing view 2','Opposite side A','Opposite side B']
     paper=Image.new('RGB',(1800,1990),D.PAPER);ink=ImageDraw.Draw(paper)
     ink.text((35,25),f'C5 / {data.valid.sum()} accepted centers / sampled by surface area',font=D.font(38),fill=D.INK)
@@ -126,13 +128,13 @@ def run(name):
     assert sorted(all_faces)==sorted(polygons)
     # Independent barycentric containment on each original source triangle.
     for point,face in zip(data.centers_m,data.center_faces):
-        assert face in polygons and point[1]>=S.FLOOR_CLEARANCE_M-1e-12
+        assert face in polygons and point[2]>=S.FLOOR_CLEARANCE_M-1e-12
         tri=mesh.triangles[face];scale=mesh.extents.max()
         uv=np.linalg.lstsq((tri[1:]-tri[0]).T/scale,(point-tri[0])/scale,rcond=None)[0]
         bary=np.r_[1-uv.sum(),uv]
         assert bary.min()>=-1e-9
         assert np.linalg.norm(bary@tri-point)<scale*1e-10
-    views=[D.axes([.6,.55,-.9]),D.axes([-.6,.65,.9])]
+    views=[D.axes([.6, -.9, .55]),D.axes([-.6, .9, .65])]
     seen=[visible(domain,data,b) for b in views]
     work=float(mesh.area_faces[domain.work_ids].sum())
     report=dict(object=name,center_count=len(data.centers_m),

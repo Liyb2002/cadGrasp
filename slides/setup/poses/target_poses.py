@@ -1,7 +1,7 @@
 """Export named target poses and working surfaces, without running support search.
 
 The legacy pose_1 snapshots are preserved. New targets specify gravity in
-mesh coordinates and place the lowest vertex on y=0. These are held target
+mesh coordinates and place the lowest vertex on z=0. These are held target
 poses, not a claim of passive stability or a verified tipping trajectory.
 """
 from pathlib import Path
@@ -27,19 +27,19 @@ from step1.needs import CONE_HALF_DEG, K, COORD
 
 DEFINITIONS = {
     'B': (
-    ('pose_2', 'Side tilt', [1., .5, -.6], 'side / foot', None),
-    ('pose_3', 'Inverted / ear A', [-.3, -.8, 1.], 'ear A tip', 8),
-    ('pose_4', 'Inverted / ear B', [.35, -.1, 1.], 'ear B tip', 70),
+    ('pose_2', 'Side tilt', [1., -.6, .5], 'side / foot', None),
+    ('pose_3', 'Inverted / ear A', [-.3, 1., -.8], 'ear A tip', 8),
+    ('pose_4', 'Inverted / ear B', [.35, 1., -.1], 'ear B tip', 70),
     ),
     'A1-f': (
-        ('pose_2', 'Upright / tilted end', [.25, -.35, -1.], 'lower end corner', None),
-        ('pose_3', 'Inverted / opposite end', [.45, -.85, 1.], 'upper end corner', None),
-        ('pose_4', 'Sideways / lateral corner', [-1., -.35, .15], 'lateral corner', None),
+        ('pose_2', 'Upright / tilted end', [.25, -1., -.35], 'lower end corner', None),
+        ('pose_3', 'Inverted / opposite end', [.45, 1., -.85], 'upper end corner', None),
+        ('pose_4', 'Sideways / lateral corner', [-1., .15, -.35], 'lateral corner', None),
     ),
     'C5': (
-        ('pose_2', 'Opposite end down', [-.35, .25, 1.], 'opposite end vertex', None),
-        ('pose_3', 'Back corner down', [-.3, -1., -.25], 'back corner vertex', None),
-        ('pose_4', 'Side corner down', [1., .55, .3], 'side corner vertex', None),
+        ('pose_2', 'Opposite end down', [-.35, 1., .25], 'opposite end vertex', None),
+        ('pose_3', 'Back corner down', [-.3, -.25, -1.], 'back corner vertex', None),
+        ('pose_4', 'Side corner down', [1., .3, .55], 'side corner vertex', None),
     ),
 }
 
@@ -56,7 +56,7 @@ def save(path, data):
 def target_transform(raw, gravity_local):
     g = np.asarray(gravity_local, float)
     g /= np.linalg.norm(g)
-    rotation = trimesh.geometry.align_vectors(g, [0., -1., 0.])[:3, :3]
+    rotation = trimesh.geometry.align_vectors(g, [0., 0., -1.])[:3, :3]
     vertex = int(np.argmax(raw.vertices @ g))
     transform = np.eye(4)
     transform[:3, :3] = rotation
@@ -69,7 +69,7 @@ def choose_region(mesh, transform, key, previous):
     choices = []
     for candidate in G.regions(mesh, transform, key):
         mask = candidate['take']
-        if not candidate['band'] or world[mesh.faces[mask], 1].min() <= G.CONTACT_EPS:
+        if not candidate['band'] or world[mesh.faces[mask], 2].min() <= G.CONTACT_EPS:
             continue
         overlap = max((mesh.area_faces[mask & old].sum() /
                        mesh.area_faces[mask | old].sum() for old in previous), default=0.)
@@ -84,8 +84,8 @@ def inspect(mesh, transform, mask, raw):
     rotation = transform[:3, :3]
     world = mesh.vertices @ rotation.T + transform[:3, 3]
     raw_world = raw.vertices @ rotation.T + transform[:3, 3]
-    bottom = float(world[:, 1].min())
-    contact = np.flatnonzero(np.abs(raw_world[:, 1]) < 1e-9)
+    bottom = float(world[:, 2].min())
+    contact = np.flatnonzero(np.abs(raw_world[:, 2]) < 1e-9)
     fraction = float(mesh.area_faces[mask].sum() / mesh.area)
     connectivity = G.components(mesh, mask)
     admissible = G.admissible(mesh, transform)
@@ -95,12 +95,12 @@ def inspect(mesh, transform, mask, raw):
     assert len(contact) == 1, f'Expected one point on the floor, got {contact}'
     assert connectivity == 1 and .08 <= fraction <= .15
     assert admissible[mask].all()
-    return dict(ground_min_y_m=bottom, floor_contact_raw_vertex_ids=contact.tolist(),
+    return dict(ground_min_z_m=bottom, floor_contact_raw_vertex_ids=contact.tolist(),
                 work_area_fraction=fraction, work_face_count=int(mask.sum()),
                 work_components=connectivity, work_normal_rays_clear=True,
-                minimum_work_outward_normal_y=float((mesh.face_normals @ rotation.T)[mask, 1].min()),
-                minimum_work_vertex_y_m=float(world[mesh.faces[mask], 1].min()),
-                gravity_in_mesh_frame=(rotation.T @ [0., -1., 0.]).tolist(),
+                minimum_work_outward_normal_z=float((mesh.face_normals @ rotation.T)[mask, 2].min()),
+                minimum_work_vertex_z_m=float(world[mesh.faces[mask], 2].min()),
+                gravity_in_mesh_frame=(rotation.T @ [0., 0., -1.]).tolist(),
                 com_world_m=(rotation @ mesh.center_mass + transform[:3, 3]).tolist())
 
 
@@ -111,7 +111,7 @@ def panel(mesh, transform, mask, view, contact, size=490, closeup=False):
     margin = .10 * world.extents.max()
     x0, y0 = COORD.floor(low) - margin
     x1, y1 = COORD.floor(high) + margin
-    ground = np.array([[x0, 0., y0], [x1, 0., y0], [x1, 0., y1], [x0, 0., y1]])
+    ground = np.array([[x0, y0, 0.], [x1, y0, 0.], [x1, y1, 0.], [x0, y1, 0.]])
     floor = ground[[[0, 1, 2], [0, 2, 3]]]
     triangles = np.concatenate([floor, world.triangles])
     colors = np.tile(R.GREY, (len(triangles), 1))
@@ -124,7 +124,7 @@ def panel(mesh, transform, mask, view, contact, size=490, closeup=False):
     width = 1.12 * max(hi[:2] - lo[:2])
     if closeup:
         width = .42 * world.extents.max()
-        focus = contact + np.array([0., .10 * world.extents.max(), 0.])
+        focus = contact + np.array([0., 0., .10 * world.extents.max()])
     picture, _ = R.raster(triangles, colors, focus, basis, width, size, unlit=(0, 1))
     draw = ImageDraw.Draw(picture)
     x, y = R.project(np.asarray(contact), focus, basis, width, size)[:2]
@@ -136,13 +136,13 @@ def panel(mesh, transform, mask, view, contact, size=490, closeup=False):
 
 def draw_pose(mesh, transform, mask, metadata):
     rotation = transform[:3, :3]
-    profile = rotation @ [-1., .4, .1]
-    profile[1] = 0.
+    profile = rotation @ [-1., .1, .4]
+    profile[2] = 0.
     profile /= np.linalg.norm(profile)
-    profile[1] = .38
+    profile[2] = .38
     work_view = np.average((mesh.face_normals @ rotation.T)[mask],
                            axis=0, weights=mesh.area_faces[mask])
-    work_view[1] = max(work_view[1], .45)
+    work_view[2] = max(work_view[2], .45)
     contact = np.asarray(metadata['floor_contact_m'])
     width, height = 1510, 604
     page = Image.new('RGB', (width, height), R.PAPER)
@@ -192,7 +192,7 @@ def build(name='B'):
         checks = inspect(mesh, transform, mask, raw)
         vertex = checks['floor_contact_raw_vertex_ids'][0]
         contact = transform[:3, :3] @ raw.vertices[vertex] + transform[:3, 3]
-        contact[1] = 0.
+        contact[2] = 0.
         if pose != 'pose_1':
             np.savez_compressed(folder/'setup.npz', object=name, pose_id=pose,
                 T_world_mesh=transform, com_m=checks['com_world_m'], work_faces=mask,
@@ -207,7 +207,7 @@ def build(name='B'):
             uniform_subdivision_rounds=rounds, checks=checks,
             source_snapshot='setup.npz', source_snapshot_sha256=digest(folder/'setup.npz'),
             generator=str(Path(__file__).relative_to(ROOT)), generator_sha256=digest(__file__),
-            work_region_method='Connected geodesic region; outward normal y > 0.35; '
+            work_region_method='Connected geodesic region; outward normal z > 0.35; '
                                'face-center outward rays clear; 8-15% total mesh area',
             reachability_scope='Normal rays only; Step 1 later checks each sampled cone direction')
         image = draw_pose(mesh, transform, mask, metadata)

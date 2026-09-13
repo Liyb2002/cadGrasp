@@ -25,11 +25,11 @@ def upward_supply(problem, contacts):
     supply = V.Supply(problem, contacts)
     # The sign test uses the original normals, without a tolerance allowing
     # slightly negative forces. Zero-height directions remain admissible.
-    keep = supply.raw[:, 1] >= 0
+    keep = supply.raw[:, 2] >= 0
     for key in ['points', 'normals', 'owners', 'raw', 'full']:
         setattr(supply, key, getattr(supply, key)[keep])
     supply.exact_cache.clear()
-    assert (supply.normals[:, 1] >= 0).all()
+    assert (supply.normals[:, 2] >= 0).all()
     return supply
 
 
@@ -57,7 +57,7 @@ def run(name):
                         pool_contact_owners=pool.owners, current_covered=current_mask,
                         pool_covered=mask, box_vertices=box)
     result = dict(object=name, experiment='no_downward_point_reactions',
-        force_restriction='Each active point reaction has inward_normal_y >= 0; thus every support has nonnegative net vertical force.',
+        force_restriction='Each active point reaction has inward_normal_z >= 0; thus every support has nonnegative net vertical force.',
         current_selected_ids=[contact['candidate_id'] for contact in selected],
         current_selected_covered_count=int(current_mask.sum()),
         current_selected_covered_percent=100*float(current_mask.mean()),

@@ -71,7 +71,7 @@ class Scene:
 
     def clear(self, part, ground=False):
         floor = -self.scale*1e-10 if ground else self.scale*1e-10
-        return bool(part.vertices[:, 1].min() >= floor and self.volume(part) <= 1e-11*self.scale**3)
+        return bool(part.vertices[:, 2].min() >= floor and self.volume(part) <= 1e-11*self.scale**3)
 
 
 def face_frame(mesh, face):
@@ -83,7 +83,7 @@ def face_frame(mesh, face):
 def safe_face_polygon(mesh, face, inner, outer, tolerance):
     weights = np.eye(3)
     for offsets in (inner, outer):
-        heights = (mesh.vertices+offsets)[mesh.faces[face], 1]
+        heights = (mesh.vertices+offsets)[mesh.faces[face], 2]
         weights = H.clip_plane(weights, np.r_[-heights, tolerance])
         if len(weights) < 3: return np.empty((0, 3))
     return weights@mesh.triangles[face]
@@ -122,7 +122,7 @@ def belt(mesh, contacts, work_ids, depth, scene, blocked_faces=()):
     # Clip near-floor faces instead of rejecting a whole face whose distant
     # vertex happens to touch the floor. Actual ribbons remain strictly above it.
     centers = mesh.triangles_center.copy()
-    near_floor = np.min((mesh.vertices+outer)[mesh.faces, 1], axis=1) <= scale*1e-9
+    near_floor = np.min((mesh.vertices+outer)[mesh.faces, 2], axis=1) <= scale*1e-9
     for face in np.flatnonzero(allowed & near_floor):
         polygon = safe_face_polygon(mesh, face, inner, outer, scale*1e-9)
         if len(polygon) < 3: allowed[face] = False
@@ -132,7 +132,7 @@ def belt(mesh, contacts, work_ids, depth, scene, blocked_faces=()):
         if allowed[a] and allowed[b]:
             low, high = 0., 1.
             for offsets in (inner, outer):
-                z = (mesh.vertices+offsets)[edge, 1]-scale*1e-9
+                z = (mesh.vertices+offsets)[edge, 2]-scale*1e-9
                 if np.all(z <= 0): low, high = 1., 0.; break
                 if z[0] <= 0: low = max(low, float(-z[0]/(z[1]-z[0])))
                 if z[1] <= 0: high = min(high, float(-z[0]/(z[1]-z[0])))
@@ -210,7 +210,7 @@ def belt(mesh, contacts, work_ids, depth, scene, blocked_faces=()):
             point = shared[first, second]
             mid_offsets = (inner+outer)/2
             center = H.head_cell(mesh, point[None], first, mid_offsets)[1]
-            radius = min(gap*.2, width*.05, thickness*.1, center[1]*.25)
+            radius = min(gap*.2, width*.05, thickness*.1, center[2]*.25)
             if radius <= scale*1e-10: continue
             part = T.beam(center, center, radius, radius)
             if not scene.clear(part):
@@ -230,8 +230,8 @@ def open_ring(mesh, polygon, required, pivot, angle, expansion, cut_fraction, sc
     Low object geometry can enlarge the ring for final-pose clearance.
     """
     scale = scene.scale; height = .04*scale; margin = .008*scale
-    low_triangles = mesh.triangles[np.min(mesh.triangles[:, :, 1], axis=1) <= height+margin]
-    clipped = [H.clip_plane(t, np.array([0., 1., 0., -height-margin])) for t in low_triangles]
+    low_triangles = mesh.triangles[np.min(mesh.triangles[:, :, 2], axis=1) <= height+margin]
+    clipped = [H.clip_plane(t, np.array([0., 0., 1., -height-margin])) for t in low_triangles]
     low = [COORD.floor(p) for p in clipped if len(p)]
     cloud = np.vstack([polygon]+low)
     hull = cloud[ConvexHull(cloud).vertices]
@@ -240,9 +240,9 @@ def open_ring(mesh, polygon, required, pivot, angle, expansion, cut_fraction, sc
     ring = R.make(padded, expansion, scale, width_fraction=.05, height_fraction=.04)
     a = COORD.floor(G.frame(angle)[0])
     lo = float(np.max(np.asarray(required)@a))
-    hi = float(np.max(ring['outer_xz_m']@a))
+    hi = float(np.max(ring['outer_xy_m']@a))
     cut = lo+cut_fraction*(hi-lo)
-    polygons = [R.clip(p, a, cut) for p in ring['edge_strips_xz_m']]
+    polygons = [R.clip(p, a, cut) for p in ring['edge_strips_xy_m']]
     polygons = [p for p in polygons if len(p) >= 3 and Polygon(p).area > 1e-14*scale**2]
     if not polygons: return None
     points = np.vstack(polygons)
@@ -251,16 +251,16 @@ def open_ring(mesh, polygon, required, pivot, angle, expansion, cut_fraction, sc
     parts = []
     for p in polygons:
         bottom = COORD.lift_floor(p)
-        part = D.engine.hull_mesh(np.vstack([bottom, bottom+[0, height, 0]]))
+        part = D.engine.hull_mesh(np.vstack([bottom, bottom+[0, 0, height]]))
         if not scene.clear(part, ground=True): return None
         parts.append(part)
     joined, solid = union_parts(parts, scale)
     if not solid['one_solid']: return None
     return parts, dict(bearing_deg=float(angle), expansion=float(expansion), cut_fraction=float(cut_fraction),
-        cut_normal_xz=a.tolist(), cut_offset_m=cut, height_m=height,
-        width_m=ring['width_m'], pads_xz_m=[p.tolist() for p in polygons],
-        step5_seed_polygon_xz_m=np.asarray(polygon).tolist(),
-        inner_xz_m=ring['inner_xz_m'].tolist(), outer_xz_m=ring['outer_xz_m'].tolist(),
+        cut_normal_xy=a.tolist(), cut_offset_m=cut, height_m=height,
+        width_m=ring['width_m'], pads_xy_m=[p.tolist() for p in polygons],
+        step5_seed_polygon_xy_m=np.asarray(polygon).tolist(),
+        inner_xy_m=ring['inner_xy_m'].tolist(), outer_xy_m=ring['outer_xy_m'].tolist(),
         opening='front cap removed along +a', construction='Step5 demand-derived ring clipped to an open arc',
         actual_remaining_footprint_covers_demand=True, solid=solid)
 
@@ -271,7 +271,7 @@ def short_links(skin, base, scene, limit=8):
     radius = .025*scene.scale
     end_radius = min(radius, .4*base['height_m'])
     proposals = []
-    polygons = [Polygon(p) for p in base['pads_xz_m']]
+    polygons = [Polygon(p) for p in base['pads_xy_m']]
     for root_radius, index, start in T.roots(skin, count=24):
         closest, _, _ = scene.mesh.nearest.on_surface(start[None])
         normal = start-closest[0]

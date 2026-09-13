@@ -14,11 +14,11 @@ from step4_floor_contact.footprints import rectangle
 
 class FixedFeetTests(unittest.TestCase):
     def setup_case(self):
-        mesh=trimesh.creation.box([1., 1., 1.]);mesh.apply_translation([0, 1., 0])
-        patch=contact(mesh,[0,-1,0],0)
+        mesh=trimesh.creation.box([1., 1., 1.]);mesh.apply_translation([0, 0, 1.])
+        patch=contact(mesh,[0,0,-1],0)
         pads=[rectangle(np.array(c)-.02,np.array(c)+.02).tolist() for c in [(-1.1,-.3),(-.8,-.3),(-.8,.3),(-1.1,.3)]]
-        foot=dict(candidate_id='C0',pads_xz_m=pads,height_m=.018,fixed_for_step5=True,
-                  center_xz_m=[-.95,0],bearing_area_m2=4*.04**2)
+        foot=dict(candidate_id='C0',pads_xy_m=pads,height_m=.018,fixed_for_step5=True,
+                  center_xy_m=[-.95,0],bearing_area_m2=4*.04**2)
         work=W.WorkVolume([[[4.,4.,4.],[5.,4.,4.],[4.,5.,4.]]],[[0,0,1]],[0],30.,1.)
         direction=dict(certified_directions=D.normalize(isolated=[0.]))
         return mesh,patch,direction,foot,work
@@ -28,16 +28,16 @@ class FixedFeetTests(unittest.TestCase):
         result,module=H.build_one(mesh,patch,direction,foot,.01,work,edge_budget=50)
         self.assertTrue(result['passed'],result)
         self.assertEqual(foot,before)
-        np.testing.assert_array_equal(module['plan']['ground_polygons_xz_m'],foot['pads_xz_m'])
+        np.testing.assert_array_equal(module['plan']['ground_polygons_xy_m'],foot['pads_xy_m'])
         self.assertEqual(len(module['plan']['routes']),4)
         self.assertTrue(module['solid']['one_solid'])
         self.assertTrue(result['object_sweep']['passed'])
 
     def test_fixed_foot_collision_fails_without_resizing_or_suppressing_next_support(self):
         mesh,patch,direction,foot,work=self.setup_case()
-        failed={**foot,'candidate_id':'bad','pads_xz_m':[[[4.,4.],[4.1,4.],[4.1,4.1],[4.,4.1]]]}
+        failed={**foot,'candidate_id':'bad','pads_xy_m':[[[4.,4.],[4.1,4.],[4.1,4.1],[4.,4.1]]]}
         # A reserved ray volume beginning at the ground blocks this actual pad.
-        reserved=W.WorkVolume([[[3.,0.,3.],[6.,0.,3.],[3.,0.,6.]]],[[0,1,0]],[0],30.,1.)
+        reserved=W.WorkVolume([[[3.,3.,0.],[6.,3.,0.],[3.,6.,0.]]],[[0,0,1]],[0],30.,1.)
         rejected,_=H.build_one(mesh,{**patch,'candidate_id':'bad'},direction,failed,.01,reserved)
         self.assertFalse(rejected['passed'])
         calls=[]
@@ -51,10 +51,10 @@ class FixedFeetTests(unittest.TestCase):
         self.assertEqual([m['plan']['candidate_id'] for m in modules],['C0'])
 
     def test_individual_paths_survive_pair_order_cycle(self):
-        obstacle=trimesh.creation.box([.2, .2, .2]);obstacle.apply_translation([0, 1, 3])
+        obstacle=trimesh.creation.box([.2, .2, .2]);obstacle.apply_translation([0, 3, 1])
         modules=[]
         for x,a in [(1.,[1.,0,0]),(-1.,[-1.,0,0])]:
-            solid=trimesh.creation.box([.2, .4, .2]);solid.apply_translation([x, .2, 0])
+            solid=trimesh.creation.box([.2, .2, .4]);solid.apply_translation([x, 0, .2])
             modules.append(dict(joined=solid,parts=[solid],plan=dict(direction=np.array(a))))
         result=L.check_assembly(obstacle,modules)
         self.assertFalse(result['passed'])
@@ -103,7 +103,7 @@ class FixedFeetTests(unittest.TestCase):
         from PIL import Image
         from step5_connect_support import draw
         mesh,contact,direction,foot,work=self.setup_case()
-        foot['hull_xz_m']=rectangle([-1.12,-.32],[-.78,.32]).tolist()
+        foot['hull_xy_m']=rectangle([-1.12,-.32],[-.78,.32]).tolist()
         domain=SimpleNamespace(mesh=mesh,work_ids=np.array([],int))
         floor=dict(report=dict(ground_footprints=[foot]))
         report=dict(support_count=0,contact_count=1,supports=[],assemblable_subset_ids=[],
@@ -159,10 +159,10 @@ class FixedFeetTests(unittest.TestCase):
         from step5_connect_support import routing
         mesh,_,_,_,work=self.setup_case()
         router=routing.Router(mesh,work,0.)
-        touching=routing.beam(np.array([-1.,router.radius,0.]),
-                              np.array([-1.2,router.radius,0.]),router.radius,router.radius)
+        touching=routing.beam(np.array([-1.,0.,router.radius]),
+                              np.array([-1.2,0.,router.radius]),router.radius,router.radius)
         self.assertFalse(router.clear(touching))
-        touching.apply_translation([0, router.scale*1e-8, 0])
+        touching.apply_translation([0, 0, router.scale*1e-8])
         self.assertTrue(router.clear(touching))
 
     def test_later_direct_connection_precedes_early_expensive_spatial_search(self):

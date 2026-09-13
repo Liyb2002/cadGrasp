@@ -99,7 +99,7 @@ def block():
     R = np.array([[np.cos(phi), -np.sin(phi)], [np.sin(phi), np.cos(phi)]])
     local = np.array([[-a, -b], [a, -b], [a, b], [-a, b]])
     corners = local @ R.T
-    centre = -corners[0]                                 # lift the resting corner to y = 0
+    centre = -corners[0]                                 # lift the resting corner to z = 0
     return corners + centre, centre, R
 
 

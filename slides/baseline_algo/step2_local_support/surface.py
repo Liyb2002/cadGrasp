@@ -50,8 +50,7 @@ def eligible_polygons(domain):
     polygons = {}
     for i in np.flatnonzero(~work):
         # Preserve the original clipping start vertex, then restore outward winding.
-        poly = clip(mesh.triangles[i][[0, 2, 1]], np.array([0., 1., 0.]), FLOOR_CLEARANCE_M, upper=False)
-        if len(poly): poly = poly[np.r_[0, np.arange(len(poly)-1, 0, -1)]]
+        poly = clip(mesh.triangles[i], np.array([0., 0., 1.]), FLOOR_CLEARANCE_M, upper=False)
         if area(poly) > mesh.area*1e-16:
             polygons[int(i)] = poly
     allowed = np.zeros(len(mesh.faces), bool)
@@ -69,7 +68,7 @@ def surface_groups(polygons,mesh=None):
     for f in ids:
         p=polygons[f]
         normal=np.cross(p-p[0],np.roll(p,-1,axis=0)-p[0]).sum(axis=0)
-        axis=int(np.array([0,2,1])[np.abs(normal)[[0,2,1]].argmax()])
+        axis=int(np.abs(normal).argmax())
         groups[f]=2*axis+int(normal[axis]<0)
     def root(f):
         while parent[f]!=f:
@@ -81,7 +80,7 @@ def surface_groups(polygons,mesh=None):
         if a!=b:parent[max(a,b)]=min(a,b)
     if mesh is not None:
         for (a,b),edge in zip(mesh.face_adjacency,mesh.face_adjacency_edges):
-            if mesh.vertices[edge,1].max()>FLOOR_CLEARANCE_M:
+            if mesh.vertices[edge,2].max()>FLOOR_CLEARANCE_M:
                 join(int(a),int(b))
     else:
         # Geometry-only entry point for analytic layered-sheet checks.
@@ -135,7 +134,7 @@ def equal_area_centers(triangles,sources,count):
     """Split a chart by actual area, then choose a point on each leaf surface."""
     triangles=np.asarray(triangles)
     normal=np.cross(triangles[:,1]-triangles[:,0],triangles[:,2]-triangles[:,0]).sum(axis=0)
-    tangent_axes=np.array([a for a in (0,2,1) if a!=int(np.array([0,2,1])[np.abs(normal)[[0,2,1]].argmax()])])
+    tangent_axes=np.array([a for a in (0,1,2) if a!=int(np.abs(normal).argmax())])
     points=[];faces=[];cell_areas=[]
     def divide(tri,source,n):
         weights=areas(tri);total=weights.sum()

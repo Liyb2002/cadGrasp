@@ -19,7 +19,7 @@ def wrench(points, forces, origin):
 
 def contact_rays(domain, contacts, pivot):
     points = [np.asarray(pivot).reshape(1, 3)]
-    normals = [np.array([[0., 1., 0.]])]
+    normals = [np.array([[0., 0., 1.]])]
     owners = [np.array([-1])]
     for j, contact in enumerate(contacts):
         p = contact['triangles_m'].reshape(-1, 3)
@@ -41,7 +41,7 @@ def relaxed_matrix(points, normals, owners, origin, scale, count):
     matrix[:6, :len(points)] = g.T
     for j in range(count):
         ids = np.flatnonzero(owners == j)
-        matrix[6+j, ids] = normals[ids, 1]
+        matrix[6+j, ids] = normals[ids, 2]
         matrix[6+j, len(points)+j] = -1.
     return matrix
 
@@ -62,10 +62,10 @@ def grounded_matrix(points, normals, owners, origin, scale, feet, friction):
         if owner >= 0:
             column[6*(owner+1):6*(owner+2)] = -g
         columns.append(column)
-    rays = np.array([[friction, 1, 0], [-friction, 1, 0],
-                     [0, 1, friction], [0, 1, -friction]], float)
+    rays = np.array([[friction, 0, 1], [-friction, 0, 1],
+                     [0, friction, 1], [0, -friction, 1]], float)
     for j, foot in enumerate(feet):
-        xy = np.concatenate(foot['pads_xz_m'])
+        xy = np.concatenate(foot['pads_xy_m'])
         for point in COORD.lift_floor(xy):
             for force in rays:
                 column = np.zeros(6*(count+1))
@@ -210,10 +210,10 @@ def support_wrenches(solution, solver, points, normals, owners, origin, count):
 
 def pressure_centers(wrenches, origin):
     moments = wrenches[..., 3:]+np.cross(origin, wrenches[..., :3])
-    normal = wrenches[..., 1]
+    normal = wrenches[..., 2]
     points = np.full(wrenches.shape[:-1]+(2,), np.nan)
     loaded = normal > 1e-10
-    points[loaded] = np.stack([moments[..., 2][loaded], -moments[..., 0][loaded]], axis=-1)/normal[loaded, None]
+    points[loaded] = np.stack([-moments[..., 1][loaded], moments[..., 0][loaded]], axis=-1)/normal[loaded, None]
     return points, loaded
 
 
@@ -238,7 +238,7 @@ def exact_relaxed_separator(matrix, target, points, normals, owners, origin, sca
     for point, normal, owner in zip(points, normals, owners):
         n = list(map(Q, normal)); r = [Q(p)-c for p, c in zip(point, origin_q)]
         g = n+[r[1]*n[2]-r[2]*n[1], r[2]*n[0]-r[0]*n[2], r[0]*n[1]-r[1]*n[0]]+[Fraction(0)]*count
-        if owner >= 0: g[6+owner] = n[1]
+        if owner >= 0: g[6+owner] = n[2]
         exact.append(g)
     for j in range(count):
         g = [Fraction(0)]*(6+count); g[6+j] = Fraction(-1); exact.append(g)

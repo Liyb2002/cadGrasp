@@ -1,11 +1,12 @@
-"""Schema-aware, one-time conversion of stored scientific coordinates to Y-up.
+"""Schema-aware, one-time conversion of stored scientific coordinates to Z-up.
 
-Indices, colors, barycentric coordinates and contact-plane coordinates are not
-world vectors. These explicit field sets keep them out of the axis permutation.
+Indices, colors and contact-plane coordinates are not world vectors. These
+explicit fields keep them out of the axis permutation. Barycentric coordinates
+follow the corresponding reversed triangle winding.
 """
 import re
 import numpy as np
-import coordinates as C
+import coordinate_transport as C
 
 POLAR = set('''arrow_head_m arrow_tail_m arrow_surface_end_points_m center_m center
     centers_m centerlines_m centre_mm com_m com_mesh_frame com_world com_world_m
@@ -19,15 +20,15 @@ POLAR = set('''arrow_head_m arrow_tail_m arrow_surface_end_points_m center_m cen
     skin_outward_normals tangent1 tangent2 terminals_m translation_m up vector vectors
     vertices_m part_vertices_m union_vertices_m view_toward_camera camera_vector
     camera_view_vector waypoints_m weakest_direction weakest_outward_normal withdrawal_direction
-    contact_normals contact_points_m ground_forces ground_points_m bounds_m bounds_mm
-    extents_m d anchor translation v points supports patch_min_rho_at upper focus camera_position camera_target direction_vector'''.split())
+    sample_pt sample_force support_union_vertices_m support_part_vertices_m contact_centers_m contact_normals contact_points_m ground_forces ground_points_m bounds_m bounds_mm
+    extents_m arrow_points_m arrow_directions sampled_forces_mg floor_point_m ground_corners_m floor_contact_corners_m d anchor translation v points supports patch_min_rho_at upper focus camera_position camera_target direction_vector'''.split())
 AXIAL = set('''axis moment_balance_residual_mgm moment_from_component_expansion_mgm
     moment_mg_m moment_wmm gravity_torque_about_original_floor_point_mgm'''.split())
-WRENCH = set('''external_wrench head_resultant_on_support head_resultant_on_workpiece
+WRENCH = set('''support_wrenches sample_wrench external_wrench head_resultant_on_support head_resultant_on_workpiece
     motion need_wrench physical_dual push_wrench target_wrench load_wrenches
     continuous_outer_load_wrenches full target targets floor6 dual'''.split())
-TRIANGLES = {'triangles', 'triangles_m', 'floor_triangles_m'}
-FACES = {'faces', 'union_faces', 'part_faces', 'f'}
+TRIANGLES = {'triangles', 'triangles_m', 'floor_triangles_m', 'support_floor_triangles_m', 'contact_triangles_m'}
+FACES = {'faces', 'union_faces', 'part_faces', 'f', 'support_union_faces', 'support_part_faces'}
 CAMERA = {'basis', 'camera_basis'}
 MATRICES = {'inertia_com'}
 POSES = {'T_world_mesh', 'poses', 'transform', 'rotation_matrix', 'rotation'}
@@ -35,10 +36,12 @@ POSES = {'T_world_mesh', 'poses', 'transform', 'rotation_matrix', 'rotation'}
 
 def world_key(key):
     """Rename world planar fields; leave local parameter-plane names unchanged."""
-    return key.replace('ground_min_z_m', 'ground_min_y_m').replace(
-        'minimum_work_vertex_z_m', 'minimum_work_vertex_y_m').replace('_xy_', '_xz_').replace('_normal_z', '_normal_y').replace(
-        'withdrawal_z', 'withdrawal_y').replace('inward_z_', 'inward_y_').replace(
-        'workpiece_z', 'workpiece_y').replace('common_top_z_', 'common_top_y_')
+    return key.replace('ground_min_y_m', 'ground_min_z_m').replace(
+        'minimum_work_vertex_y_m', 'minimum_work_vertex_z_m').replace('_xz_', '_xy_').replace('_normal_y', '_normal_z').replace(
+        'withdrawal_y', 'withdrawal_z').replace('inward_y_', 'inward_z_').replace(
+        'workpiece_y', 'workpiece_z').replace('common_top_y_', 'common_top_z_').replace(
+        'normal_y_guard', 'normal_z_guard').replace('cut_normal_xz', 'cut_normal_xy')
+
 
 
 def field(key, value):
@@ -99,6 +102,10 @@ def record(value):
         else:
             converted = item
         result[world_key(key)] = converted
+    if result.get('world_up') == '+Y':
+        result['world_up'] = '+Z'
+    if all(k in value for k in ('u', 'v', 'work_face_index')):
+        result['u'], result['v'] = value['v'], value['u']
     if 'parameters' in value and isinstance(value['parameters'], dict):
         params = value['parameters']
         if 'u' in params and 'v' in params:

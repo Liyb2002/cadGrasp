@@ -107,9 +107,9 @@ def ground_sheet(name,domain,floor,report,out):
     success={r['candidate_id'] for r in report['supports']}
     for j,foot in enumerate(floor['report']['ground_footprints']):
         good=foot['candidate_id'] in success
-        for polygon in foot['pads_xz_m']:
+        for polygon in foot['pads_xy_m']:
             xy=np.asarray(polygon)*1000;ax.fill(*xy.T,color=color(j) if good else '#b4b9ba')
-        points=np.asarray(foot['hull_xz_m'])*1000
+        points=np.asarray(foot['hull_xy_m'])*1000
         ax.plot(*np.vstack([points,points[0]]).T,color=color(j),alpha=.45,ls='--',lw=1)
         label=points[np.argmax(points[:,1])]
         ax.annotate(foot['candidate_id']+('' if good else ' (no connection)'),label,xytext=(3,5),textcoords='offset points',fontsize=9,color=color(j))
@@ -141,30 +141,7 @@ def animate(name,domain,contacts,modules,order_ids,destination,label):
     frames[0].save(destination,save_all=True,append_images=frames[1:],duration=150,loop=0)
 
 
-def run(name,static_only=False):
-    out=C.OUTPUTS/name/pose_name()/C.STAGE;report=C.I.check_report(out/'connection.json')
-    domain,contacts,schedule,floor,_,_,_=C.read_inputs(name)
-    modules=[(entry,C.I.load_npz(out/entry['folder']/'geometry.npz')) for entry in report['supports']]
-    overview(name,domain,contacts,modules,floor,report,out)
-    views=positions(name,domain,contacts,modules,floor,report,out,schedule)
-    ground_sheet(name,domain,floor,report,out)
-    # A fresh render must not retain an animation from an older case/subset.
-    for path in out.rglob('insertion.gif'):path.unlink()
-    if not static_only:
-        for entry,data in modules:
-            animate(name,domain,contacts,[(entry,data)],[entry['candidate_id']],out/entry['folder']/'insertion.gif','Individual path; other supports omitted')
-        label='Complete assembly geometry' if report['geometric_assembly_verified'] else 'Compatible subset; not full load coverage'
-        animate(name,domain,contacts,modules,report['assemblable_subset_order'],out/'insertion.gif',label)
-    artifacts={str(p.relative_to(out)):C.sha256(p) for p in list(out.rglob('*.png'))+list(out.rglob('*.gif'))}
-    C.I.save(out/'views.json',dict(complete=True,static_only=static_only,connection_sha256=C.sha256(out/'connection.json'),
-        all_selected_supports_drawn=True,successful_supports_retained_on_partial_failure=True,
-        contact_position_references=views,ground_ring_drawn=False,feet_are_step4_fixed_targets=True,
-        provenance=dict(inputs=C.I.hashes([out/'connection.json']),
-                        code=C.I.hashes([Path(__file__),Path(V.__file__),Path(R.__file__)])),artifacts=artifacts))
-    print(name,'Step 5 figures written:',len(contacts),'support panels,',len(modules),'individual animations',flush=True)
-
-
-# Current one-body entry; earlier independent-body helpers remain for regressions.
+# Current one-body entry; shared geometry and regression helpers stay available.
 from step5_connect_support.belt_assembly import draw as draw_assembly
 
 

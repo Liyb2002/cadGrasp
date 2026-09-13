@@ -14,15 +14,15 @@ from step3_scheculer import verification as V
 
 class FloorSupportTests(unittest.TestCase):
     def test_shear_bound_tension_and_contact_moment(self):
-        point = COORD.polar(np.array([.25, -.5, 0.]))
-        com = COORD.polar(np.array([0., 0., 1.]))
+        point = np.asarray(np.array([.25, -.5, 0.]))
+        com = np.asarray(np.array([0., 0., 1.]))
         columns = F.columns(point, com)
 
         def feasible(force, free_moment=None):
-            force = COORD.polar(force)
+            force = np.asarray(force)
             torque = np.cross(point-com, force)
             if free_moment is not None:
-                torque += COORD.axial(free_moment)
+                torque += np.asarray(free_moment)
             result = linprog(np.zeros(4), A_eq=columns.T,
                              b_eq=np.r_[force, torque], bounds=(0, None), method='highs')
             return result.success
@@ -36,8 +36,8 @@ class FloorSupportTests(unittest.TestCase):
 
     def test_independent_supply_reconstruction_includes_all_floor_rays(self):
         problem = V.C.Problem.__new__(V.C.Problem)
-        problem.floor = COORD.polar(np.array([.125, -.25, 0.]))
-        problem.domain = NS(com=COORD.polar(np.array([0., 0., .5])))
+        problem.floor = np.asarray(np.array([.125, -.25, 0.]))
+        problem.domain = NS(com=np.asarray(np.array([0., 0., .5])))
         problem.scale = np.array([1., 1., 1., 2., 2., 2.])
         problem.floor_columns = V.C.U.floor(F.columns(problem.floor, problem.domain.com),problem.scale)
         supply = V.Supply(problem, [])

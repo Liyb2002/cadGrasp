@@ -1,6 +1,6 @@
 # A1-f 的目标姿态
 
-当前所有保存的坐标已迁移为 Y-up，地面为 y=0。下方早期实验结论按原日期保留；最新 baseline 状态见 [当前说明](../../../baseline_algo/baseline_algo.md)。
+当前所有保存的坐标已迁移为 Z-up，地面为 z=0。下方早期实验结论按原日期保留；最新 baseline 状态见 [当前说明](../../../baseline_algo/baseline_algo.md)。
 
 [新版五组姿态与工作面总览](../target_poses.png)。灰色是物体，绿色是工作面；只保留五个选定 case 的新版预览，其余 case 的姿态数据仍保留。
 

@@ -17,7 +17,7 @@ from step1.cases import pose_name
 
 PALETTE = np.array([[41, 139, 147], [210, 128, 44], [106, 120, 187],
                     [162, 90, 142], [99, 151, 94], [164, 126, 89]], float)
-VIEW = R.axes([.68, .8, -1.])
+VIEW = R.axes([.68, -1., .8])
 OBJECT_OPACITY = .72
 OCCLUDED_CONTACT_OPACITY = .60
 
@@ -42,14 +42,14 @@ def plan_view(domain, contacts, report, arrays, out):
         xy = boundary(COORD.floor(contact['triangles_m'].reshape(-1, 3)))*1000
         if len(xy) >= 3: ax.fill(*xy.T, color=color(j), alpha=.55)
     for j, foot in enumerate(report['ground_footprints']):
-        for pad in foot['pads_xz_m']:
+        for pad in foot['pads_xy_m']:
             xy = np.asarray(pad)*1000
             ax.fill(*xy.T, color=color(j), alpha=.95)
-        hull = np.asarray(foot['hull_xz_m'])*1000
+        hull = np.asarray(foot['hull_xy_m'])*1000
         ax.plot(*np.vstack([hull, hull[0]]).T, color=color(j), lw=1.3, ls='--', alpha=.65)
-        points = arrays['pressure_centers_xz_m'][:, j]
-        if 'continuous_pressure_centers_xz_m' in arrays:
-            points = np.vstack([points, arrays['continuous_pressure_centers_xz_m'][:, j]])
+        points = arrays['pressure_centers_xy_m'][:, j]
+        if 'continuous_pressure_centers_xy_m' in arrays:
+            points = np.vstack([points, arrays['continuous_pressure_centers_xy_m'][:, j]])
         points = points[np.isfinite(points).all(axis=1)]
         if len(points):
             region = boundary(points)*1000
@@ -66,7 +66,7 @@ def object_view(domain, contacts, report, out, size=1500):
     pads = []
     pad_colors = []
     for j, foot in enumerate(feet):
-        for xy in foot['pads_xz_m']:
+        for xy in foot['pads_xy_m']:
             corners = COORD.lift_floor(xy)
             pads.append(corners[[[0, 1, 2], [0, 2, 3]]])
             pad_colors.append(np.tile(PALETTE[j % len(PALETTE)], (2, 1)))
@@ -74,8 +74,8 @@ def object_view(domain, contacts, report, out, size=1500):
     all_points = np.concatenate([domain.mesh.vertices]+[p.reshape(-1, 3) for p in pads])
     margin = .08*domain.mesh.extents.max()
     lo = COORD.floor(all_points).min(axis=0)-margin; hi = COORD.floor(all_points).max(axis=0)+margin
-    floor = np.array([[lo[0], 0, lo[1]], [hi[0], 0, lo[1]],
-                      [hi[0], 0, hi[1]], [lo[0], 0, hi[1]]])[[[0, 1, 2], [0, 2, 3]]]
+    floor = np.array([[lo[0], lo[1], 0], [hi[0], lo[1], 0],
+                      [hi[0], hi[1], 0], [lo[0], hi[1], 0]])[[[0, 1, 2], [0, 2, 3]]]
     projected = np.vstack([all_points, floor.reshape(-1, 3)])@VIEW.T
     low, high = projected.min(axis=0), projected.max(axis=0)
     focus = ((low+high)/2)@VIEW

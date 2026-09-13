@@ -109,7 +109,7 @@ def face_graph(mesh, floor_height, tol):
     centers = mesh.triangles_center
     for (a, b), edge in zip(mesh.face_adjacency, mesh.face_adjacency_edges):
         vertices = mesh.vertices[edge]
-        z = vertices[:, 1]
+        z = vertices[:, 2]
         if z.max() < floor_height-tol:
             continue
         length = np.linalg.norm(vertices[1]-vertices[0])

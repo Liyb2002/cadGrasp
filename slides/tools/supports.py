@@ -18,7 +18,7 @@ from __future__ import annotations
 import argparse
 
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import trimesh
 from PIL import Image, ImageDraw
@@ -207,7 +207,7 @@ def sample_sets(mesh, T, dirs, n_dist, n_cand, seed) -> dict:
     # area and sampling the surface by area essentially never lands on it. It is
     # the one contact we get for free, so it is added explicitly.
     Vw = mesh.vertices @ R.T + t
-    touching = Vw[Vw[:, 1] <= CONTACT_EPS]
+    touching = Vw[Vw[:, 2] <= CONTACT_EPS]
     if len(touching):
         step = max(1, len(touching) // 24)
         floor = touching[::step]
@@ -217,11 +217,11 @@ def sample_sets(mesh, T, dirs, n_dist, n_cand, seed) -> dict:
     scale = float(np.linalg.norm(mesh.extents))
     ref = mesh.center_mass @ R.T + t
     return {"pd": pd, "push_d": push_d, "pc": pc, "push_c": push_c,
-            "ground": pc[:, 1] <= CONTACT_EPS,
+            "ground": pc[:, 2] <= CONTACT_EPS,
             "W": wrenches(pc, push_c, ref, scale),
             "D": wrenches(pd, push_d, ref, scale),
             # one unit of weight at the centre of mass
-            "gravity": np.array([0.0, -1.0, 0.0, 0.0, 0.0, 0.0]),
+            "gravity": np.array([0.0, 0.0, -1.0, 0.0, 0.0, 0.0]),
             # the samples are area-uniform, so this estimates the area fraction;
             # supports.py itself reports the exact one, off the refined mesh
             "region_area_fraction_sampled": float(inside.mean())}
@@ -250,7 +250,7 @@ def region_ceiling(mesh, T, dirs, target_edge=None) -> dict:
         mesh, lambda m: region_mask(mesh, T, dirs, m.triangles_center, m.face_normals),
         target_edge)
     # the push is along the inward normal, so its upward part is -n_z
-    n_z = (refined.face_normals @ T[:3, :3].T)[:, 1]
+    n_z = (refined.face_normals @ T[:3, :3].T)[:, 2]
     v_z = -n_z[mask]
     area = refined.area_faces
     return {"region_area_fraction": float(area[mask].sum() / area.sum()),
@@ -273,7 +273,7 @@ def k_star(s: dict) -> dict:
     other side, exactly. Read the pair, not either one alone.
     """
     W, D, gravity, push_c, push_d = s["W"], s["D"], s["gravity"], s["push_c"], s["push_d"]
-    from_below = push_c[:, 1] >= DOWNWARD
+    from_below = push_c[:, 2] >= DOWNWARD
     W_below = W[:, from_below]
     if not from_below.any() or not D.shape[1]:
         strength, n_free = np.array([0.0]), 0
@@ -291,7 +291,7 @@ def k_star(s: dict) -> dict:
     # K* = 0 for two quite different reasons: some push cannot be answered at all,
     # or the supports cannot even hold the workpiece up on their own.
     holds_gravity = bool(from_below.any() and opposable(W_below, -gravity)[0])
-    v_z_max = float(push_d[:, 1].max()) if len(push_d) else -1.0
+    v_z_max = float(push_d[:, 2].max()) if len(push_d) else -1.0
     return {"k_star_no_clamping": float(np.min(ok)),
             "k_star_median": float(np.median(ok)),
             "k_star_ceiling_sampled": ceiling(v_z_max),
@@ -306,7 +306,7 @@ def k_star(s: dict) -> dict:
             "worst_push_dir": [float(v) for v in push_d[worst]] if len(push_d) else None,
             "n_disturbances": int(len(s["pd"])),
             "fraction_of_region_pushing_upward":
-                float((push_d[:, 1] > 0.0).mean()) if len(push_d) else 0.0}
+                float((push_d[:, 2] > 0.0).mean()) if len(push_d) else 0.0}
 
 
 def analyse(mesh, T, dirs, n_dist, n_cand, seed, k):
@@ -378,12 +378,12 @@ def render(name, T, parts, contacts, px, azimuth):
     cam.lookat[:] = (lo + hi) / 2
     cam.distance = 1.85 * size / 2 / np.tan(np.deg2rad(model.vis.global_.fovy / 2))
 
-    with YUpRenderer(model, px, px, max_geom=2000) as r:
+    with Renderer(model, px, px, max_geom=2000) as r:
         r.update_scene(data, camera=cam)
         scn = r.scene
         for c in contacts:
             p, u = np.asarray(c["p"]), np.asarray(c["push"])
-            rgba = np.array(PRESSES_DOWN if u[1] < DOWNWARD else PUSHES_UP, np.float32)
+            rgba = np.array(PRESSES_DOWN if u[2] < DOWNWARD else PUSHES_UP, np.float32)
             g = scn.geoms[scn.ngeom]
             mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_ARROW, np.zeros(3), np.zeros(3),
                                 np.zeros(9), rgba)
@@ -427,7 +427,7 @@ def main() -> None:
         parts, area = paint_region(mesh, T, dirs, d / "work_regions" / "paint",
                                    f"sup_p{args.pose}_r{i}")
 
-        n_down = sum(1 for c in res["contacts"] if c["push"][1] < DOWNWARD)
+        n_down = sum(1 for c in res["contacts"] if c["push"][2] < DOWNWARD)
         rec = {"region_index": i, "n_passes": reg["n_passes"],
                "region_area_fraction": area,
                **{k: v for k, v in res.items() if not k.startswith("_")},

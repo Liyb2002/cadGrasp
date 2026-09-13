@@ -24,7 +24,7 @@ from __future__ import annotations
 import argparse
 
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import trimesh
 from PIL import Image, ImageDraw
@@ -59,7 +59,7 @@ def contact_wrenches(mesh, T, inside, n_cand, n_dist, seed):
     # the workpiece rests on a line once it is tipped, so area sampling never
     # lands there; that contact is free and has to be put in by hand
     V = mesh.vertices @ R.T + t
-    touching = V[V[:, 1] <= CONTACT_EPS]
+    touching = V[V[:, 2] <= CONTACT_EPS]
     if len(touching):
         step = max(1, len(touching) // 24)
         floor = touching[::step]
@@ -70,7 +70,7 @@ def contact_wrenches(mesh, T, inside, n_cand, n_dist, seed):
     return {"W": wrenches(cand_p, cand_u, ref, scale),
             "D": wrenches(dist_p, dist_u, ref, scale),
             "p": cand_p, "u": cand_u, "face": cand_f,
-            "gravity": np.array([0.0, -1.0, 0.0, 0.0, 0.0, 0.0])}
+            "gravity": np.array([0.0, 0.0, -1.0, 0.0, 0.0, 0.0])}
 
 
 def sample_surface_faces(mesh, n, seed):
@@ -223,7 +223,7 @@ def render(name, T, parts, px, azimuth, marks=(), arrows=()):
     cam.lookat[:] = (lo + hi) / 2
     cam.distance = 1.7 * size / 2 / np.tan(np.deg2rad(model.vis.global_.fovy / 2))
     rgba = np.array([float(x) for x in KEPT.split()], np.float32)
-    with YUpRenderer(model, px, px, max_geom=3000) as r:
+    with Renderer(model, px, px, max_geom=3000) as r:
         r.update_scene(data, camera=cam)
         scn = r.scene
         for q, n, col in arrows:               # whatever the caller wants drawn

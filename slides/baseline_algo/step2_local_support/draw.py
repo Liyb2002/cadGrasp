@@ -47,7 +47,7 @@ def isolated_detail(domain,data,index,basis,width,size):
 def run(name):
     domain,data,report=P.read(name)
     folder=P.OUTPUTS/name/pose_name()/'step2_local_support'
-    views=[D.axes([.6,.55,-.9]),D.axes([-.6,-.65,.9])]
+    views=[D.axes([.6, -.9, .55]),D.axes([-.6, .9, -.65])]
     chosen=sample_contacts(domain,data,report,views)
     valid=np.flatnonzero(data.valid).tolist()
     work=P.W.WorkVolume.read(folder/'work_volume.json') if P.POLICY.ENFORCE_PROCESS_ACCESS else None

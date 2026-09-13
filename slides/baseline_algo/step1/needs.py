@@ -30,7 +30,7 @@ from cone_model import CONE_HALF_DEG, frame
 
 OBJECTS = ('A1-f', 'B', 'C5')
 K = 0.5
-GRAVITY = np.array([0., -1., 0.])
+GRAVITY = np.array([0., 0., -1.])
 RAY_OFFSET_M = 1e-5
 DEFAULT_SAMPLE_COUNT = 32768
 DEFAULT_SAMPLE_SEED = 20260907
@@ -79,15 +79,13 @@ def setup_geometry(name):
     if float(meta['K']) != K:
         raise ValueError('Setup snapshot uses a different force magnitude limit')
     raw = trimesh.load(ROOT / 'objects' / name / 'mesh.stl', force='mesh')
-    vertices, faces = np.asarray(raw.vertices), COORD.faces(np.asarray(raw.faces))
-    # Subdivide in the original corner order to preserve stored work-face IDs.
+    vertices, faces = np.asarray(raw.vertices), np.asarray(raw.faces)
     rounds = 0
     while len(faces) < len(meta['work_faces']) and rounds < 6:
         vertices, faces = trimesh.remesh.subdivide(vertices, faces)
         rounds += 1
     if len(faces) != len(meta['work_faces']):
         raise ValueError('Cannot reproduce setup work-face indexing')
-    faces = COORD.faces(faces)
     local = trimesh.Trimesh(vertices, faces, process=False)
     np.testing.assert_allclose(local.area, raw.area, rtol=1e-12)
     np.testing.assert_allclose(local.volume, raw.volume, rtol=1e-12)
@@ -102,7 +100,7 @@ def setup_geometry(name):
     tangent1, tangent2 = frame(inward)
     return {
         'schema_version': 2,
-        'coordinate_system': 'y_up_xz_floor',
+        'coordinate_system': 'z_up_xy_floor',
         'object': name,
         'pose_id': pose,
         'representation': 'continuous_parametric_wrench_set',
@@ -110,7 +108,7 @@ def setup_geometry(name):
         'scope': f'Current triangle mesh, setup {pose}, every process magnitude from zero to K',
         'units': {'position': 'm', 'force': 'mg', 'moment': 'mg*m',
                   'mg': 'object weight; multiply both wrench blocks by weight in N for SI'},
-        'frame': {'name': 'world', 'up': [0, 1, 0], 'moment_origin_m': com.tolist(),
+        'frame': {'name': 'world', 'up': [0, 0, 1], 'moment_origin_m': com.tolist(),
                   'T_world_mesh': T.tolist(),
                   'tip': int(meta['tip']) if int(meta['tip']) >= 0 else None},
         'load': {'K': K, 'magnitude_range_mg': [0., K],
@@ -253,7 +251,7 @@ def example_cases(domain):
     used_faces = set()
     for attempt in range(300):
         i = int(rng.choice(len(areas), p=areas/areas.sum()))
-        v, u = rng.random(2)
+        u, v = rng.random(2)
         if u+v > 1:
             u, v = 1-u, 1-v
         theta = float(np.arccos(rng.uniform(np.cos(domain.half_angle), 1)))
@@ -320,7 +318,7 @@ def sample_needs(domain, count=DEFAULT_SAMPLE_COUNT, seed=DEFAULT_SAMPLE_SEED):
     while accepted < count and evaluated < budget:
         random = rng.random((min(SAMPLE_BATCH_SIZE, budget-evaluated), 6))
         indices = np.searchsorted(cdf, random[:, 0], side='right')
-        v, u = random[:, 1].copy(), random[:, 2].copy()
+        u, v = random[:, 1].copy(), random[:, 2].copy()
         reflect = u+v > 1
         u[reflect], v[reflect] = 1-u[reflect], 1-v[reflect]
         theta = np.arccos(np.cos(domain.half_angle) +

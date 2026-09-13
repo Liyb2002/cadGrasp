@@ -11,8 +11,8 @@ outputs. The displayed approach pose is on the saved path, at most 60 mm from
 the installed pose; it is not labelled as the start of the whole path.
 
 Run `python slides/render.py --only trajectory` in the cadgrasp environment.
-Both `sweep_demo.png` and `sweep_eq.png` are generated. Equations use Y-up, floor
-`y=0`, insertion direction `a` and withdrawal direction `-a`. This saved path is a
+Both `sweep_demo.png` and `sweep_eq.png` are generated. Equations use Z-up, floor
+`z=0`, insertion direction `a` and withdrawal direction `-a`. This saved path is a
 pure horizontal translation and reaches a separating plane before its finite
 checked endpoint; continued withdrawal therefore remains clear.
 

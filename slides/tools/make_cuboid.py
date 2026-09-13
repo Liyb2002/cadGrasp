@@ -76,7 +76,7 @@ def tilt_apart_deg(Ra: np.ndarray, Rb: np.ndarray, group: np.ndarray) -> float:
     compared here. This is the stricter of the two tests and the one that decides
     whether ten poses are ten experiments.
     """
-    ga, gb = Ra.T @ np.array([0.0, -1, 0]), Rb.T @ np.array([0.0, -1, 0])
+    ga, gb = Ra.T @ np.array([0.0, 0, -1]), Rb.T @ np.array([0.0, 0, -1])
     c = np.clip(np.einsum("nij,j->ni", group, ga) @ gb, -1, 1)
     return float(np.degrees(np.arccos(c)).min())
 
@@ -92,21 +92,21 @@ def flatten(T0: np.ndarray, half: float) -> np.ndarray:
     to every other placement anyway.
     """
     R = np.asarray(T0)[:3, :3]
-    g = R.T @ np.array([0.0, -1, 0])
+    g = R.T @ np.array([0.0, 0, -1])
     down = np.zeros(3)
     down[int(np.argmax(np.abs(g)))] = np.sign(g[int(np.argmax(np.abs(g)))])
-    A = trimesh.geometry.align_vectors(down, np.array([0.0, -1, 0]))[:3, :3]
-    M = R @ A.T                                        # what is left is a turn about y
-    yaw = float(np.arctan2(M[2, 0] - M[0, 2], M[0, 0] + M[2, 2]))
+    A = trimesh.geometry.align_vectors(down, np.array([0.0, 0, -1]))[:3, :3]
+    M = R @ A.T                                        # what is left is a turn about z
+    yaw = float(np.arctan2(M[1, 0] - M[0, 1], M[0, 0] + M[1, 1]))
     c, s = np.cos(yaw), np.sin(yaw)
-    return se3(np.array([[c, 0., -s], [0., 1., 0.], [s, 0., c]]) @ A,
-               np.array([0.0, half, 0]))
+    return se3(np.array([[c, -s, 0.0], [s, c, 0], [0, 0, 1]]) @ A,
+               np.array([0.0, 0, half]))
 
 
 def footprint(V: np.ndarray, T0: np.ndarray) -> np.ndarray:
     """The four corners the cube stands on, counter-clockwise."""
     W = V @ T0[:3, :3].T + T0[:3, 3]
-    xy = COORD.floor(W[W[:, 1] < W[:, 1].min() + 1e-9])
+    xy = COORD.floor(W[W[:, 2] < W[:, 2].min() + 1e-9])
     a = np.arctan2(*(xy - xy.mean(axis=0)).T[::-1])
     return xy[np.argsort(a)]
 
@@ -119,9 +119,9 @@ def pivots(poly: np.ndarray, j: int) -> tuple:
     diagonal touches the square at that corner alone.
     """
     a, b = poly[j], poly[(j + 1) % len(poly)]
-    edge = (COORD.lift_floor((a+b)/2), -COORD.lift_floor(b-a))
+    edge = (COORD.lift_floor((a+b)/2), COORD.lift_floor(b-a))
     out = poly[j] - poly.mean(axis=0)
-    corner = (COORD.lift_floor(poly[j]), -COORD.lift_floor([-out[1],out[0]]))
+    corner = (COORD.lift_floor(poly[j]), COORD.lift_floor([-out[1],out[0]]))
     return edge, corner, float(np.linalg.norm(b - a))
 
 
@@ -163,7 +163,7 @@ def build_tips(d, mesh: trimesh.Trimesh) -> list:
     for k, (kind, deg) in enumerate([("edge", g) for g in EDGE_TIPS]
                                     + [("point", g) for g in CORNER_TIPS]):
         pl = placements[k % len(placements)]
-        T0 = flatten(np.asarray(pl["T_world_mesh"]), float(mesh.extents[1]) / 2)
+        T0 = flatten(np.asarray(pl["T_world_mesh"]), float(mesh.extents[2]) / 2)
         poly = footprint(V, T0)
         edge, corner, edge_len = pivots(poly, k % 4)
         q, axis = edge if kind == "edge" else corner

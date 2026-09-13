@@ -16,12 +16,12 @@ INK = '#202b30'
 def axes(view):
     view = np.array(view, dtype=float, copy=True)
     view /= np.linalg.norm(view)
-    up = np.array([0., 1., 0.])
+    up = np.array([0., 0., 1.])
     if abs(view@up) > .95:
-        up = np.array([0., 0., 1.])
-    right = -np.cross(up, view)
+        up = np.array([0., 1., 0.])
+    right = np.cross(up, view)
     right /= np.linalg.norm(right)
-    return np.array([right, -np.cross(view, right), view])
+    return np.array([right, np.cross(view, right), view])
 
 
 def project(points, focus, basis, width, size):
@@ -78,7 +78,7 @@ def floor_triangles(domain):
     margin=.13*domain.mesh.extents.max()
     x0,y0=COORD.floor(low)-margin
     x1,y1=COORD.floor(high)+margin
-    corners=np.array([[x0,0.,y0],[x1,0.,y0],[x1,0.,y1],[x0,0.,y1]])
+    corners=np.array([[x0,y0,0.],[x1,y0,0.],[x1,y1,0.],[x0,y1,0.]])
     return corners[[[0,1,2],[0,2,3]]]
 
 

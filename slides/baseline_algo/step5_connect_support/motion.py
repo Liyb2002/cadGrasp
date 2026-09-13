@@ -15,7 +15,7 @@ def insertion_vector(direction):
     direction=np.asarray(direction,float)
     if direction.shape!=(3,) or not np.isfinite(direction).all():
         raise ValueError('Expected a finite world-frame insertion vector')
-    if abs(np.linalg.norm(direction)-1)>1e-12 or abs(direction[1])>1e-12:
+    if abs(np.linalg.norm(direction)-1)>1e-12 or abs(direction[2])>1e-12:
         raise ValueError('Step 5 requires the a horizontal unit direction selected for this independent support')
     return direction
 
@@ -105,7 +105,7 @@ def sweep_check(mesh,parts,direction,minimum_length=0.):
     tolerance=1e-11*scale**3
     end=F.intersection_volumes(mesh,parts,scale)
     volumes=F.intersection_volumes(mesh,swept,scale)
-    below=[max(0.,-float(p.vertices[:,1].min())) for p in parts]
+    below=[max(0.,-float(p.vertices[:,2].min())) for p in parts]
     start_gap=float((mesh.vertices@a).min()-((vertices-length*a)@a).max())
     return dict(passed=bool(max(end+volumes,default=0.)<=tolerance and
                            max(below,default=0.)<=scale*1e-10 and start_gap>0),

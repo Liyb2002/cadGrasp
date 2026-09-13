@@ -69,6 +69,14 @@ def run(name, draw=True, resume=False):
     previous_state = None
     tracker = D.Tracker(problem, out)
     problem.inputs.append(tracker.catalogue_path)
+    wall_timings = []
+
+    def timed(stage, number, operation):
+        tick = time.monotonic()
+        try:
+            return operation()
+        finally:
+            wall_timings.append(dict(stage=stage, round=number, elapsed_seconds=time.monotonic()-tick))
 
     def score(number):
         filter_path, eligible, selected = tracker.prepare(number)
@@ -106,15 +114,16 @@ def run(name, draw=True, resume=False):
             except (OSError, RuntimeError, AssertionError):
                 result = None
         if result is None:
-            result = A.run(name, number, problem)
+            result = timed('3.3.size_search', number, lambda: A.run(name, number, problem))
         previous_state = I.folder(name, A.OUTPUT_NAME, number)/'state.json'
-        directions, direction_path = tracker.update(previous_state.parent/'contacts.npz', previous_state, number)
+        directions, direction_path = timed('3.3.direction_update', number,
+            lambda: tracker.update(previous_state.parent/'contacts.npz', previous_state, number))
         problem.inputs.append(direction_path)
         if draw:
             selection_draw = load_stage('select', 'draw')
             adjustment_draw = load_stage('optimize', 'draw')
-            selection_draw.run(name, number)
-            adjustment_draw.run(name, number)
+            timed('3.3.selection_drawing', number, lambda: selection_draw.run(name, number))
+            timed('3.3.adjustment_drawing', number, lambda: adjustment_draw.run(name, number))
         return dict(result, insertion=dict(
             mode=D.D.MODE,
             all_contacts_have_certified_direction=directions['all_contacts_have_certified_direction'],
@@ -139,7 +148,11 @@ def run(name, draw=True, resume=False):
         return validation
 
     try:
-        rounds, status = iterate(score, choose, optimize, validate)
+        rounds, status = iterate(
+            lambda n: timed('3.1', n, lambda: score(n)),
+            lambda n: timed('3.2', n, lambda: choose(n)),
+            lambda n: timed('3.3', n, lambda: optimize(n)),
+            lambda n, a: timed('3.validation', n, lambda: validate(n, a)))
     except Exception as error:
         I.save(out/'status.json', dict(object=name, status='search_error', complete=False,
             error_type=type(error).__name__, error=str(error)))
@@ -168,7 +181,7 @@ def run(name, draw=True, resume=False):
         minimum_contact_area_m2=minimum_area, all_contact_areas_above_minimum=area_valid,
         selected_ids=[p['candidate_id'] for p in contacts], sample_count=len(mask),
         covered_count=int(mask.sum()), covered_percent=100*float(mask.mean()),
-        completion_rule='Every actual optimized head retains a common certified 3-D withdrawal direction; each load has one joint equilibrium reaction with sum(head_force_on_workpiece_y) >= 0. Loads pass AFTER optimization, then the continuous-domain certificate passes; counterexamples return to Step 3.1.',
+        completion_rule='Every actual optimized head retains a common certified 3-D withdrawal direction; each load has one joint equilibrium reaction with sum(head_force_on_workpiece_z) >= 0. Loads pass AFTER optimization, then the continuous-domain certificate passes; counterexamples return to Step 3.1.',
         insertion_direction_record=str(direction_path.relative_to(C.ROOT)),
         insertion_mode=D.D.MODE,
         contact_heads_individually_insertable=directions['all_contacts_have_certified_direction'],
@@ -184,6 +197,8 @@ def run(name, draw=True, resume=False):
         final_state=str(previous_state.relative_to(C.ROOT)) if previous_state else None,
         round_limit=Q.MAX_CONTACTS, initial_candidate_count=int(problem.data.valid.sum()),
         elapsed_seconds=time.monotonic()-started,
+        wall_timings=wall_timings,
+        wall_timing_scope='3.1 includes parallel precomputation; 3.3 includes its named substeps (do not sum parent and children). Resume timings include cache reads, not the historical computation. Other scheduler work remains outside these callbacks.',
         provenance=dict(inputs=I.hashes(problem.inputs+state_inputs),
                         code=dict(A.code_hashes(), **D.code_hashes(), **I.hashes([Path(__file__), Path(Q.__file__), Path(V.__file__), Path(E.__file__)]))),
         artifacts={str(path.relative_to(out)): C.sha256(path) for path in

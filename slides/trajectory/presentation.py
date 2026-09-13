@@ -32,7 +32,7 @@ def scene():
             path['length_scale_m'], path['motion'], start)
         moved.append(copy)
     cloud = np.vstack([p.vertices for p in parts+moved])
-    ground = cloud[np.abs(cloud[:, 1]) < 1e-8]
+    ground = cloud[np.abs(cloud[:, 2]) < 1e-8]
     cam = S.camera(domain, size=1100, extra=cloud, ground_points=ground)
     images = [S.render(domain, parts=list(zip(group, colors)), cam=cam, ground_points=ground)[0]
               for group in (moved, parts)]
@@ -56,7 +56,7 @@ def main():
     fig.text(.5, .88, 'B / pose 2', ha='center', fontsize=19, color=S.MUTED)
     fig.text(.05, .69, r'$\mathrm{Sweep}(S,a)=\{x-ta:\ x\in S,\ t\geq0\}$', fontsize=25)
     fig.text(.05, .53, r'$\mathrm{Sweep}(S,a)\cap\mathrm{int}(W)=\varnothing$', fontsize=25)
-    fig.text(.05, .38, r'$\mathrm{Sweep}(S,a)\cap\{y<0\}=\varnothing$', fontsize=25)
+    fig.text(.05, .38, r'$\mathrm{Sweep}(S,a)\cap\{z<0\}=\varnothing$', fontsize=25)
     fig.text(.05, .23, 'S: the complete rigid support     W: the workpiece', fontsize=18)
     fig.text(.05, .16, 'a: insertion direction; withdrawal moves along -a.', fontsize=17, color=S.MUTED)
     ax = fig.add_axes([.57, .10, .41, .74], facecolor='white'); ax.imshow(images[1]); ax.axis('off')

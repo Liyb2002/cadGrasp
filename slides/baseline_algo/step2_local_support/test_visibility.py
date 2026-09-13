@@ -10,10 +10,10 @@ from step2_local_support import work_volume as W,visibility as V
 
 
 def domain_with_blocker():
-    base=trimesh.creation.box([.1, .1, .1]);base.apply_translation([0, -.05, 0])
-    roof=trimesh.convex.convex_hull([[-3,.5,-3],[3,.5,-3],[0,.5,3],[0,.8,0]])
+    base=trimesh.creation.box([.1, .1, .1]);base.apply_translation([0, 0, -.05])
+    roof=trimesh.convex.convex_hull([[-3,-3,.5],[3,-3,.5],[0,3,.5],[0,0,.8]])
     mesh=trimesh.util.concatenate([base,roof])
-    ids=np.flatnonzero(base.face_normals[:,1]>.9)
+    ids=np.flatnonzero(base.face_normals[:,2]>.9)
     return SimpleNamespace(mesh=mesh,work_ids=ids,normals=-base.face_normals[ids],ray_offset=1e-5,
                            data={'load':{'cone_half_deg':30.}})
 
@@ -22,7 +22,7 @@ class VisibilityTests(unittest.TestCase):
     def test_occluded_half_ray_removed_even_beyond_the_occluding_object(self):
         domain=domain_with_blocker()
         raw=W.WorkVolume(domain.mesh.triangles[domain.work_ids],-domain.normals,domain.work_ids,30.,6.)
-        solid=trimesh.creation.box([.02, .02, .02]);solid.apply_translation([0, 2., 0])
+        solid=trimesh.creation.box([.02, .02, .02]);solid.apply_translation([0, 0, 2.])
         self.assertFalse(raw.check_parts([solid])['passed'])
         work=W.WorkVolume.from_domain(domain)
         self.assertEqual(len(work.triangles),0)
@@ -30,8 +30,8 @@ class VisibilityTests(unittest.TestCase):
         self.assertGreater(work.visibility['occluded_parameter_measure'],0)
 
     def test_occluded_single_witness_is_not_mistaken_for_a_clear_piece(self):
-        work=W.WorkVolume([[[0,0,0],[1,0,0],[0,0,1]]],[[0,1,0]],[1],30.,1.)
-        solid=trimesh.creation.box([.01]*3);solid.apply_translation([.2, 1., .2])
+        work=W.WorkVolume([[[0,0,0],[1,0,0],[0,1,0]]],[[0,0,1]],[1],30.,1.)
+        solid=trimesh.creation.box([.01]*3);solid.apply_translation([.2, .2, 1.])
         witness=dict(classification='outer_envelope_intersection',reachable_ray_witness_found=False)
         with patch.object(work,'_intersection',return_value=witness):
             result=work.check_parts([solid])

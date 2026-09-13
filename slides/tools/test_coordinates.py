@@ -3,14 +3,15 @@ import unittest
 import numpy as np
 import trimesh
 from scipy.spatial.transform import Rotation
-import coordinates as C
+import coordinate_transport as C
+import coordinates as WORLD
 
 
 class Coordinates(unittest.TestCase):
     def test_positions_and_ground_exchange_only_y_z(self):
         np.testing.assert_array_equal(C.polar([2., 3., 7.]), [2., 7., 3.])
-        np.testing.assert_array_equal(C.polar([2., 3., 0.])[C.UP_AXIS], 0.)
-        np.testing.assert_array_equal(C.polar([0., 0., -1.]), [0., -1., 0.])
+        np.testing.assert_array_equal(C.polar([2., 0., 3.])[WORLD.UP_AXIS], 0.)
+        np.testing.assert_array_equal(C.polar([0., -1., 0.]), [0., 0., -1.])
 
     def test_torque_is_axial_not_just_a_permutation(self):
         r = np.array([.23, -.13, .37]); force = np.array([.4, .2, -.8])
@@ -49,7 +50,7 @@ class Coordinates(unittest.TestCase):
         np.testing.assert_allclose(weights@world_supply, C.wrench(weights@supply))
         np.testing.assert_array_equal(C.wrench(C.wrench(np.c_[supply, weights])), np.c_[supply, weights])
 
-    def test_y_up_floor_pressure_center_from_world_moment(self):
+    def test_floor_pressure_center_under_axis_exchange(self):
         force = np.array([.12, -.17, -.92]); point = np.array([.4, .3, .7])
         gravity = np.array([0., 0., -1.]); com = np.array([.1, .2, .4])
         moment = np.cross(point, force)+np.cross(com, gravity)
@@ -65,23 +66,11 @@ class Coordinates(unittest.TestCase):
         # Camera rows are screen axes expressed in world coordinates, not a body rotation.
         np.testing.assert_allclose(C.polar(points)@C.polar(camera_rows).T, points@camera_rows.T)
 
-    def test_matplotlib_keeps_asymmetric_world_box_and_projection(self):
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d.proj3d import proj_transform
-        first, second = plt.figure(), plt.figure()
-        old, new = first.add_subplot(projection='3d'), second.add_subplot(projection='3d')
-        low, high = np.array([-.8, -1.5, -.4]), np.array([1., .7, 2.])
-        points = np.array([[.1, -.2, .6], [-.7, .3, 1.2]])
-        for ax, lo, hi in [(old, low, high), (new, C.polar(low), C.polar(high))]:
-            ax.set_xlim(lo[0], hi[0]); ax.set_ylim(lo[1], hi[1]); ax.set_zlim(lo[2], hi[2])
-        old.set_box_aspect([1., 1.5, 2.]); new.set_box_aspect([1., 2., 1.5])
-        old.view_init(elev=23., azim=-47.)
-        C.matplotlib_view(new, 23., -47.)
-        np.testing.assert_allclose(proj_transform(*points.T, old.get_proj()),
-                                   proj_transform(*C.polar(points).T, new.get_proj()), atol=1e-15)
-        plt.close(first); plt.close(second)
+    def test_native_world_is_z_up(self):
+        self.assertEqual(WORLD.UP_AXIS, 2)
+        np.testing.assert_array_equal(WORLD.WORLD_UP, [0., 0., 1.])
+        np.testing.assert_array_equal(WORLD.floor([2., 3., 7.]), [2., 3.])
+        np.testing.assert_array_equal(WORLD.lift_floor([2., 3.]), [2., 3., 0.])
 
 
 if __name__ == '__main__':

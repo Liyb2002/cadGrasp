@@ -211,7 +211,7 @@ def md5(p):
 
 
 def compass(deg):
-    return np.array([np.cos(np.radians(deg)), 0.0, np.sin(np.radians(deg))])
+    return np.array([np.cos(np.radians(deg)), np.sin(np.radians(deg)), 0.0])
 
 
 # ------------------------------------------------------------- the geometry ---
@@ -245,9 +245,9 @@ def bore_frame(Tm):
     on the floor, so its path has no vertical component and the axis it is
     designed round must not either), then across, then up."""
     w = Tm[:3, :3] @ np.asarray(TAIL)
-    ax = np.array([w[0], 0.0, w[2]])
+    ax = np.array([w[0], w[1], 0.0])
     ax /= np.linalg.norm(ax)
-    return ax, -np.cross([0.0, 1.0, 0.0], ax), np.array([0.0, 1.0, 0.0])
+    return ax, np.cross([0.0, 0.0, 1.0], ax), np.array([0.0, 0.0, 1.0])
 
 
 def support(bunny, Tm):
@@ -366,14 +366,14 @@ def arrow(a, S, azim):
     row's AZIMUTH alone -- the eye's horizontal heading, fixed before the
     refit -- so both arrows exist before the camera is fitted and can be
     fitted INTO the frame (the first cut clipped them at the panel's edge)."""
-    up = np.array([0.0, 1.0, 0.0])
-    side = -np.cross(up, a)
+    up = np.array([0.0, 0.0, 1.0])
+    side = np.cross(up, a)
     if side @ compass(azim) < 0:
         side = -side
     c = S.centroid.copy()
     off = float(((S.vertices - c) @ side).max()) + ARROW_AIR + HEAD_R * ARROW_W
-    c[[0,2]] += off * side[[0,2]]
-    c[1] = ARROW_W + 0.0005
+    c[:2] += off * side[:2]
+    c[2] = ARROW_W + 0.0005
     p0 = c - 0.5 * ARROW_L * a
     M = trimesh.geometry.align_vectors([0.0, 0.0, 1.0], a)
     hl = HEAD_L * ARROW_L

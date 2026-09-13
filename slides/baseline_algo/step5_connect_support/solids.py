@@ -31,7 +31,7 @@ def ring_plan(mesh,contact,heads,ring,angle):
     if local[:,2].min()<=0:raise ValueError('Contact head reaches the floor')
     return dict(candidate_id=contact['candidate_id'],bearing_deg=float(angle),basis=basis,
         direction=basis[0],back_m=back,post_y_m=y,member_width_m=thickness,
-        anchor_xz_m=boundary,ray_distance_m=float(distance),expansion=ring['expansion'],
+        anchor_xy_m=boundary,ray_distance_m=float(distance),expansion=ring['expansion'],
         ground_height_m=ring['height_m'])
 
 
@@ -61,10 +61,10 @@ def with_ground(connector_parts,connector_labels,plan,polygons):
     height=plan['ground_height_m'];parts=[];labels=[]
     for index,xy in enumerate(polygons):
         points=COORD.lift_floor(xy)
-        parts.append(D.engine.hull_mesh(np.vstack([points,points+[0.,height,0.]])))
+        parts.append(D.engine.hull_mesh(np.vstack([points,points+[0.,0.,height]])))
         labels.append(f'ground_strip_{index:03d}')
     corners=COORD.lift_floor(np.concatenate(polygons))
-    plan={**plan,'ground_polygons_xz_m':polygons,'ground_corners_m':corners,
+    plan={**plan,'ground_polygons_xy_m':polygons,'ground_corners_m':corners,
           'ground_area_m2':float(sum(Polygon(p).area for p in polygons))}
     return parts+connector_parts,labels+connector_labels,plan
 

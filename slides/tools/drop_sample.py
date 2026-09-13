@@ -63,12 +63,12 @@ def random_rotations(n: int, seed: int) -> np.ndarray:
 
 def place_above_ground(V: np.ndarray, R: np.ndarray, clearance: float,
                        com_xy: np.ndarray | None = None) -> np.ndarray:
-    """Translation putting the rotated mesh `clearance` above y=0, centred in xz."""
+    """Translation putting the rotated mesh `clearance` above z=0, centred in xy."""
     W = V @ R.T
     t = np.zeros(3)
-    t[1] = clearance - W[:, 1].min()
+    t[2] = clearance - W[:, 2].min()
     if com_xy is not None:
-        t[[0,2]] = -com_xy
+        t[:2] = -com_xy
     return t
 
 
@@ -121,7 +121,7 @@ def gravity_in_mesh_frame(quat_wxyz: np.ndarray) -> np.ndarray:
     right key to cluster placements on.
     """
     R = quat_wxyz_to_mat(quat_wxyz)
-    return R.T @ np.array([0.0, -1.0, 0.0])
+    return R.T @ np.array([0.0, 0.0, -1.0])
 
 
 def cluster_directions(dirs: np.ndarray, deg: float):
@@ -145,7 +145,7 @@ def cluster_directions(dirs: np.ndarray, deg: float):
 
 def canonical_pose(V: np.ndarray, com: np.ndarray, g_mesh: np.ndarray):
     """Yaw-free pose that lays the object on the face `g_mesh` points at."""
-    R = Rotation.align_vectors([[0.0, -1.0, 0.0]], [g_mesh])[0].as_matrix()
+    R = Rotation.align_vectors([[0.0, 0.0, -1.0]], [g_mesh])[0].as_matrix()
     com_w_xy = COORD.floor(R @ com)
     t = place_above_ground(V, R, clearance=0.0, com_xy=com_w_xy)
     return R, t
@@ -159,12 +159,12 @@ def support_geometry(V: np.ndarray, com: np.ndarray, R: np.ndarray, t: np.ndarra
     """
     W = V @ R.T + t
     com_w = R @ com + t
-    z0 = W[:, 1].min()
-    sup = COORD.floor(W[W[:, 1] <= z0 + CONTACT_EPS])
+    z0 = W[:, 2].min()
+    sup = COORD.floor(W[W[:, 2] <= z0 + CONTACT_EPS])
 
     out = {
         "com_world": [float(v) for v in com_w],
-        "h_com_m": float(com_w[1] - z0),
+        "h_com_m": float(com_w[2] - z0),
         "n_support_points": int(len(sup)),
     }
     try:
@@ -198,7 +198,7 @@ def support_geometry(V: np.ndarray, com: np.ndarray, R: np.ndarray, t: np.ndarra
         "d_edges_m": [float(v) for v in d],
         "d_min_m": float(d.min()),
         "d_max_m": float(d.max()),
-        "d_over_h_min": float(d.min() / max(com_w[1] - z0, 1e-9)),
+        "d_over_h_min": float(d.min() / max(com_w[2] - z0, 1e-9)),
     })
     return out
 

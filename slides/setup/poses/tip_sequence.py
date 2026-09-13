@@ -240,7 +240,7 @@ from PIL import Image, ImageDraw
 HERE = Path(__file__).resolve().parent          # slides/poses
 ROOT = HERE.parents[2]                          # the repository root
 sys.path.insert(0, str(ROOT / "slides/tools"))
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import coordinates as COORD
 
 from common import mat_to_quat_wxyz, obj_path, read_json      # noqa: E402
@@ -265,7 +265,7 @@ FOVY = 45.0                     # MuJoCo's default, which SCENE keeps
 PAD = 1.10                      # the fitted frame's margin: the widest thing on
                                 # the panel reaches 1/PAD of the half-frame
 FIT_ROUNDS = 24                 # fixed-point rounds of `frame_for`
-Z = np.array([0.0, 1.0, 0.0])
+Z = np.array([0.0, 0.0, 1.0])
 
 # ---- the row's camera.  One per ROW, computed from that row's pivot ----------
 # A rotation carries every point round a circle in the plane perpendicular to its
@@ -401,7 +401,7 @@ def axes_for(elev, azim):
     a, e = np.deg2rad(azim + 180.0), np.deg2rad(-elev)
     fwd = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
     right = np.array([np.sin(a), -np.cos(a), 0.0])
-    return COORD.polar(fwd), COORD.polar(right), COORD.polar(np.cross(right, fwd))
+    return fwd, right, np.cross(right, fwd)
 
 
 def frame_for(pts, ax):
@@ -472,10 +472,10 @@ def outward(axis, point, com_rest):
     """
     a = np.asarray(axis, float)
     a = a / np.linalg.norm(a)
-    assert abs(a[1]) < 1e-12, (
-        f"the pivot axis is not horizontal ({a[1]:.3e} in y) -- it is supposed "
+    assert abs(a[2]) < 1e-12, (
+        f"the pivot axis is not horizontal ({a[2]:.3e} in z) -- it is supposed "
         f"to be a supporting line of the footprint, lying on the floor")
-    n = np.array([-a[2], 0.0, a[0]])
+    n = np.array([a[1], -a[0], 0.0])
     n /= np.linalg.norm(n)
     s = float(n @ (np.asarray(com_rest, float) - np.asarray(point, float)))
     assert abs(s) > 1e-6, (
@@ -637,7 +637,7 @@ def push_site(mesh, T, axis, point, sign, fwd):
     u /= np.maximum(np.linalg.norm(u, axis=1, keepdims=True), 1e-15)
     arm = np.linalg.norm(r - np.outer(r @ a, a), axis=1)
     push = (u * n).sum(axis=1) <= -GRIP
-    high = c[:, 1] >= 0.5 * (c[:, 1].min() + c[:, 1].max())
+    high = c[:, 2] >= 0.5 * (c[:, 2].min() + c[:, 2].max())
     front = n @ fwd <= -FRONT
     flat = np.abs(u @ fwd) <= VIEW
     for sel, why in ((push & high & front & flat, ""),
@@ -990,7 +990,7 @@ def render(name, T, parts, cam, draw=()):
     cm.azimuth, cm.elevation = cam.azim + 180.0, -cam.elev
     cm.lookat[:] = cam.lookat
     cm.distance = cam.dist
-    with YUpRenderer(model, PX, PX, max_geom=64) as r:
+    with Renderer(model, PX, PX, max_geom=64) as r:
         r.update_scene(data, camera=cm)
         scn = r.scene
         for kind, args in draw:

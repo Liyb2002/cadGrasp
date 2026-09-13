@@ -25,11 +25,11 @@ def output_folder(name):
 def pressure_centers(loads, origin):
     """Required ground wrenches about COM -> ground CoP in world coordinates."""
     loads = np.asarray(loads, float).reshape(-1, 6)
-    normal = loads[:, 1]
+    normal = loads[:, 2]
     if not np.isfinite(loads).all() or np.any(normal <= 0):
         raise ValueError('Finite floor demand requires strictly positive normal reaction')
     moments = loads[:, 3:]+np.cross(origin, loads[:, :3])
-    return np.c_[moments[:, 2], -moments[:, 0]]/normal[:, None], normal
+    return np.c_[-moments[:, 1], moments[:, 0]]/normal[:, None], normal
 
 
 def outer_loads(domain):
@@ -77,9 +77,9 @@ def build(name):
     enclosure, outer_normal = pressure_centers(outer, domain.com)
     # Positive-denominator linear-fractional maps preserve convex containment:
     # p(sum a_i w_i) = sum (a_i N_i / sum a_i N_i) p(w_i).
-    arrays = dict(load_wrenches=loads, floor_demands_xz_m=cloud,
+    arrays = dict(load_wrenches=loads, floor_demands_xy_m=cloud,
         total_floor_normal_mg=normal,
-        continuous_outer_load_wrenches=outer, continuous_floor_enclosure_xz_m=enclosure,
+        continuous_outer_load_wrenches=outer, continuous_floor_enclosure_xy_m=enclosure,
         continuous_outer_normal_mg=outer_normal,
         original_pivot_m=pivot, moment_origin_m=domain.com)
     np.savez_compressed(out/'floor_contact.npz', **arrays)
@@ -130,19 +130,19 @@ def audit(name):
     np.testing.assert_array_equal(arrays['continuous_outer_load_wrenches'], outer_loads(domain))
     # Independent external-load formula, including q_y * F_horizontal.
     f = np.asarray(samples['force_push_mg']); q = np.asarray(samples['pt_m'])
-    expected = (COORD.floor(domain.com)-COORD.floor(q)*f[:, 1, None]+q[:, 1, None]*COORD.floor(f))/(1-f[:, 1, None])
-    np.testing.assert_allclose(arrays['floor_demands_xz_m'][1:1+len(f)], expected, atol=1e-12, rtol=1e-12)
-    np.testing.assert_allclose(arrays['floor_demands_xz_m'][0], COORD.floor(domain.com), atol=1e-14)
+    expected = (COORD.floor(domain.com)-COORD.floor(q)*f[:, 2, None]+q[:, 2, None]*COORD.floor(f))/(1-f[:, 2, None])
+    np.testing.assert_allclose(arrays['floor_demands_xy_m'][1:1+len(f)], expected, atol=1e-12, rtol=1e-12)
+    np.testing.assert_allclose(arrays['floor_demands_xy_m'][0], COORD.floor(domain.com), atol=1e-14)
     for load_key, point_key, normal_key in [
-        ('load_wrenches', 'floor_demands_xz_m', 'total_floor_normal_mg'),
-        ('continuous_outer_load_wrenches', 'continuous_floor_enclosure_xz_m', 'continuous_outer_normal_mg')]:
+        ('load_wrenches', 'floor_demands_xy_m', 'total_floor_normal_mg'),
+        ('continuous_outer_load_wrenches', 'continuous_floor_enclosure_xy_m', 'continuous_outer_normal_mg')]:
         w = arrays[load_key]; p = arrays[point_key]; n = arrays[normal_key]
-        np.testing.assert_array_equal(n, w[:, 1]); assert np.all(n > 0)
+        np.testing.assert_array_equal(n, w[:, 2]); assert np.all(n > 0)
         floor_moment = np.cross(COORD.lift_floor(p), COORD.lift_floor(np.zeros((len(p), 2)), n))
         about_world = w[:, 3:]+np.cross(domain.com, w[:, :3])
         np.testing.assert_allclose(COORD.floor(floor_moment), COORD.floor(about_world), atol=1e-12, rtol=1e-12)
     assert not report['floor_polygon_designed']
-    assert not any(key in arrays for key in ('support_polygon_xz_m', 'required_hull_xz_m', 'support_boundary_closed_m'))
+    assert not any(key in arrays for key in ('support_polygon_xy_m', 'required_hull_xy_m', 'support_boundary_closed_m'))
     result = dict(object=name, pose=pose_name(), complete=True, passed=True,
         demand_formula_independently_checked=True, continuous_outer_domain_rebuilt=True,
         demand_points_only_verified=True, floor_shape_deferred_to_step5=True,
@@ -169,15 +169,15 @@ def draw(name):
     ax.add_collection(PolyCollection(COORD.floor(domain.mesh.triangles)*1000,
                                     facecolors='#e3e4df', edgecolors='none'))
     ax.autoscale_view()
-    p = a['floor_demands_xz_m']*1000
+    p = a['floor_demands_xy_m']*1000
     ax.scatter(*p.T, s=2, alpha=.23, c='#bd8236', rasterized=True)
-    outer = a['continuous_floor_enclosure_xz_m']*1000
+    outer = a['continuous_floor_enclosure_xy_m']*1000
     ax.scatter(*outer.T, s=3, alpha=.3, c='#298b93', rasterized=True)
     ax.scatter(*(COORD.floor(a['original_pivot_m'])*1000), marker='x', s=55, c='#33424a')
     ax.set_aspect('equal'); ax.set_axis_off(); ax.margins(.12)
     fig.subplots_adjust(.025, .025, .975, .975)
     fig.savefig(out/'floor_contact.png'); plt.close(fig)
-    floor_points = COORD.lift_floor(a['floor_demands_xz_m'])
+    floor_points = COORD.lift_floor(a['floor_demands_xy_m'])
     points = np.vstack([domain.mesh.vertices, floor_points])
     view = V.camera(domain, [], points=points)
     body = V.scene(domain, [], [], 1100, view=view, xray=True, labels=False)

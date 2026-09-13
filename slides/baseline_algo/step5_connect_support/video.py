@@ -31,7 +31,7 @@ def render(domain,data,path,out):
     points=np.vstack([domain.mesh.vertices]+[move(data['union_vertices_m'],i) for i in range(72)])
     travel=move(data['union_vertices_m'],0).mean(axis=0)-move(data['union_vertices_m'],71).mean(axis=0)
     horizontal=np.linalg.norm(COORD.floor(travel))
-    sight=np.array([travel[2],.55*horizontal,-travel[0]]) if horizontal>1e-8 else np.array([1.,.5,-1.])
+    sight=np.array([travel[1],-travel[0],.55*horizontal]) if horizontal>1e-8 else np.array([1.,-1.,.5])
     basis=V.R.axes(sight)
     view=V.camera(domain,[],basis=basis,points=points)
     fixed_floor=V.floor_triangles(points,.025*scene.scale);frames=[]

@@ -31,16 +31,16 @@ def propose_directions(mesh, contacts, work_ids, limit=24):
     preferred = preferred_direction(mesh, work_ids)
     faces = np.unique(np.concatenate([c['source_faces'] for c in contacts])) if contacts else np.array([], int)
     normals = mesh.face_normals[faces]
-    matrix = np.unique(np.vstack([normals, [0., 1., 0.]]), axis=0)
+    matrix = np.unique(np.vstack([normals, [0., 0., 1.]]), axis=0)
     proposals = []
     def add(value):
         value = np.asarray(value, float)
         size = np.linalg.norm(value)
         if size < 1e-7: return
         value = value/size
-        if value[1] < -1e-10 or np.min(matrix@value) < -NORMAL_TOLERANCE: return
-        if abs(value[1]) < 1e-10:
-            value[1] = 0.; value /= np.linalg.norm(value)
+        if value[2] < -1e-10 or np.min(matrix@value) < -NORMAL_TOLERANCE: return
+        if abs(value[2]) < 1e-10:
+            value[2] = 0.; value /= np.linalg.norm(value)
         if all(np.linalg.norm(value-p) > 1e-5 for p in proposals): proposals.append(value)
     objectives = np.vstack([preferred, np.eye(3), -np.eye(3),
                             np.random.default_rng(5119).normal(size=(24, 3))])
@@ -74,7 +74,7 @@ def propose_directions(mesh, contacts, work_ids, limit=24):
         direction_convention='support withdrawal +d; insertion reverses the same line; workpiece fixed',
         contact_source_faces=faces.tolist(), constraint_normals=matrix.tolist(),
         candidate_directions=[p.tolist() for p in proposals], candidate_count=len(proposals),
-        first_order_tolerance=NORMAL_TOLERANCE, floor_requires_nonnegative_withdrawal_y=True,
+        first_order_tolerance=NORMAL_TOLERANCE, floor_requires_nonnegative_withdrawal_z=True,
         preferred_direction_contact_conflicts=blocked, lp_diagnostics=diagnostics,
         global_impossibility_claimed=False, rotation_searched=False,
         scope='Numerical local proposals for fixed contact patches, followed by full head sweeps; not a proof against all rigid paths')
@@ -115,7 +115,7 @@ class SweptScene(B.Scene):
     def __init__(self, mesh, direction, clearance=0.):
         super().__init__(mesh)
         self.direction = np.asarray(direction, float)
-        if abs(np.linalg.norm(self.direction)-1) > 1e-8 or self.direction[1] < -1e-10:
+        if abs(np.linalg.norm(self.direction)-1) > 1e-8 or self.direction[2] < -1e-10:
             raise ValueError('Expected a unit, non-downward withdrawal direction')
         self.clearance = float(clearance)
         self.check_count = 0
@@ -205,7 +205,7 @@ def loose_frame(scene, heads, depth, gap, offset):
         # One broad rear joint per selected contact block, independent of mesh
         # tessellation. Its cap joins every exact interior neck of that block.
         shifted=np.vstack(shifted_roots);terminal=shifted.mean(axis=0)
-        terminal[1]=max(terminal[1],radius+gap)
+        terminal[2]=max(terminal[2],radius+gap)
         cap=D.engine.hull_mesh(np.vstack([shifted,terminal+radius*T.CORNERS]))
         scene.context_parts=heads+necks+caps
         scene.context_labels=head_labels+[f'neck_{k:04d}' for k in range(len(necks))]+[f'frame_{k:04d}' for k in range(len(caps))]
@@ -245,13 +245,13 @@ def loose_frame(scene, heads, depth, gap, offset):
 
 
 def base_seed(mesh, floor, direction, gap):
-    cloud = [floor['support_polygon_xz_m'], COORD.floor(mesh.vertices)]
-    if direction[1] > 1e-5:
+    cloud = [floor['support_polygon_xy_m'], COORD.floor(mesh.vertices)]
+    if direction[2] > 1e-5:
         q = mesh.vertices
         # Project obstacles backwards to both faces of the thick base. Include
         # the original projection for vertices already below its upper face.
         for height in (0., .04*float(mesh.extents.max())):
-            amount = np.maximum(q[:, 1]-height, 0.)/direction[1]
+            amount = np.maximum(q[:, 2]-height, 0.)/direction[2]
             cloud.append(COORD.floor(q)-amount[:, None]*COORD.floor(direction))
     return FD.boundary(np.vstack(cloud))
 
@@ -265,7 +265,7 @@ def open_u(mesh, floor, direction, gap, expansion, scene):
     basis = G.frame(angle); scale = scene.scale
     seed = base_seed(mesh, floor, direction, gap)
     local = COORD.lift_floor(seed)@basis.T
-    required = COORD.lift_floor(floor['support_polygon_xz_m'])@basis.T
+    required = COORD.lift_floor(floor['support_polygon_xy_m'])@basis.T
     margin = gap+.025*scale*expansion; width=.05*scale; height=.04*scale
     back = float(local[:,0].min()-margin)
     front = float(required[:,0].max()+margin)
@@ -279,11 +279,11 @@ def open_u(mesh, floor, direction, gap, expansion, scene):
     for a,b in bounds:
         xy=np.array([[a[0],a[1],0.],[b[0],a[1],0.],[b[0],b[1],0.],[a[0],b[1],0.]])@basis
         polygons.append(COORD.floor(xy).tolist())
-    ground,_=A.footprint(parts,floor['original_pivot_m'],floor['required_hull_xz_m'],scale)
+    ground,_=A.footprint(parts,floor['original_pivot_m'],floor['required_hull_xy_m'],scale)
     if not ground['passed']:return None
     return parts,dict(kind='directional_open_u',bearing_deg=angle,expansion=expansion,
-        width_m=width,height_m=height,pads_xz_m=polygons,opening='relative object motion -withdrawal',
-        seed_polygon_xz_m=seed.tolist(),actual_remaining_footprint_covers_demand=True)
+        width_m=width,height_m=height,pads_xy_m=polygons,opening='relative object motion -withdrawal',
+        seed_polygon_xy_m=seed.tolist(),actual_remaining_footprint_covers_demand=True)
 
 
 def base_candidates(domain, floor, direction, gap, scene):
@@ -292,11 +292,11 @@ def base_candidates(domain, floor, direction, gap, scene):
     angle = float(np.rad2deg(np.arctan2(-horizontal[1], -horizontal[0]))) if np.linalg.norm(horizontal)>1e-8 else 0.
     for expansion in (1.,1.25,1.6):
         for turn in (0.,90.,-90.,180.):
-            value=B.open_ring(domain.mesh,seed,floor['required_hull_xz_m'],floor['original_pivot_m'],
+            value=B.open_ring(domain.mesh,seed,floor['required_hull_xy_m'],floor['original_pivot_m'],
                               angle+turn,expansion,.3,scene)
             if value is not None:
                 parts,base=value
-                yield parts,dict(base,kind='directional_open_ring',seed_polygon_xz_m=seed.tolist())
+                yield parts,dict(base,kind='directional_open_ring',seed_polygon_xy_m=seed.tolist())
         value=open_u(domain.mesh,floor,direction,gap,expansion,scene)
         if value is not None:yield value
 
@@ -305,7 +305,7 @@ def thick_links(terminals, base, scene, gap):
     radius=.024*scene.scale;end_radius=min(radius,.4*base['height_m'])
     choices=[]
     for first in terminals:
-        for polygon in base['pads_xz_m']:
+        for polygon in base['pads_xy_m']:
             material=Polygon(polygon);inset=material.buffer(-end_radius*.5)
             if inset.is_empty:inset=material
             xy=np.asarray(nearest_points(Point(COORD.floor(first)),inset)[1].coords[0])
@@ -389,7 +389,7 @@ def search(domain, contacts, points, depth, budget, progress=None, failure=None,
                 if not solid['one_solid']:
                     if failure:failure('whole_path',parts,names,dict(status='assembly_disconnected',withdrawal_direction=direction.tolist()))
                     continue
-                ground,tri=A.footprint(parts,floor['original_pivot_m'],floor['required_hull_xz_m'],scale)
+                ground,tri=A.footprint(parts,floor['original_pivot_m'],floor['required_hull_xy_m'],scale)
                 if not ground['passed']:
                     if failure:failure('whole_path',parts,names,dict(status='actual_footprint_does_not_cover_demand',withdrawal_direction=direction.tolist()))
                     continue

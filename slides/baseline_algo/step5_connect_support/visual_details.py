@@ -11,7 +11,7 @@ BLUE=np.array([64.,119.,165.])
 TEAL=np.array([47.,139.,143.])
 MUTED='#65706c'
 ORANGE_INK='#a65c14'
-VIEW=R.axes([.68,.8,-1.])
+VIEW=R.axes([.68, -1., .8])
 
 
 def fit(points,basis=VIEW,margin=1.13):
@@ -23,7 +23,7 @@ def fit(points,basis=VIEW,margin=1.13):
 def floor_triangles(points,margin):
     low=np.min(points,axis=0);high=np.max(points,axis=0)
     x0,y0=COORD.floor(low)-margin;x1,y1=COORD.floor(high)+margin
-    return np.array([[x0,0.,y0],[x1,0.,y0],[x1,0.,y1],[x0,0.,y1]])[[[0,1,2],[0,2,3]]]
+    return np.array([[x0,y0,0.],[x1,y0,0.],[x1,y1,0.],[x0,y1,0.]])[[[0,1,2],[0,2,3]]]
 
 
 def geometry_points(domain,modules,translations=None):
@@ -187,9 +187,9 @@ def dashed(ink,points,color='#2f8b8f',width=3):
 def plan_view(domain,floor,report,modules,size,contacts=()):
     paper=Image.new('RGB',(size,size),R.PAPER);ink=ImageDraw.Draw(paper)
     scale=float(domain.mesh.extents.max());arrows=[]
-    points=[COORD.floor(domain.mesh.vertices),floor['required_hull_xz_m'],np.asarray(report['ring']['outer_xz_m'])]
+    points=[COORD.floor(domain.mesh.vertices),floor['required_hull_xy_m'],np.asarray(report['ring']['outer_xy_m'])]
     for entry,data in modules:
-        center=np.asarray(entry['anchor_xz_m']);direction=COORD.floor(entry['direction'])
+        center=np.asarray(entry['anchor_xy_m']);direction=COORD.floor(entry['direction'])
         tail=center-.16*scale*direction;label=center-.22*scale*direction
         arrows.append((tail,center,label,entry));points.extend([COORD.floor(data['ground_corners_m']),label[None]])
     points=np.vstack(points);low=points.min(axis=0);high=points.max(axis=0)
@@ -198,27 +198,27 @@ def plan_view(domain,floor,report,modules,size,contacts=()):
     def polygon(points,fill):ink.polygon([tuple(p) for p in xy(points)],fill=fill)
     silhouette=COORD.floor(domain.mesh.vertices);boundary=silhouette[ConvexHull(silhouette).vertices]
     polygon(boundary,'#e8e9e5')
-    required=floor['required_hull_xz_m'];polygon(required,'#f3dfbc')
+    required=floor['required_hull_xy_m'];polygon(required,'#f3dfbc')
     ink.line([tuple(p) for p in xy(np.vstack([required,required[0]]))],fill='#b97e2c',width=3)
     if report['ground']:
-        hull=np.asarray(report['ground']['supplied_hull_xz_m'])
+        hull=np.asarray(report['ground']['supplied_hull_xy_m'])
         dashed(ink,xy(np.vstack([hull,hull[0]])))
-    loop=np.asarray(report['ring']['inner_xz_m'])
+    loop=np.asarray(report['ring']['inner_xy_m'])
     dashed(ink,xy(np.vstack([loop,loop[0]])),color='#92a6a0',width=2)
     for entry,data in modules:
         color=tuple(entry.get('ground_color',[47,139,143]))
-        for footprint in entry['ground_polygons_xz_m']:polygon(footprint,color)
+        for footprint in entry['ground_polygons_xy_m']:polygon(footprint,color)
     lookup={c['candidate_id']:c for c in contacts}
     for entry,data in modules:
         contact=lookup.get(entry['candidate_id'])
         if contact is None:continue
-        contact_pixel=xy(COORD.floor(contact['center_m']));anchor_pixel=xy(entry['anchor_xz_m'])
+        contact_pixel=xy(COORD.floor(contact['center_m']));anchor_pixel=xy(entry['anchor_xy_m'])
         dashed(ink,np.array([contact_pixel,anchor_pixel]),color=ORANGE_INK,width=2)
         x,y=contact_pixel;r=max(4,size/180)
         ink.ellipse((x-r,y-r,x+r,y+r),fill=tuple(map(int,R.ORANGE)),outline=ORANGE_INK,width=1)
     for tail,tip,label,entry in arrows:
         arrow(ink,xy(tail),xy(tip))
-        kind='ground' if entry['ground_polygons_xz_m'] else 'head'
+        kind='ground' if entry['ground_polygons_xy_m'] else 'head'
         ink.text(tuple(xy(label)),f"{entry['candidate_id']} {kind}\n{entry['bearing_deg']:.1f}°",font=R.font(int(size*.024)),fill='#346987',anchor='mm',align='center')
     px,py=xy(COORD.floor(floor['original_pivot_m']));r=6
     ink.line([(px-r,py-r),(px+r,py+r)],fill=R.INK,width=3)

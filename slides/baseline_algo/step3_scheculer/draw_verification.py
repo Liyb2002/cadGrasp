@@ -60,7 +60,7 @@ def run(name):
     ax.axis('off')
     ax.text(0,.93,'The missing per-support equilibrium condition',fontsize=16,color=ink)
     ax.text(.03,.70,r'$R_j=\sum_i\lambda_{ji}n_{ji,z}\ \geq\ 0$',fontsize=26,color=ink)
-    ax.text(.03,.49,f'All inward normal y values of {second["id"]}:\n[{second["inward_y_min"]:.4f}, {second["inward_y_max"]:.4f}]',fontsize=15,color=ink)
+    ax.text(.03,.49,f'All inward normal y values of {second["id"]}:\n[{second["inward_z_min"]:.4f}, {second["inward_z_max"]:.4f}]',fontsize=15,color=ink)
     ax.text(.03,.29,r'$n_{ji,z}<0,\quad\lambda_{ji}\geq0\quad\Longrightarrow\quad\lambda_{ji}=0$',fontsize=21,color=red)
     ax.text(.03,.09,'Summing the bodies cancels their contact forces.\nWhole-assembly balance does not restore this condition.',fontsize=13,color=ink)
     ax=axs[1,1]

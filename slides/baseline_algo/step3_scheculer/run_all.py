@@ -68,10 +68,12 @@ def completed_schedule(name, drawings=True):
     return None
 
 
-def run(objects,from_step=1,resume=False,no_round_drawings=False,pose=None,through_step=None,lp_retry=False,continuous_retry=False,visibility_retry=False,connection_edge_budget=2000,connection_workers=1):
+def run(objects,from_step=1,resume=False,no_round_drawings=False,pose=None,through_step=None,lp_retry=False,continuous_retry=False,visibility_retry=False,connection_edge_budget=2000,connection_workers=1,timings=None,force_directions=False):
     through_step = 5 if through_step is None else through_step
     if through_step < from_step:
         raise ValueError('The last stage must not precede the first stage')
+    if force_directions and not from_step <= 2 <= through_step:
+        raise ValueError('Forced direction computation requires Step2 in the requested stages')
     if connection_edge_budget < 1:
         raise ValueError('The per-support connection edge budget must be positive')
     if connection_workers < 1:
@@ -79,17 +81,17 @@ def run(objects,from_step=1,resume=False,no_round_drawings=False,pose=None,throu
     if (lp_retry or continuous_retry) and len(objects) != 1:
         raise ValueError('Use --lp-retry for one object/pose per process')
     with selected_pose(pose):
-        return _run(objects,from_step,resume,no_round_drawings,through_step,lp_retry,continuous_retry,visibility_retry,connection_edge_budget,connection_workers)
+        return _run(objects,from_step,resume,no_round_drawings,through_step,lp_retry,continuous_retry,visibility_retry,connection_edge_budget,connection_workers,timings,force_directions)
 
 
-def _run(objects,from_step=1,resume=False,no_round_drawings=False,through_step=5,lp_retry=False,continuous_retry=False,visibility_retry=False,connection_edge_budget=2000,connection_workers=1):
+def _run(objects,from_step=1,resume=False,no_round_drawings=False,through_step=5,lp_retry=False,continuous_retry=False,visibility_retry=False,connection_edge_budget=2000,connection_workers=1,timings=None,force_directions=False):
     starts={1:'step1/needs.py',2:'step2_local_support/circles.py',3:'step3_scheculer/scheduler.py',
             4:'step4_floor_contact/floor_contact.py',5:'step5_connect_support/connect.py'}
     active = list(objects)
     blocked = []
     cached=[]
     cached_candidates=[]
-    if resume and from_step<=2:
+    if resume and from_step<=2 and not force_directions:
         # Recheck after acquiring the case lock: another recovery process may
         # have completed Step 2 while this command was waiting for that lock.
         from step2_local_support import circles,insertion_directions,audit,sampling_audit
@@ -124,6 +126,8 @@ def _run(objects,from_step=1,resume=False,no_round_drawings=False,through_step=5
             continue
         print(f'[{", ".join(stage_objects)}] {stage}', flush=True)
         flags=[]
+        if stage=='step2_local_support/insertion_directions.py' and force_directions:
+            flags.append('--force')
         if stage=='step3_scheculer/scheduler.py':
             if resume:flags.append('--resume')
             if no_round_drawings:flags.append('--no-draw')
@@ -153,7 +157,8 @@ def _run(objects,from_step=1,resume=False,no_round_drawings=False,through_step=5
         import os
         if stage == 'step3_scheculer/scheduler.py' and int(os.environ.get('CADGRASP_SCORE_WORKERS', '1')) > 1:
             command.insert(1, str(HERE/'step3_scheculer/parallel_scoring.py'))
-        result = subprocess.run(command, cwd=ROOT, check=False)
+        operation = lambda: subprocess.run(command, cwd=ROOT, check=False)
+        result = timings.call(stage, stage_objects, operation) if timings is not None else operation()
         if stage == 'step3_scheculer/scheduler.py' and result.returncode == 2:
             for name in stage_objects:
                 try:
@@ -182,6 +187,8 @@ if __name__ == '__main__':
     parser.add_argument('--through-step',type=int,choices=[1,2,3,4,5],default=None,
                         help='Last stage (default 5; one connected rigid support and explicit failure diagnostics)')
     parser.add_argument('--resume',action='store_true')
+    parser.add_argument('--timing-name',default='timing.json',help='Timing JSON basename in the last requested stage')
+    parser.add_argument('--force-directions',action='store_true',help='Recompute Step2 directions, including when unchanged inputs permit a cache hit')
     parser.add_argument('--lp-retry',action='store_true',help='Record an additional original-equation IPM retry if the usual solver reports an unresolved error')
     parser.add_argument('--continuous-retry',action='store_true',help='Also try direct primal enclosure certificates if an optional dual-hull test is inconclusive')
     parser.add_argument('--visibility-retry',action='store_true',help='Use a conservative possible-shadow union recovery in Step 2')
@@ -191,6 +198,8 @@ if __name__ == '__main__':
     parser.add_argument('--connection-workers',type=int,default=1,
                         help='Legacy option; one-body construction is sequential within each case')
     args = parser.parse_args()
+    if Path(args.timing_name).name != args.timing_name or not args.timing_name.startswith('timing') or not args.timing_name.endswith('.json'):
+        parser.error('--timing-name must be a JSON basename starting with timing')
     objects = args.objects or ['A1-f', 'B', 'C5']
     if any(name not in ['A1-f', 'B', 'C5'] for name in objects):
         parser.error('objects must be A1-f, B or C5')
@@ -207,5 +216,17 @@ if __name__ == '__main__':
             folder=HERE/'output'/name/pose_name();folder.mkdir(parents=True,exist_ok=True)
             handle=locks.enter_context((folder/'.pipeline.lock').open('a'))
             fcntl.flock(handle,fcntl.LOCK_EX)
-        code=run(objects,args.from_step,args.resume,args.no_round_drawings,args.pose,args.through_step,args.lp_retry,args.continuous_retry,args.visibility_retry,args.connection_edge_budget,args.connection_workers)
+        from step3_scheculer.timing import StageTimings
+        import os
+        last = args.through_step or 5
+        directory = {1:'step_1_needs',2:'step2_local_support',3:'step3_scheculer',4:'step4_floor_contact',5:'step5_connect_support'}[last]
+        timings = StageTimings([HERE/'output'/name/pose_name()/directory/args.timing_name for name in objects],
+            dict(command=sys.argv, from_step=args.from_step, through_step=last, resume=args.resume, force_directions=args.force_directions,
+                 environment={k:v for k,v in os.environ.items() if k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','VECLIB_MAXIMUM_THREADS','CADGRASP_SCORE_WORKERS','CADGRASP_DIRECTION_WORKERS')}))
+        try:
+            code=run(objects,args.from_step,args.resume,args.no_round_drawings,args.pose,args.through_step,args.lp_retry,args.continuous_retry,args.visibility_retry,args.connection_edge_budget,args.connection_workers,timings,args.force_directions)
+        except BaseException as error:
+            timings.finish(error=error)
+            raise
+        timings.finish(returncode=code)
     sys.exit(code)

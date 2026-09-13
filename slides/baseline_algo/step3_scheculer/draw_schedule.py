@@ -33,7 +33,7 @@ def run(name):
     ink.text((28,128),f"Stop: {schedule['status']}",font=R.font(25),fill=R.INK)
     views=[]
     for j in range(max(1,len(contacts))):
-        basis=V.contact_camera(domain,data,j) if contacts else R.axes([1,.5,-1])
+        basis=V.contact_camera(domain,data,j) if contacts else R.axes([1, -1, .5])
         focus,width=R.overall_camera(domain,basis)
         scene,ids=R.raster(triangles,palette,focus,basis,width,620,overlay=np.arange(len(base),len(triangles)))
         picture.paste(scene,(15+635*j,230))

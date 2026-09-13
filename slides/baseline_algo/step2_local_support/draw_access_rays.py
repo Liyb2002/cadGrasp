@@ -46,8 +46,8 @@ def draw(name):
     q, u, face, theta, count = sample(domain)
     length = .60*float(domain.mesh.extents.max())
     end = q+length*u
-    views = [('Oblique', R.axes([.6,.55,-.9])), ('Side', R.axes([1,.15,0])),
-             ('Top', R.axes([0,1,0]))]
+    views = [('Oblique', R.axes([.6, -.9, .55])), ('Side', R.axes([1, 0, .15])),
+             ('Top', R.axes([0, 0, 1]))]
     paper = Image.new('RGB', (2700, 1190), R.PAPER)
     ink = ImageDraw.Draw(paper)
     ink.text((30,20), f'{name} / {pose_name()} / outer sampled access rays', font=R.font(40), fill=R.INK)

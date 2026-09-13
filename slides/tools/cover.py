@@ -27,7 +27,7 @@ import shutil
 
 import matplotlib
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import coordinates as COORD
 import trimesh
@@ -57,7 +57,7 @@ HAVE = "#E08A24"
 HAZE = "#f3ddc0"
 PUSH_BLUE = "#2563EB"
 ARROW = (0.85, 0.30, 0.05, 1.0)
-UP = np.array([0.0, 1.0, 0.0])
+UP = np.array([0.0, 0.0, 1.0])
 TOL = 1e-7
 RAY_DOT = 0.02       # a ray shorter than this is drawn as a dot: matplotlib's own
                      # arrow head is a fixed FRACTION of the shaft, so a short one
@@ -168,7 +168,7 @@ def shot(name, T, parts, px, pushes, holds_, triad=True):
     right = np.array([np.sin(a), 0.0, -np.cos(a)])
     up = -np.cross(right, fwd)
     eye = np.asarray(cam.lookat) - cam.distance * fwd
-    with YUpRenderer(model, px, px, max_geom=3000) as r:
+    with Renderer(model, px, px, max_geom=3000) as r:
         r.update_scene(data, camera=cam)
         scn = r.scene
 
@@ -258,9 +258,9 @@ def screen_axes():
     each site with the sign of `cross` guessed again.
     """
     a, e = np.deg2rad(AZIM), np.deg2rad(ELEV)
-    rt = np.array([-np.sin(a), 0.0, np.cos(a)])
-    ey = np.array([np.cos(e)*np.cos(a), np.sin(e), np.cos(e)*np.sin(a)])
-    return COORD.polar(ey), COORD.polar(rt), COORD.polar(np.cross(ey, rt))
+    rt = np.array([-np.sin(a), np.cos(a), 0.0])
+    ey = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
+    return np.asarray(ey), np.asarray(rt), np.asarray(np.cross(ey, rt))
 
 
 def _light():
@@ -495,7 +495,7 @@ def globe(ax, ico, fills, dots, quills, marks, title, triad=False, bars=(),
         ax.quiver(tail[:, 0], tail[:, 1], tail[:, 2], vec[:, 0], vec[:, 1], vec[:, 2],
                   color=col, linewidth=1.1, arrow_length_ratio=.34, alpha=.92)
     if weight:
-        ax.quiver(0, .55, 0, 0, -1.1, 0, color="#111110", linewidth=2.6,
+        ax.quiver(0, 0, .55, 0, 0, -1.1, color="#111110", linewidth=2.6,
                   arrow_length_ratio=.24, zorder=70)
     for u, col, lab in marks:
         ax.scatter(*(1.05 * np.asarray(u)), s=70, c=col, edgecolors="white",
@@ -503,27 +503,27 @@ def globe(ax, ico, fills, dots, quills, marks, title, triad=False, bars=(),
         ax.text(*(1.55 * np.asarray(u)), lab, color=col, fontsize=12,
                 ha="center", va="center", zorder=61, fontweight="bold")
     if triad:
-        # the world is Y-up: the floor is y=0 and the weight through the centre
-        # runs down -y. Parked below and left of the ball, where neither the
+        # the world is z-up: the floor is z=0 and the weight through the centre
+        # runs down -z. Parked below and left of the ball, where neither the
         # sheet nor the weight goes, and tipped toward the eye so the sphere
         # cannot sort itself in front of it.
         a, e = np.deg2rad(AZIM), np.deg2rad(ELEV)
-        rt = np.array([-np.sin(a), 0.0, np.cos(a)])          # screen right,
-        ey = np.array([np.cos(e)*np.cos(a), np.sin(e), np.cos(e)*np.sin(a)])
-        o = 0.50 * ey - 1.34 * rt + 1.12 * np.cross(ey, rt)  # eye, and screen up
+        rt = np.array([-np.sin(a), np.cos(a), 0.0])          # screen right,
+        ey = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
+        o = 0.50 * ey - 1.34 * rt - 1.12 * np.cross(ey, rt)  # eye, and screen up
         for u, lab in zip(np.eye(3), "xyz"):
             ax.quiver(*o, *(0.34 * u), color=TRIAD_INK, linewidth=1.3,
                       arrow_length_ratio=.35, zorder=80)
             ax.text(*(o + 0.48 * u), lab, color=TRIAD_INK, fontsize=10,
                     ha="center", va="center", zorder=81)
     th = np.linspace(0, 2 * np.pi, 200)
-    ax.plot(1.02 * np.cos(th), np.zeros_like(th), 1.02 * np.sin(th), color=MUTED,
+    ax.plot(1.02 * np.cos(th), 1.02 * np.sin(th), np.zeros_like(th), color=MUTED,
             lw=.7, alpha=.5)
     ax.set_xlim(-reach, reach)
-    ax.set_zlim(-reach, reach)
-    ax.set_ylim(-reach - 0.05, reach + 0.15)
-    ax.set_box_aspect((1, 1.06, 1), zoom=1.42)
-    COORD.matplotlib_view(ax, elev=ELEV, azim=AZIM)
+    ax.set_ylim(-reach, reach)
+    ax.set_zlim(-reach - 0.05, reach + 0.15)
+    ax.set_box_aspect((1, 1, 1.06), zoom=1.42)
+    ax.view_init(elev=ELEV, azim=AZIM)
     ax.set_axis_off()
     if rings_front:
         # the ruler, laid OVER the picture instead of buried in it. Square to the eye
@@ -582,8 +582,8 @@ def globe(ax, ico, fills, dots, quills, marks, title, triad=False, bars=(),
             # straight UP THE SCREEN off the tip: the one offset that cannot land
             # back on the ray, or on the weight arrow the origin already carries
             a, e = np.deg2rad(AZIM), np.deg2rad(ELEV)
-            rt = np.array([-np.sin(a), 0.0, np.cos(a)])
-            ey = np.array([np.cos(e)*np.cos(a), np.sin(e), np.cos(e)*np.sin(a)])
+            rt = np.array([-np.sin(a), np.cos(a), 0.0])
+            ey = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
             ax.text(*(v3 + 0.26 * np.cross(ey, rt)), lab, color=col, fontsize=12,
                     ha="center", va="center", zorder=101, fontweight="bold")
     ax.set_title(title, color=INK, fontsize=13, pad=10, linespacing=1.35)
@@ -688,7 +688,7 @@ def main() -> None:
 
         # a support may touch anywhere off the work region; its direction is the
         # inward normal there, and one direction per tile is plenty
-        on_floor = (part.triangles_center @ R.T + t)[:, 1] <= CONTACT_EPS
+        on_floor = (part.triangles_center @ R.T + t)[:, 2] <= CONTACT_EPS
         off = np.flatnonzero(~inside & ~on_floor)
         push = -(part.face_normals[off] @ R.T)
         push /= np.linalg.norm(push, axis=1, keepdims=True)

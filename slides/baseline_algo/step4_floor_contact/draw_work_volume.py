@@ -11,11 +11,11 @@ from step2_local_support import work_volume as W
 PURPLE=np.array([136.,101.,176.])
 OUTLINE=np.array([91.,62.,130.])
 SHELL_OPACITY=.40
-BASIS=R.axes([.68,.8,-1.])
+BASIS=R.axes([.68, -1., .8])
 CAP_RADIUS_FRACTION=.46
-VIEWS=(('oblique',BASIS),('front',R.axes([0.,.30,-1.])),
-       ('right',R.axes([1.,.30,0.])),('back',R.axes([0.,.30,1.])),
-       ('left',R.axes([-1.,.30,0.])),('top',R.axes([0.,1.,0.])))
+VIEWS=(('oblique',BASIS),('front',R.axes([0., -1., .30])),
+       ('right',R.axes([1., 0., .30])),('back',R.axes([0., 1., .30])),
+       ('left',R.axes([-1., 0., .30])),('top',R.axes([0., 0., 1.])))
 
 
 def layer(triangles,colors,focus,width,size,unlit=(),basis=BASIS):
@@ -64,7 +64,7 @@ def shell_mesh(work):
         return trimesh.Trimesh(vertices=np.empty((0,3)),faces=np.empty((0,3),int),process=False),dict(center_m=center.tolist(),radius_m=radius)
     endpoints=np.vstack(samples)
     unit=(endpoints-center)/radius
-    azimuth=np.arctan2(unit[:,2],unit[:,0]);latitude=np.arcsin(np.clip(unit[:,1],-1,1))
+    azimuth=np.arctan2(unit[:,1],unit[:,0]);latitude=np.arcsin(np.clip(unit[:,2],-1,1))
     # Average on the common sphere within small angular bins for a uniform mesh.
     bins=np.c_[np.floor((azimuth+np.pi)*96/(2*np.pi)),np.floor((latitude+np.pi/2)*48/np.pi)].astype(int)
     _,inverse=np.unique(bins,axis=0,return_inverse=True)
@@ -81,7 +81,7 @@ def shell_mesh(work):
     faces[reverse]=faces[reverse][:,::-1]
     mesh=trimesh.Trimesh(points,faces,process=False)
     mesh.remove_unreferenced_vertices()
-    return mesh,dict(center_m=center.tolist(),radius_m=radius,common_top_y_m=float(center[1]+radius),
+    return mesh,dict(center_m=center.tolist(),radius_m=radius,common_top_z_m=float(center[2]+radius),
                      source_point_count=len(work.triangles)*3,cap_point_count=len(cap),face_count=len(faces))
 
 

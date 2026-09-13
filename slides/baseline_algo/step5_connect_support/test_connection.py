@@ -21,7 +21,7 @@ def contact(mesh,normal,index):
 
 class ConnectionTests(unittest.TestCase):
     def test_two_separate_supports_enter_from_opposite_sides_and_enclose_ground_demand(self):
-        mesh=trimesh.creation.box([1., 1., 1.]);mesh.apply_translation([0, 1., 0])
+        mesh=trimesh.creation.box([1., 1., 1.]);mesh.apply_translation([0, 0, 1.])
         contacts=[contact(mesh,[-1,0,0],0),contact(mesh,[1,0,0],1)]
         directions=[dict(certified_directions=D.normalize(isolated=[a])) for a in [0.,180.]]
         points=np.array([[-.6,-.6],[.6,-.6],[.6,.6],[-.6,.6]])
@@ -49,10 +49,10 @@ class ConnectionTests(unittest.TestCase):
         self.assertIsNone(L.installation_order(2,[(0,1),(1,0)]))
 
     def test_individually_clear_paths_can_have_no_joint_installation_order(self):
-        obstacle=trimesh.creation.box([.2, .2, .2]);obstacle.apply_translation([0, 1, 3])
+        obstacle=trimesh.creation.box([.2, .2, .2]);obstacle.apply_translation([0, 3, 1])
         modules=[]
         for x,a in [(1.,[1.,0,0]),(-1.,[-1.,0,0])]:
-            solid=trimesh.creation.box([.2, .4, .2]);solid.apply_translation([x, .2, 0])
+            solid=trimesh.creation.box([.2, .2, .4]);solid.apply_translation([x, 0, .2])
             modules.append(dict(joined=solid,parts=[solid],plan=dict(direction=np.array(a))))
         result=L.check_assembly(obstacle,modules)
         self.assertTrue(all(r['passed'] for r in result['object_sweeps']))
@@ -63,19 +63,19 @@ class ConnectionTests(unittest.TestCase):
 
     def test_ring_arcs_can_touch_but_cannot_overlap(self):
         pad=np.array([[0,0],[1,0],[1,1],[0,1]])
-        first=dict(ground_polygons_xz_m=[pad])
-        self.assertTrue(L.pads_separate([first,dict(ground_polygons_xz_m=[pad+[1,0]])],1e-12))
-        self.assertFalse(L.pads_separate([first,dict(ground_polygons_xz_m=[pad+[.9,0]])],1e-12))
+        first=dict(ground_polygons_xy_m=[pad])
+        self.assertTrue(L.pads_separate([first,dict(ground_polygons_xy_m=[pad+[1,0]])],1e-12))
+        self.assertFalse(L.pads_separate([first,dict(ground_polygons_xy_m=[pad+[.9,0]])],1e-12))
 
     def test_complete_hull_coverage_does_not_replace_complete_ring_coverage(self):
         points=np.array([[-1.,-1.],[1.,-1.],[1.,1.],[-1.,1.]])
         ring=R.make(points,1.,1.)
-        plans=[dict(ground_polygons_xz_m=[p]) for p in ring['edge_strips_xz_m']]
+        plans=[dict(ground_polygons_xy_m=[p]) for p in ring['edge_strips_xy_m']]
         self.assertTrue(R.check(ring,plans,1.)['passed'])
         incomplete=plans[:-1]
         for plan in incomplete:
-            xy=np.concatenate(plan['ground_polygons_xz_m'])
-            plan['ground_corners_m']=np.c_[xy[:,0],np.zeros(len(xy)),xy[:,1]]
+            xy=np.concatenate(plan['ground_polygons_xy_m'])
+            plan['ground_corners_m']=np.c_[xy,np.zeros(len(xy))]
         self.assertTrue(L.ground_check(incomplete,points,np.zeros(3),1.)['passed'])
         self.assertFalse(R.check(ring,incomplete,1.)['passed'])
 
@@ -86,7 +86,7 @@ class ConnectionTests(unittest.TestCase):
         self.assertIsNone(R.ray_exit(ring,[-2,0],[-1,0]))
 
     def test_duplicate_contact_heads_remain_overlapped_after_depth_search(self):
-        mesh=trimesh.creation.box([1., 1., 1.]);mesh.apply_translation([0, 1., 0])
+        mesh=trimesh.creation.box([1., 1., 1.]);mesh.apply_translation([0, 0, 1.])
         first=contact(mesh,[-1,0,0],0);second={**first,'candidate_id':'C1','candidate_index':1}
         directions=[dict(certified_directions=D.normalize(isolated=[0.]))]*2
         points=np.array([[-.6,-.6],[.6,-.6],[.6,.6],[-.6,.6]])
@@ -97,8 +97,8 @@ class ConnectionTests(unittest.TestCase):
         self.assertEqual(result['attempts'],[])
 
     def test_clear_endpoint_does_not_prove_clear_trajectory(self):
-        mesh=trimesh.creation.box([1, 1, 1]);mesh.apply_translation([0, 1., 0])
-        part=trimesh.creation.box([.2, .2, .2]);part.apply_translation([1, 1., 0])
+        mesh=trimesh.creation.box([1, 1, 1]);mesh.apply_translation([0, 0, 1.])
+        part=trimesh.creation.box([.2, .2, .2]);part.apply_translation([1, 0, 1.])
         result=M.sweep_check(mesh,[part],np.array([1.,0.,0.]),3.)
         self.assertLess(result['per_part_final_intersection_m3'][0],1e-12)
         self.assertFalse(result['passed'])

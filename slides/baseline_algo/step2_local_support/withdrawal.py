@@ -61,14 +61,14 @@ def make_catalogue(mesh, work_ids, contacts):
     for elevation in (-80,-60,-40,-20,0,20,40,60,80):
         e = np.deg2rad(elevation)
         for azimuth in range(0,360,15):
-            a = np.deg2rad(azimuth); add([np.cos(e)*np.cos(a),np.sin(e),np.cos(e)*np.sin(a)])
-    add([0,1,0]); add([0,-1,0])
+            a = np.deg2rad(azimuth); add([np.cos(e)*np.cos(a),np.cos(e)*np.sin(a),np.sin(e)])
+    add([0,0,1]); add([0,0,-1])
     # Geometry-specific seeds preserve useful tangent directions on planar parts.
     for c in contacts:
         n = np.average(mesh.face_normals[c['source_faces']], axis=0, weights=c['triangle_areas_m2'])
-        add(n); add(COORD.lift_floor(COORD.floor(n))); add(-np.cross(n,[0,1,0])); add(-np.cross([0,1,0],n))
+        add(n); add(COORD.lift_floor(COORD.floor(n))); add(np.cross(n,[0,0,1])); add(np.cross([0,0,1],n))
     array = np.asarray(vectors)
-    floor = array[:,1] < -NORMAL_TOL
+    floor = array[:,2] < -NORMAL_TOL
     work = array@back < -NORMAL_TOL if back is not None else np.zeros(len(array),bool)
     allowed = np.flatnonzero(~floor & ~work)
     return dict(vectors=array.tolist(), global_allowed_directions=normalize(allowed),
@@ -106,9 +106,9 @@ class Analyzer(H.Analyzer):
     def test(self, heads, direction):
         """Convex head cells swept continuously until an AABB separates forever."""
         d = np.asarray(direction)
-        if d[1] < -NORMAL_TOL: return dict(clear=False,reason='floor_direction')
+        if d[2] < -NORMAL_TOL: return dict(clear=False,reason='floor_direction')
         points = np.vstack([h.vertices for h in heads])
-        if points[:,1].min() < -self.scale*1e-10: return dict(clear=False,reason='installed_floor_collision')
+        if points[:,2].min() < -self.scale*1e-10: return dict(clear=False,reason='installed_floor_collision')
         distances=[]
         for axis,v in enumerate(d):
             if v>1e-10: distances.append((self.mesh.bounds[1,axis]+.035*self.scale-points[:,axis].min())/v)

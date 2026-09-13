@@ -1,4 +1,4 @@
-"""Shared presentation scenes: saved case geometry, Y-up, compact floor.
+"""Shared presentation scenes: saved case geometry, Z-up, compact floor.
 
 Only read baseline inputs. Rendering never invokes a baseline stage or rebuilds
 the setup catalogue. Colours, camera and floor match head_total_force.png.
@@ -29,7 +29,7 @@ FRAME = (106, 138, 157)
 RED = (184, 49, 53)
 INK = '#151515'
 MUTED = '#686868'
-VIEW = np.array([.8, .12, -1.])
+VIEW = np.array([.8, -1., .12])
 FLOOR_MARGIN = .13
 CAMERA_MARGIN = 1.32
 LOAD_FACE = 213
@@ -48,7 +48,7 @@ def case_label(domain):
 def load(name='B', pose='pose_2'):
     domain = ContinuousNeeds.read(BASE/'output'/name/pose/'step_1_needs/needs.json')
     assert domain.data['object'] == name and domain.data['pose_id'] == pose
-    assert np.allclose(domain.gravity, [0., -1., 0.])
+    assert np.allclose(domain.gravity, [0., 0., -1.])
     return domain
 
 
@@ -68,14 +68,14 @@ def samples(domain=None):
 
 
 def floor(domain, points=()):
-    """A finite Y=0 rectangle, enlarged only to contain depicted floor data."""
-    cloud = domain.mesh.vertices[:, [0, 2]]
+    """A finite Z=0 rectangle, enlarged only to contain depicted floor data."""
+    cloud = domain.mesh.vertices[:, [0, 1]]
     if len(points):
-        cloud = np.vstack([cloud, np.asarray(points).reshape(-1, 3)[:, [0, 2]]])
+        cloud = np.vstack([cloud, np.asarray(points).reshape(-1, 3)[:, [0, 1]]])
     margin = FLOOR_MARGIN * float(domain.mesh.extents.max())
     low, high = cloud.min(0)-margin, cloud.max(0)+margin
-    corners = np.array([[low[0], 0., low[1]], [high[0], 0., low[1]],
-                        [high[0], 0., high[1]], [low[0], 0., high[1]]])
+    corners = np.array([[low[0], low[1], 0.], [high[0], low[1], 0.],
+                        [high[0], high[1], 0.], [low[0], high[1], 0.]])
     return corners[[[0, 1, 2], [0, 2, 3]]]
 
 
@@ -145,7 +145,7 @@ def text(draw, xy, message, size=28, color=INK, anchor='mm'):
 
 def applied_force(image, cam, domain, label=True, point=None, direction=None, length=None):
     point = domain.mesh.triangles_center[LOAD_FACE] if point is None else np.asarray(point)
-    direction = np.array([0., -1., 0.]) if direction is None else np.asarray(direction)
+    direction = np.array([0., 0., -1.]) if direction is None else np.asarray(direction)
     length = .045 if length is None else length
     end = cam.project(point)[:2]
     start = cam.project(point-length*direction)[:2]
@@ -159,7 +159,7 @@ def applied_force(image, cam, domain, label=True, point=None, direction=None, le
 def record(path, domain=None, **fields):
     domain = load() if domain is None else domain
     source = case_path(domain) / 'step_1_needs/needs.json'
-    result = dict(object=domain.data['object'], pose=domain.data['pose_id'], coordinate_system='Y-up; floor y=0',
+    result = dict(object=domain.data['object'], pose=domain.data['pose_id'], coordinate_system='Z-up; floor z=0',
                   camera_vector=VIEW.tolist(), floor_margin_fraction=FLOOR_MARGIN,
                   camera_margin=CAMERA_MARGIN,
                   source=str(source.relative_to(SLIDES)),

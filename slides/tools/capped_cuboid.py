@@ -283,7 +283,7 @@ def main() -> None:
         targets, pw, pu = targets[keep], pw[keep], pu[keep]
         unit = targets / np.linalg.norm(targets, axis=1, keepdims=True)
 
-        on_floor = (part.triangles_center @ R.T + t)[:, 1] <= CONTACT_EPS
+        on_floor = (part.triangles_center @ R.T + t)[:, 2] <= CONTACT_EPS
         off = np.flatnonzero(~inside & ~on_floor)
         push = -(part.face_normals[off] @ R.T)
         push /= np.linalg.norm(push, axis=1, keepdims=True)

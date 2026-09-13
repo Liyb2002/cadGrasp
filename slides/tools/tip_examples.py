@@ -22,7 +22,7 @@ import coordinates as COORD
 import argparse
 
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import trimesh
 from PIL import Image, ImageDraw, ImageFont
@@ -174,22 +174,22 @@ def tip_limits(V: np.ndarray, com_w: np.ndarray, T0: np.ndarray,
     a = axis / np.linalg.norm(axis)
     r = com_w - q
     r_perp = r - (r @ a) * a                            # offset from the line
-    h = float(r_perp[1])
-    d = float(np.linalg.norm(COORD.floor(r_perp) * [1, 1]) if abs(r_perp[1]) < 1e-12
-              else np.linalg.norm(r_perp - r_perp[1] * np.array([0, 1.0, 0])))
+    h = float(r_perp[2])
+    d = float(np.linalg.norm(COORD.floor(r_perp) * [1, 1]) if abs(r_perp[2]) < 1e-12
+              else np.linalg.norm(r_perp - r_perp[2] * np.array([0, 0, 1.0])))
     balance = float(np.arctan2(d, h)) if h > 1e-9 else np.pi / 2
 
     # Sign: tip the way that lifts the centre of gravity.
     sign = 1.0
     probe = rotation_about(a, 1e-3) @ (com_w - q) + q
-    if probe[1] < com_w[1]:
+    if probe[2] < com_w[2]:
         sign = -1.0
 
     # March out until some other part of the object reaches the floor, then
     # bisect so the reported angle is the one where it just touches.
     def lowest(ang):
         R, t = tip(V, None, T0, q, sign * a, ang)
-        return (V @ R.T + t)[:, 1].min()
+        return (V @ R.T + t)[:, 2].min()
 
     hit = balance
     lo_ang = 0.0
@@ -224,13 +224,13 @@ def make_example(V: np.ndarray, com: np.ndarray, T0: np.ndarray,
     R, t = tip(V, com, T0, q, lim["sign"] * np.asarray(lim["axis"]), angle)
 
     W = V @ R.T + t
-    lifted = W[(V @ T0[:3, :3].T + T0[:3, 3])[:, 1] < 1.5e-3]   # was touching before
+    lifted = W[(V @ T0[:3, :3].T + T0[:3, 3])[:, 2] < 1.5e-3]   # was touching before
     return {
         "pivot": kind,
         "tip_deg": float(np.degrees(angle)),
         "T_world_mesh": [[float(v) for v in row] for row in se3(R, t)],
-        "gap_max_m": float(lifted[:, 1].max()) if len(lifted) else 0.0,
-        "ground_clearance_min_m": float(W[:, 1].min()),
+        "gap_max_m": float(lifted[:, 2].max()) if len(lifted) else 0.0,
+        "ground_clearance_min_m": float(W[:, 2].min()),
         **lim,
     }
 
@@ -275,7 +275,7 @@ def render(name: str, entry: dict, px: int, view: str) -> Image.Image:
     if view == "side":   # look along the pivot line, from just above the floor,
         cam.azimuth = float(np.degrees(np.arctan2(a[1], a[0])))   # so the wedge of
         cam.elevation = -2.0                                      # clearance under
-        cam.lookat[:] = [(lo + hi)[0] / 2, hi[1] * 0.3, (lo + hi)[2] / 2]  # it shows
+        cam.lookat[:] = [(lo + hi)[0] / 2, (lo + hi)[1] / 2, hi[2] * 0.3]  # it shows
         margin = 1.35
     else:
         cam.azimuth, cam.elevation = 135.0, -22.0
@@ -283,7 +283,7 @@ def render(name: str, entry: dict, px: int, view: str) -> Image.Image:
     cam.distance = margin * float(np.linalg.norm(hi - lo)) / 2 / np.tan(
         np.deg2rad(model.vis.global_.fovy / 2))
 
-    with YUpRenderer(model, px, px) as r:
+    with Renderer(model, px, px) as r:
         r.update_scene(data, camera=cam)
         return Image.fromarray(r.render())
 
@@ -374,10 +374,10 @@ def run_object(name: str, size: int) -> list[dict]:
 
         edge_len = float(np.linalg.norm(e1 - e0))
         ex_edge = make_example(V, com, T0, COORD.lift_floor((e0+e1)/2),
-                               -COORD.lift_floor(e1-e0), "edge")
+                               COORD.lift_floor(e1-e0), "edge")
         ex_edge["half_length"] = edge_len / 2
         ex_edge["edge_length_m"] = edge_len
-        ex_point = make_example(V, com, T0, COORD.lift_floor(c), -COORD.lift_floor(c_dir), "point")
+        ex_point = make_example(V, com, T0, COORD.lift_floor(c), COORD.lift_floor(c_dir), "point")
         ex_point["half_length"] = 0.0
         for ex in (ex_edge, ex_point):
             ex["placement"] = pl["index"]
@@ -387,8 +387,8 @@ def run_object(name: str, size: int) -> list[dict]:
 
         # Where the tip is cut short by the object itself, also record the pose
         # at the limit -- the moment a second part of it reaches the floor.
-        for ex, q_, ax_, kind in ((ex_edge, COORD.lift_floor((e0+e1)/2), -COORD.lift_floor(e1-e0), "edge"),
-                                  (ex_point, COORD.lift_floor(c), -COORD.lift_floor(c_dir), "point")):
+        for ex, q_, ax_, kind in ((ex_edge, COORD.lift_floor((e0+e1)/2), COORD.lift_floor(e1-e0), "edge"),
+                                  (ex_point, COORD.lift_floor(c), COORD.lift_floor(c_dir), "point")):
             if ex["limited_by"] == "balance":
                 continue
             at_limit = make_example(V, com, T0, q_, ax_, kind, fraction=1.0)

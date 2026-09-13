@@ -279,7 +279,7 @@ def direction_chart(canvas, rows, vectors):
         text(draw,(x0-15,y),str(e),19,'rm')
     for row,col in zip(rows,COLORS):
         v=-vectors[row['certified_directions']['ids']]
-        az=np.rad2deg(np.arctan2(v[:,2],v[:,0]));el=np.rad2deg(np.arcsin(v[:,1]))
+        az=np.rad2deg(np.arctan2(v[:,1],v[:,0]));el=np.rad2deg(np.arcsin(v[:,2]))
         for a,e in zip(az,el):
             x=x0+(a+180)/360*(x1-x0);y=y0-e/90*(y1-y0)
             draw.ellipse([x-4,y-4,x+4,y+4],fill=tuple(col.astype(int)))
@@ -303,7 +303,7 @@ def main():
     baseline_counts=[len(row['certified_directions']['ids']) for row in rows]
     # This figure illustrates geometric escape, rather than Step2's additional
     # area-averaged work-side preference. Check the entire above-floor catalogue.
-    allowed=W.normalize(np.flatnonzero(vectors[:,1]>=-W.NORMAL_TOL))
+    allowed=W.normalize(np.flatnonzero(vectors[:,2]>=-W.NORMAL_TOL))
     rows=[analyzer.analyze(c,allowed=allowed) for c in contacts]
     proof=prove_blocked(rows)
     assert not set.intersection(*(set(r['certified_directions']['ids']) for r in rows))
@@ -345,8 +345,8 @@ def main():
         arrow_convention='Insertion toward each head, reversing the certified withdrawal ray',
         direction_chart_convention='Insertion vectors: negatives of the certified withdrawal vectors',
         arrow_rendering='3-D stems with camera-facing triangular tips, all depth-tested against the workpiece',
-        upward_orange_check=analyzer.test(heads[0],np.array([0.,1.,0.])),
-        horizontal_catalogue_counts=[int(np.sum(abs(vectors[r['certified_directions']['ids'],1])<1e-12)) for r in rows],
+        upward_orange_check=analyzer.test(heads[0],np.array([0.,0.,1.])),
+        horizontal_catalogue_counts=[int(np.sum(abs(vectors[r['certified_directions']['ids'],2])<1e-12)) for r in rows],
         direction_coverage=coverage,
         display_note='Sparse arrows cover the full certified 3-D direction set, including normal-like, oblique and sideways directions. Lengths are adjusted for legibility, preserving the actual 3-D directions.',
         displayed_direction_ids=selected,displayed_withdrawal_directions=[d.tolist() for d in directions],

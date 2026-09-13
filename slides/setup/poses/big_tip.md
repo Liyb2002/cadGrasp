@@ -232,10 +232,10 @@ vertices that get drawn.
    one pointing most nearly straight down; turn the whole pose by the smallest rotation
    carrying that normal exactly onto `−ẑ` — about their common perpendicular, by the angle
    between them, so nothing is spun about the vertical that does not have to be; then drop
-   until the lowest vertex of the mesh is at `y = 0`. The tilt taken out and the drop are
+   until the lowest vertex of the mesh is at `z = 0`. The tilt taken out and the drop are
    returned and print on every placement.
 3. **Two asserts, and between them they are what "a stable placement" means.**
-   - The facet found was already within `TILT` = 3° of level (`arccos(−n_y)` in degrees), or
+   - The facet found was already within `TILT` = 3° of level (`arccos(−n_z)` in degrees), or
      the recorded pose is not resting on it and the fault is upstream, not here.
    - The centre of mass projects **inside the footprint** — the 2-D convex hull of the hull
      vertices standing at `z ≤ TOUCH` = 0.1 mm in the seated pose — tested by evaluating
@@ -432,7 +432,7 @@ bearings, each a complete (direction, contact, limit) in closed form.**
    weakest of the three (*Known issues*).
 10. **The rotation, and the re-seat.** `T* = rot_about_line(ẑ × e1, q, tip) · T_rest` about
    the footprint vertex `q` step 2 chose, then dropped so its own lowest vertex is exactly
-   at `y = 0`; column 2 is the same thing at `MIDWAY` = 0.5 of the tip, re-seated the same
+   at `z = 0`; column 2 is the same thing at `MIDWAY` = 0.5 of the tip, re-seated the same
    way. The re-seat moves the pose by a
    fraction of a millimetre in EITHER direction and both directions are the same fact — a
    real contact is a rolling one and a mesh's is a chord of it. DOWN by up to `TOUCH`,
@@ -579,7 +579,7 @@ part actually touches.
 `objects/<name>/region/region.json` stores one patch per pose of `tips.json`, and these
 are not those poses. The rules are that file's own `seed_rule` and `growth_rule`, quoted:
 an area-uniform seed among faces that turn up far enough for a gun above the part
-(`n_y > 0.35`), stand clear of the floor band and are visible from outside along their own
+(`n_z > 0.35`), stand clear of the floor band and are visible from outside along their own
 normal; then a geodesic disc grown by Dijkstra on the face-adjacency graph weighted by the
 distance between face centres, never carried past 15 % of the surface, stopping at a target
 drawn from [9 %, 14 %].

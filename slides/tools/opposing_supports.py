@@ -26,7 +26,7 @@ import io
 
 import matplotlib
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import trimesh
 from PIL import Image, ImageDraw
@@ -175,7 +175,7 @@ def render_part(name, T, parts, contacts, px, azimuth):
     cam.lookat[:] = (lo + hi) / 2
     cam.distance = 1.75 * size / 2 / np.tan(np.deg2rad(model.vis.global_.fovy / 2))
 
-    with YUpRenderer(model, px, px, max_geom=4000) as r:
+    with Renderer(model, px, px, max_geom=4000) as r:
         r.update_scene(data, camera=cam)
         scn = r.scene
         col = np.array(SUPPORT_RGBA, np.float32)

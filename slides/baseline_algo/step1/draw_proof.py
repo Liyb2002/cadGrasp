@@ -159,7 +159,7 @@ def draw(name):
         tau = np.asarray(case['need_wrench'])[3:]*1000
         force_ax = fig.add_axes([.483, bottom+.005, .237, .215], projection='3d')
         torque_ax = fig.add_axes([.727, bottom+.005, .237, .215], projection='3d')
-        vector_panel(force_ax, f, -f, 1.6, BLUE, r'$F_{need}=mg\,\hat{y}-F_{push}$')
+        vector_panel(force_ax, f, -f, 1.6, BLUE, r'$F_{need}=mg\,\hat{z}-F_{push}$')
         vector_panel(torque_ax, tau, -tau, torque_limit, ORANGE,
                      r'$\tau_{need}=-(\mathrm{pt}-c)\times F_{push}$')
         fig.text(.078, bottom-.01, 'pt = '+triple(np.asarray(case['pt_m'])*1000, 2)+' mm', fontsize=10.5)

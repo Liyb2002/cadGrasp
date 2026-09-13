@@ -21,7 +21,7 @@ def reaction_check(points, normals, owners, com, scale, target):
     """
     raw = B.Q.wrench(points, normals, com)
     matrix = (raw*scale).T
-    vertical = np.where(owners >= 0, normals[:, 1], 0.)
+    vertical = np.where(owners >= 0, normals[:, 2], 0.)
     result = linprog(-vertical, A_eq=matrix, b_eq=target*scale,
                      bounds=(0, None), method='highs', options=B.Q.OPTIONS)
     report = dict(maximum_normal_lp_status=int(result.status), numerical_diagnostic=True,
@@ -47,7 +47,7 @@ def reaction_check(points, normals, owners, com, scale, target):
     report.update(object_only_reaction_found=True, residual=residual,
                   head_resultant_on_workpiece=head.tolist(),
                   head_resultant_on_support=(-head).tolist(),
-                  required_floor_normal_for_shown_allocation_mg=float(head[1]),
+                  required_floor_normal_for_shown_allocation_mg=float(head[2]),
                   allocation_scope='One workpiece-equilibrium allocation; not a feasible support equilibrium.')
     return report, weights
 
@@ -88,7 +88,7 @@ def run(name):
         tip = point+.2*domain.mesh.extents.max()*force/length
         a, b = V.R.project(np.array([point, tip]), *[view[0], view[2], view[1], size])[:, :2]
         V.arrow(ink, a, b, color=color, width=7)
-    arrow(domain.com, np.array([0., -1., 0.]), '#303b3e')
+    arrow(domain.com, np.array([0., 0., -1.]), '#303b3e')
     if weights is not None:
         arrow(np.mean([c['center_m'] for c in contacts], axis=0),
               np.asarray(check['head_resultant_on_support'])[:3], '#b93535')

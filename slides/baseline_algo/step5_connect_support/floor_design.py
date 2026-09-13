@@ -9,7 +9,7 @@ def boundary(points):
     return points[ConvexHull(points).vertices]
 
 def support_polygon(required, pivot):
-    """Closed convex envelope in y=0; no arbitrary margin or solid material."""
+    """Closed convex envelope in z=0; no arbitrary margin or solid material."""
     vertices = boundary(np.vstack([required, COORD.floor(pivot)]))
     if len(vertices) < 3 or np.linalg.matrix_rank(vertices-vertices.mean(axis=0)) < 2:
         raise ValueError('A closed floor region requires a nondegenerate 2D demand')
@@ -19,7 +19,7 @@ def support_polygon(required, pivot):
 
 def prepare(points):
     result = dict(points)
-    result['required_hull_xz_m'] = boundary(np.vstack([points['floor_demands_xz_m'], points['continuous_floor_enclosure_xz_m']]))
-    polygon, loop = support_polygon(result['required_hull_xz_m'], points['original_pivot_m'])
-    result['support_polygon_xz_m'] = polygon
+    result['required_hull_xy_m'] = boundary(np.vstack([points['floor_demands_xy_m'], points['continuous_floor_enclosure_xy_m']]))
+    polygon, loop = support_polygon(result['required_hull_xy_m'], points['original_pivot_m'])
+    result['support_polygon_xy_m'] = polygon
     return result

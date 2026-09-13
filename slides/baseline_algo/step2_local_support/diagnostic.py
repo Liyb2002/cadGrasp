@@ -51,7 +51,7 @@ def centers_page(name, pose, domain, data, report, work, folder):
     if work is None:
         return surface_only_page(name, pose, domain, data, report, folder)
     shell, cap = V.shell_mesh(work)
-    views = [R.axes([.6, .55, -.9]), R.axes([-.6, -.65, .9])]
+    views = [R.axes([.6, -.9, .55]), R.axes([-.6, .9, -.65])]
     paper = Image.new('RGB', (1900, 2140), R.PAPER)
     ink = ImageDraw.Draw(paper)
     ink.text((35, 25), f'{name} / {pose} / Step 2 / all {len(data.valid)} sampled centers',
@@ -101,7 +101,7 @@ def centers_page(name, pose, domain, data, report, work, folder):
 
 
 def surface_only_page(name, pose, domain, data, report, folder):
-    views = [R.axes([.6, .55, -.9]), R.axes([-.6, -.65, .9])]
+    views = [R.axes([.6, -.9, .55]), R.axes([-.6, .9, -.65])]
     paper = Image.new('RGB', (1900, 1170), R.PAPER); ink = ImageDraw.Draw(paper)
     counts = Counter(key(r) for r in report['patches'])
     assert not counts['work_volume_collision'] and not counts['work_volume_unresolved']

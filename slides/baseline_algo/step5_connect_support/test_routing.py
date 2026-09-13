@@ -14,12 +14,12 @@ from step5_connect_support.surface_check import surface_distances
 
 
 def setup_route():
-    mesh=trimesh.creation.box([.4, .4, .4]);mesh.apply_translation([0, 1., 0])
+    mesh=trimesh.creation.box([.4, .4, .4]);mesh.apply_translation([0, 0, 1.])
     patch=contact(mesh,[-1,0,0],0)
     heads=D.Analyzer(mesh,.004).heads(patch)
-    y=patch['center_m'][2]
+    y=patch['center_m'][1]
     tri=np.array([[[-.84,y-.04,.3],[-.76,y-.04,.3],[-.80,y+.04,.3]]])
-    work=W.WorkVolume(COORD.polar(tri),[[0,1,0]],[9],30.,.4)
+    work=W.WorkVolume(tri,[[0,0,1]],[9],30.,.4)
     return mesh,patch,heads,work,np.array([-1.4,y])
 
 
@@ -36,7 +36,7 @@ class RoutingTests(unittest.TestCase):
         self.assertIsNotNone(route)
         self.assertGreater(len(route['record']['waypoints_m']),2)
         parts=heads+route['parts']
-        self.assertGreater(min(p.vertices[:,1].min() for p in route['parts']),0.)
+        self.assertGreater(min(p.vertices[:,2].min() for p in route['parts']),0.)
         self.assertTrue(work.check_parts(parts)['passed'])
         self.assertTrue(M.sweep_check(mesh,parts,router.direction)['passed'])
         solid,record=S.union_parts(parts,float(mesh.extents.max()))
@@ -57,9 +57,9 @@ class RoutingTests(unittest.TestCase):
         self.assertTrue(M.sweep_check(mesh,parts,router.direction)['passed'])
 
     def test_thinner_backing_preserves_contact_and_avoids_work_volume(self):
-        mesh=trimesh.creation.box([1, 1, 1]);mesh.apply_translation([0, 1, 0])
+        mesh=trimesh.creation.box([1, 1, 1]);mesh.apply_translation([0, 0, 1])
         patch=contact(mesh,[1,0,0],0)
-        work=W.WorkVolume(COORD.polar([[[.508,-2,0],[.508,2,0],[.508,0,3]]]),[[1,0,0]],[9],30.,1.)
+        work=W.WorkVolume([[[.508,-2,0],[.508,2,0],[.508,0,3]]],[[1,0,0]],[9],30.,1.)
         before=patch['triangles_m'].copy()
         heads,_,_,check,surface,backing=L.backing_heads(mesh,[patch],.01,work)
         self.assertTrue(surface['passed']);self.assertTrue(check['passed'])

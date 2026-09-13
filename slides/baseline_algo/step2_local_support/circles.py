@@ -88,8 +88,8 @@ class SurfaceCircles:
         self.source_area=np.zeros(len(mesh.faces))
         self.frames={};self.flat={}
         for f,p in polygons.items():
-            x=p[-1]-p[0];x=x/np.linalg.norm(x)
-            basis=np.array([x,-np.cross(mesh.face_normals[f],x)])
+            x=p[1]-p[0];x=x/np.linalg.norm(x)
+            basis=np.array([x,np.cross(mesh.face_normals[f],x)])
             self.frames[f]=(p[0],basis)
             self.flat[f]=Polygon((p-p[0])@basis.T)
             self.source_area[f]=self.flat[f].area
@@ -97,10 +97,10 @@ class SurfaceCircles:
         for (a,b),edge in zip(mesh.face_adjacency,mesh.face_adjacency_edges):
             if not (self.allowed[a] and self.allowed[b]):continue
             segment=mesh.vertices[edge].copy()
-            if segment[:,1].max()<=floor_height:continue
-            if segment[:,1].min()<floor_height:
-                i=int(segment[:,1].argmin());j=1-i
-                segment[i]+=(floor_height-segment[i,1])/(segment[j,1]-segment[i,1])*(segment[j]-segment[i])
+            if segment[:,2].max()<=floor_height:continue
+            if segment[:,2].min()<floor_height:
+                i=int(segment[:,2].argmin());j=1-i
+                segment[i]+=(floor_height-segment[i,2])/(segment[j,2]-segment[i,2])*(segment[j]-segment[i])
             if np.linalg.norm(segment[1]-segment[0])<=16*self.tol:continue
             self.graph[a].append((int(b),segment));self.graph[b].append((int(a),segment))
         theta=np.arange(CIRCLE_SIDES)*2*np.pi/CIRCLE_SIDES
@@ -135,7 +135,7 @@ class SurfaceCircles:
             hit=self.flat[f].intersection(disk)
             if hit.is_empty or hit.area<=radius**2*1e-14:continue
             assert hit.geom_type=='Polygon'
-            clipped[int(f)]=origin+np.asarray(orient(hit,sign=-1.).exterior.coords)[:-1]@basis
+            clipped[int(f)]=origin+np.asarray(orient(hit,sign=1.).exterior.coords)[:-1]@basis
             measure[int(f)]=float(hit.area)
         if seed not in clipped:return {},0.
         selected={int(seed)};todo=[int(seed)]
@@ -248,7 +248,7 @@ class LocalClearance:
             else:
                 normal=np.vstack([p,p+self.depth*self.mesh.face_normals[face]])
                 result=dict(valid=True,status='valid')
-                if normal[:,1].min()<-self.tol:
+                if normal[:,2].min()<-self.tol:
                     result=dict(valid=False,status='normal_hits_floor',source_face=int(face))
                 else:
                     hit=self.collision.obstruction(normal)
@@ -259,7 +259,7 @@ class LocalClearance:
                     else:
                         head=G.head_cell(self.mesh,p,int(face),self.offsets)
                         hit=self.collision.obstruction(head)
-                        if head[:,1].min()<-self.tol:result=dict(valid=False,status='head_hits_floor',source_face=int(face))
+                        if head[:,2].min()<-self.tol:result=dict(valid=False,status='head_hits_floor',source_face=int(face))
                         elif hit!=-1:result=dict(valid=False,status='head_hits_object',source_face=int(face),obstacle_face=int(hit))
                 self.cache[key]=result
             if not result['valid']:return dict(result,bearing_direction_check=bearing)

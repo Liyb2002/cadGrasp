@@ -12,19 +12,19 @@ from step3_scheculer import verification as V
 
 class VerificationTests(unittest.TestCase):
     def domain(self):
-        mesh=NS(triangles=np.array([[[0.,0.,0.],[1.,0.,0.],[0.,0.,1.]]]))
-        return NS(domain=NS(mesh=mesh,work_ids=np.array([0]),normals=np.array([[0.,1.,0.]]),
-                            com=np.zeros(3),gravity=np.array([0.,-1.,0.]),k=.5,half_angle=np.pi/6))
+        mesh=NS(triangles=np.array([[[0.,0.,0.],[1.,0.,0.],[0.,1.,0.]]]))
+        return NS(domain=NS(mesh=mesh,work_ids=np.array([0]),normals=np.array([[0.,0.,1.]]),
+                            com=np.zeros(3),gravity=np.array([0.,0.,-1.]),k=.5,half_angle=np.pi/6))
 
     def test_cap_interior_is_not_replaced_by_its_rim(self):
         problem=self.domain()
         # Maximizing -need_z chooses d=+z, which is inside the cap, not on its rim.
-        value=V.domain_extrema(problem,np.array([COORD.wrench([0.,0.,-1.,0.,0.,0.])]))[0]
+        value=V.domain_extrema(problem,np.array([np.asarray([0.,0.,-1.,0.,0.,0.])]))[0]
         self.assertAlmostEqual(value['maximum'],-.5)
         self.assertEqual(value['magnitude_mg'],.5)
 
     def test_zero_magnitude_endpoint_is_included(self):
-        value=V.domain_extrema(self.domain(),np.array([COORD.wrench([0.,0.,1.,0.,0.,0.])]))[0]
+        value=V.domain_extrema(self.domain(),np.array([np.asarray([0.,0.,1.,0.,0.,0.])]))[0]
         self.assertAlmostEqual(value['maximum'],1.)
         self.assertEqual(value['magnitude_mg'],0.)
 
@@ -38,7 +38,7 @@ class VerificationTests(unittest.TestCase):
     def test_horizontal_obstruction_is_not_a_3d_wrap_angle_test(self):
         n=np.array([[.2,0.,-1.],[-.2,0.,-1.],[0.,.2,-1.],[0.,-.2,-1.]])
         n/=np.linalg.norm(n,axis=1)[:,None]
-        problem=NS(domain=NS(mesh=NS(face_normals=COORD.polar(n))))
+        problem=NS(domain=NS(mesh=NS(face_normals=n)))
         contact={'source_faces':np.arange(4)}
         proof=V.horizontal_obstruction(problem,contact)
         self.assertTrue(proof['horizontal_translation_obstructed'])

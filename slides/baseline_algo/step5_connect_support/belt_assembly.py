@@ -38,7 +38,7 @@ def bearing_rays(domain, contacts, pivot, friction):
     """Use the same sufficient floor friction at the workpiece pivot and base."""
     points,normals,owners=Q.contact_rays(domain,contacts,pivot)
     assert owners[0] == -1 and np.count_nonzero(owners<0) == 1
-    rays=np.array([[friction,1,0],[-friction,1,0],[0,1,friction],[0,1,-friction]],float)
+    rays=np.array([[friction,0,1],[-friction,0,1],[0,friction,1],[0,-friction,1]],float)
     return (np.vstack([np.tile(points[0],(4,1)),points[1:]]),
             np.vstack([rays,normals[1:]]),np.r_[np.full(4,-1,int),np.zeros(len(owners)-1,int)])
 
@@ -210,7 +210,7 @@ def audit(name):
         for c in contacts:
             points = np.vstack([c['triangles_m'].reshape(-1, 3), c['triangles_m'].mean(axis=1)])
             assert U.surface_distances(joined, points).max() <= scene.scale*1e-9
-        ground, tri = A.footprint(parts, floor['original_pivot_m'], floor['required_hull_xz_m'], scene.scale)
+        ground, tri = A.footprint(parts, floor['original_pivot_m'], floor['required_hull_xy_m'], scene.scale)
         assert ground['passed']; np.testing.assert_array_equal(tri, data['floor_triangles_m'])
         np.testing.assert_array_equal(joined.vertices, data['union_vertices_m'])
         np.testing.assert_array_equal(joined.faces, data['union_faces'])
@@ -222,9 +222,9 @@ def audit(name):
         if base['kind']=='directional_open_u':
             rebuilt, record = X.open_u(domain.mesh,floor,direction,gap,base['expansion'],swept)
         else:
-            rebuilt, record = B.open_ring(domain.mesh,base['seed_polygon_xz_m'],floor['required_hull_xz_m'],
+            rebuilt, record = B.open_ring(domain.mesh,base['seed_polygon_xy_m'],floor['required_hull_xy_m'],
                 floor['original_pivot_m'],base['bearing_deg'],base['expansion'],base['cut_fraction'],swept)
-            record=dict(record,kind='directional_open_ring',seed_polygon_xz_m=base['seed_polygon_xz_m'])
+            record=dict(record,kind='directional_open_ring',seed_polygon_xy_m=base['seed_polygon_xy_m'])
         assert record == base
         saved = [p for p, label in zip(parts, data['part_labels']) if str(label).startswith('ground_strip_')]
         assert len(saved) == len(rebuilt)

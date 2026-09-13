@@ -52,7 +52,7 @@ def load(name):
     T = demand['T_world_mesh']
     R, t = T[:3, :3], T[:3, 3]
     extent = float(mesh.extents.max())
-    touch = ~demand['work_faces'] & ((mesh.triangles_center@R.T+t)[:, 1] > P.CONTACT_EPS)
+    touch = ~demand['work_faces'] & ((mesh.triangles_center@R.T+t)[:, 2] > P.CONTACT_EPS)
     skin = P.Skin(mesh, touch, R, t, P.CUT*extent, print)
     import hashlib
     fingerprint = hashlib.sha256()

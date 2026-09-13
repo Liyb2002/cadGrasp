@@ -23,11 +23,11 @@ class WorkLimitTests(unittest.TestCase):
     def problem(self):
         # Downward normal, with an X-aligned first edge so the polygonal circle
         # still has a vertex exactly on the tested x=0 work boundary.
-        mesh=COORD.mesh(trimesh.Trimesh([[-4,-3,1],[4,-3,1],[0,5,1]],[[1,0,2]],process=False))
-        work=A.W.WorkVolume(COORD.polar([[[0,-3,0],[0,3,0],[0,0,4]]]),[[1,0,0]],[17],30.,8.)
+        mesh=trimesh.Trimesh([[-4,-3,1],[4,-3,1],[0,5,1]],[[1,0,2]],process=False)
+        work=A.W.WorkVolume([[[0,-3,0],[0,3,0],[0,0,4]]],[[1,0,0]],[17],30.,8.)
         problem=A.SizeProblem.__new__(A.SizeProblem)
         problem.surface=A.P.SurfaceCircles(mesh,{0:mesh.triangles[0]})
-        problem.pool=problem.surface.pool(0);problem.center=np.array([-1.,1.,0.]);problem.seed=0
+        problem.pool=problem.surface.pool(0);problem.center=np.array([-1.,0.,1.]);problem.seed=0
         problem.initial_radius=.4;problem.cap=2.;problem.tolerance=1e-5
         problem.clearance=A.P.LocalClearance(mesh,.01)
         problem.work_clearance=A.WC.ContactClearance(mesh,.01,work,problem.clearance.offsets)
@@ -58,7 +58,7 @@ class WorkLimitTests(unittest.TestCase):
     def test_clear_contact_cannot_exempt_backing_that_touches_the_work_boundary(self):
         problem=self.problem();mesh=problem.domain.mesh
         # The contact is above the source plane; its downward backing touches it.
-        work=A.W.WorkVolume(mesh.triangles+np.array([0,-.01,0]),[[0,-1,0]],[17],30.,8.)
+        work=A.W.WorkVolume(mesh.triangles+np.array([0,0,-.01]),[[0,0,-1]],[17],30.,8.)
         self.assertTrue(work.check_surface(mesh.triangles)['passed'])
         problem.work_clearance=A.WC.ContactClearance(mesh,.01,work,problem.clearance.offsets)
         with self.assertRaisesRegex(ValueError,'work_volume_'):

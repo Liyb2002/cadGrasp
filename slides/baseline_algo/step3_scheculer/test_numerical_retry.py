@@ -17,7 +17,7 @@ class NumericalRetryTests(unittest.TestCase):
 
     def test_feasible_retry_preserves_original_equations(self):
         full = np.vstack([np.eye(6), -np.eye(6)])
-        target = np.array(COORD.wrench([.5, -.3, 1., -.1, .2, .3]))
+        target = np.array(np.asarray([.5, -.3, 1., -.1, .2, .3]))
         witness, evidence = R.retry_original_equations(full, target)
         self.assertIsNotNone(witness)
         np.testing.assert_allclose(np.array(witness['coefficients'])@full[witness['indices']], target, atol=1e-12)

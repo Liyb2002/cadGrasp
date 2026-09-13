@@ -30,7 +30,7 @@ def verify(name):
         for filename, field in (('mesh.stl', 'mesh_sha256'), ('poses.json', 'poses_sha256')):
             path = HERE.parents[2]/'objects'/name/filename
             assert hashlib.sha256(path.read_bytes()).hexdigest() == str(demand[field])
-        assert np.allclose(demand['force_w'], [0, 1, 0]-.5*demand['d'], atol=1e-12, rtol=0)
+        assert np.allclose(demand['force_w'], [0, 0, 1]-.5*demand['d'], atol=1e-12, rtol=0)
         assert np.allclose(demand['moment_wmm'],
                            -500*np.cross(demand['q_m']-demand['com_m'], demand['d']), atol=1e-10, rtol=0)
         assert np.array_equal(z['T_world_mesh'], demand['T_world_mesh'])
@@ -47,7 +47,7 @@ def verify(name):
 
         def geometry(ids):
             p = np.vstack([z["skin_centres_m"][ids], floor[None]])
-            u = np.vstack([-z["skin_outward_normals"][ids], [[0, 1, 0]]])
+            u = np.vstack([-z["skin_outward_normals"][ids], [[0, 0, 1]]])
             return p, u, np.c_[u, np.cross(p-com, u)]
 
         for k, row in enumerate(report["rows"], start=1):

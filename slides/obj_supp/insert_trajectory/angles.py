@@ -31,7 +31,7 @@ def hull_mesh(points):
 
 def direction(degrees):
     angle = np.deg2rad(degrees)
-    return np.array([np.cos(angle), 0., np.sin(angle)])
+    return np.array([np.cos(angle), np.sin(angle), 0.])
 
 
 def wrap_interval(start, end):
@@ -100,22 +100,22 @@ def obstacle_shadow(triangle, head, scale, guard_deg=1e-6):
     """An OPEN forbidden angular interval from one exact convex pair.
 
     q = triangle - head is the configuration obstacle for translations.
-    Its y=0 section consists of horizontal shifts placing this object triangle
+    Its z=0 section consists of horizontal shifts placing this object triangle
     in the head. A ray along -a through its interior is a collision somewhere
     along the complete straight path. Guarded endpoints remain unresolved.
     """
     points = (triangle[:, None, :]-head.vertices[None, :, :]).reshape(-1, 3)/scale
     eps = 1e-11
-    if points[:, 1].min() >= -eps or points[:, 1].max() <= eps:
+    if points[:, 2].min() >= -eps or points[:, 2].max() <= eps:
         return []
     hull = ConvexHull(points)
     edges = np.unique(np.sort(np.concatenate([hull.simplices[:, [0, 1]],
         hull.simplices[:, [1, 2]], hull.simplices[:, [2, 0]]]), axis=1), axis=0)
-    cut = list(COORD.floor(points[np.abs(points[:, 1]) < eps]))
+    cut = list(COORD.floor(points[np.abs(points[:, 2]) < eps]))
     for edge in edges:
         p, q = points[edge]
-        if p[1]*q[1] < 0:
-            cut.append(COORD.floor(p+(q-p)*(-p[1]/(q[1]-p[1]))))
+        if p[2]*q[2] < 0:
+            cut.append(COORD.floor(p+(q-p)*(-p[2]/(q[2]-p[2]))))
     if len(cut) < 3:
         return []
     cut = np.unique(np.asarray(cut), axis=0)

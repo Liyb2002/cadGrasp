@@ -160,7 +160,7 @@ def build(pose_T, mesh, tree, pose, seed=0, k=1.0, n_points=90, n_dirs=24):
     keep = np.linalg.norm(targets, axis=1) > 1e-9
     targets, pu = targets[keep], pu[keep]
 
-    on_floor = (mesh.triangles_center @ R.T + t)[:, 1] <= CONTACT_EPS
+    on_floor = (mesh.triangles_center @ R.T + t)[:, 2] <= CONTACT_EPS
     off = np.flatnonzero(~inside & ~on_floor)
     push = -(mesh.face_normals[off] @ R.T)
     push /= np.linalg.norm(push, axis=1, keepdims=True)

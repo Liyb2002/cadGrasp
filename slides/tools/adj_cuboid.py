@@ -121,7 +121,7 @@ def stage(mesh, examples, pose, args):
     keep = np.linalg.norm(targets, axis=1) > 1e-9
     targets = targets[keep]
 
-    on_floor = (part.triangles_center @ R.T + t)[:, 1] <= CONTACT_EPS
+    on_floor = (part.triangles_center @ R.T + t)[:, 2] <= CONTACT_EPS
     off = np.flatnonzero(~inside & ~on_floor)
     push = -(part.face_normals[off] @ R.T)
     push /= np.linalg.norm(push, axis=1, keepdims=True)

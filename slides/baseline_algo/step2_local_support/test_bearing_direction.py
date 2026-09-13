@@ -15,23 +15,23 @@ class BearingDirectionTests(unittest.TestCase):
         for normal in ([.6,0,.8],[0,0,1],[1,0,0]):
             with self.subTest(normal=normal):
                 self.assertTrue(H.check(SimpleNamespace(face_normals=np.array([normal])),[0])['passed'])
-        self.assertTrue(H.check(SimpleNamespace(face_normals=COORD.polar(np.array([[.6,0,-.8]]))),[0])['passed'])
+        self.assertTrue(H.check(SimpleNamespace(face_normals=np.asarray(np.array([[.6,0,-.8]]))),[0])['passed'])
 
     def test_mixed_normals_are_admitted_for_one_rigid_support(self):
-        normals=COORD.polar(np.array([[0,0,-1]]*99+[[.8,0,.6]]))
-        self.assertLess(normals.mean(axis=0)[1],0)
+        normals=np.asarray(np.array([[0,0,-1]]*99+[[.8,0,.6]]))
+        self.assertLess(normals.mean(axis=0)[2],0)
         result=H.check(SimpleNamespace(face_normals=normals),range(100))
         self.assertTrue(result['passed']);self.assertEqual(result['non_downward_face_count'],1)
         self.assertEqual(result['weakest_source_face'],99)
 
     def test_horizontal_band_does_not_filter_candidates(self):
-        for z in (1e-16,0.,-1e-16,-H.NORMAL_Y_GUARD):
+        for z in (1e-16,0.,-1e-16,-H.NORMAL_Z_GUARD):
             self.assertTrue(H.check(SimpleNamespace(face_normals=np.array([[1.,0,z]])),[0])['passed'])
-        self.assertTrue(H.check(SimpleNamespace(face_normals=np.array([[1.,0,-2*H.NORMAL_Y_GUARD]])),[0])['passed'])
+        self.assertTrue(H.check(SimpleNamespace(face_normals=np.array([[1.,0,-2*H.NORMAL_Z_GUARD]])),[0])['passed'])
 
     def test_real_geometry_accepts_top_and_bottom_without_changing_them(self):
-        mesh=trimesh.creation.box([1, 1, 1]);mesh.apply_translation([0, 2, 0])
-        top=int(np.argmax(mesh.face_normals[:,1]));bottom=int(np.argmin(mesh.face_normals[:,1]))
+        mesh=trimesh.creation.box([1, 1, 1]);mesh.apply_translation([0, 0, 2])
+        top=int(np.argmax(mesh.face_normals[:,2]));bottom=int(np.argmin(mesh.face_normals[:,2]))
         for size in (.01,1,100):
             scaled=mesh.copy();scaled.apply_scale(size)
             patch={top:scaled.triangles[top].copy()};before=patch[top].copy()

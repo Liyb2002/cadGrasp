@@ -1,1 +1,1 @@
-`unknown_lp.npz` is a numerical solver regression fixture. Its rows retain the exact recorded solver basis, independent of world coordinates, so the original HiGHS unknown-status counterexample remains reproducible. It is not geometry or a new Y-up physical output.
+`unknown_lp.npz` is a numerical solver regression fixture. Its rows retain the exact recorded solver basis, independent of world coordinates, so the original HiGHS unknown-status counterexample remains reproducible. It is not geometry or a new Z-up physical output.

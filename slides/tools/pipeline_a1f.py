@@ -59,7 +59,7 @@ import argparse
 import shutil
 
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import coordinates as COORD
 import trimesh
@@ -155,7 +155,7 @@ def replicate(name: str, pose: int, k: float = 1.0, seed: int = 0,
     keep = np.linalg.norm(targets, axis=1) > 1e-9
     targets, pw, pu = targets[keep], pw[keep], pu[keep]
 
-    on_floor = (part.triangles_center @ R.T + t)[:, 1] <= CONTACT_EPS
+    on_floor = (part.triangles_center @ R.T + t)[:, 2] <= CONTACT_EPS
     off = np.flatnonzero(~inside & ~on_floor)
     push = -(part.face_normals[off] @ R.T)
     push /= np.linalg.norm(push, axis=1, keepdims=True)
@@ -226,25 +226,25 @@ def pad_wall(p, u, r: float = PAD_R, t: float = WALL_T, floor: float = FLOOR,
     """
     u = np.asarray(u, float)
     u = u / np.linalg.norm(u)
-    a = np.array([0.0, 1.0, 0.0]) if abs(u[1]) < 0.9 else np.array([1.0, 0.0, 0.0])
-    e1 = -np.cross(u, a); e1 /= np.linalg.norm(e1)
-    e2 = -np.cross(u, e1)
+    a = np.array([0.0, 0.0, 1.0]) if abs(u[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
+    e1 = np.cross(u, a); e1 /= np.linalg.norm(e1)
+    e2 = np.cross(u, e1)
     th = np.linspace(0, 2 * np.pi, n, endpoint=False)
     face = np.asarray(p) + r * (np.cos(th)[:, None] * e1 + np.sin(th)[:, None] * e2)
     puck = np.vstack([face, face - t * u])
-    drop = puck[:, 1].min() - floor
+    drop = puck[:, 2].min() - floor
     back = COORD.floor(u) / max(float(np.linalg.norm(COORD.floor(u))), 1e-9)
     shift = COORD.lift_floor(-drop * np.tan(np.deg2rad(draft)) * back, -drop)
     pts = np.vstack([puck, puck + shift]) if drop > 0 else puck
     solid = trimesh.convex.convex_hull(pts)
-    if pts[:, 1].min() < floor - 1e-12:
+    if pts[:, 2].min() < floor - 1e-12:
         # a contact only a few millimetres up leaves the pad hanging through the
         # ground. Cutting it off is the honest fix: the wall loses the part of
         # itself that was never buildable, and keeps the whole bearing face that
         # is above the floor.
         box = trimesh.creation.box(extents=[1.0, 1.0, 1.0],
                                    transform=trimesh.transformations.translation_matrix(
-                                       [0, floor + 0.5, 0]))
+                                       [0, 0, floor + 0.5]))
         solid = trimesh.boolean.intersection([solid, box], engine="manifold")
     return solid
 
@@ -272,8 +272,8 @@ def fit_wall(p, u, world: trimesh.Trimesh, **kw):
 
 def camera(lo, hi, az, el, zoom=1.30, lift=0.42, fovy=45.0):
     """A camera framing the part AND whatever stands on the floor beside it."""
-    look = np.array([(lo[0] + hi[0]) / 2, hi[1] * lift, (lo[2] + hi[2]) / 2])
-    span = max(float(np.linalg.norm(COORD.floor(hi-lo))), float(hi[1]) * 1.5)
+    look = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, hi[2] * lift])
+    span = max(float(np.linalg.norm(COORD.floor(hi-lo))), float(hi[2]) * 1.5)
     dist = zoom * span / 2 / np.tan(np.deg2rad(fovy / 2))
     a, e = np.deg2rad(az), np.deg2rad(el)
     fwd = np.array([np.cos(e) * np.cos(a), np.sin(e), np.cos(e) * np.sin(a)])
@@ -324,7 +324,7 @@ def solid_shot(name, T, parts, solids, cam, w, h):
     mj.azimuth, mj.elevation = cam["az"], cam["el"]
     mj.lookat[:] = cam["look"]
     mj.distance = cam["dist"]
-    with YUpRenderer(model, h, w) as r:
+    with Renderer(model, h, w) as r:
         r.update_scene(data, camera=mj)
         return Image.fromarray(r.render())
 
@@ -584,7 +584,7 @@ def main() -> None:
         walls.append((f"_pipe_tmp/wall{i}.stl", "propA"))
         wall_meshes.append(w)
         drafts.append(dr_)
-        print(f"  wall {i + 1}: {1000 * (pts[i][1] - FLOOR):5.1f} mm tall, "
+        print(f"  wall {i + 1}: {1000 * (pts[i][2] - FLOOR):5.1f} mm tall, "
               f"{w.volume * 1e6:5.2f} cm3, draft {dr_:.1f} deg, "
               f"inside the part {vol * 1e9:.4f} mm3")
     # frame the part AND the fixture: the walls stand beside it and the plate in

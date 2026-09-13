@@ -67,7 +67,7 @@ class Supply:
                       r[:,0]*normals[:,1]-r[:,1]*normals[:,0]]
         # Seventh row counts only head forces; the original object-floor
         # reaction is excluded. The last ray represents N_floor >= 0.
-        raw=np.c_[normals,moments,np.where(np.array(owners)>=0,normals[:,1],0.)]
+        raw=np.c_[normals,moments,np.where(np.array(owners)>=0,normals[:,2],0.)]
         slack_index=len(FLOOR.rays())
         raw=np.insert(raw,slack_index,np.r_[np.zeros(6),-1.],axis=0)
         points=np.insert(points,slack_index,problem.floor,axis=0)
@@ -86,7 +86,7 @@ class Supply:
         if index not in self.exact_cache:
             owner=self.owners[index]
             self.exact_cache[index]=(exact_column(self.points[index],self.normals[index],self.problem.domain.com)
-                +[F(-1) if owner==-2 else F(float(self.normals[index,1])) if owner>=0 else F(0)])
+                +[F(-1) if owner==-2 else F(float(self.normals[index,2])) if owner>=0 else F(0)])
         return self.exact_cache[index]
 
     def witness(self,target):
@@ -300,11 +300,11 @@ def independent_support_check(problem,contacts):
     remaining=[]
     for contact in contacts:
         inward=-problem.domain.mesh.face_normals[np.unique(contact['source_faces'])]
-        minimum,maximum=float(inward[:,1].min()),float(inward[:,1].max())
+        minimum,maximum=float(inward[:,2].min()),float(inward[:,2].max())
         unusable=maximum < -1e-12
         if not unusable:
             remaining.append(contact)
-        rows.append(dict(id=contact['candidate_id'],inward_y_min=minimum,inward_y_max=maximum,
+        rows.append(dict(id=contact['candidate_id'],inward_z_min=minimum,inward_z_max=maximum,
                          all_reactions_must_be_zero_for_an_independent_massless_unanchored_support=unusable,
                          horizontal_insertion=horizontal_obstruction(problem,contact)))
     relaxed=Supply(problem,remaining)

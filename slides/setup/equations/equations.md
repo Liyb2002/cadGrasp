@@ -1,6 +1,6 @@
 # The four rows, written out
 
-**2026-09-13 rendering:** The current PNG uses world Y-up (`y=0` at the floor), matching B/pose_2 and the shared renderer. The older derivation below retains its original Z-up notation; its vertical/horizontal symbols must be transported when comparing with current world-coordinate arrays.
+**2026-09-13 rendering:** The current PNG uses world Z-up (`z=0` at the floor), matching B/pose_2 and the shared renderer. The derivation, saved arrays and renderer all use the same native Z-up convention.
 
 **Current declarations (2026-09-08): [problem_statement.md](../../problem_statement.md#当前决定与讨论记录).**
 The local push cone has half-angle `30°`, and the magnitude interval is `0 ≤ t ≤ K=0.5`,

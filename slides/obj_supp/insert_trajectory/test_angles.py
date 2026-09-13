@@ -15,7 +15,7 @@ class AngleTests(unittest.TestCase):
     def test_half_circle_and_wraparound(self):
         self.assertEqual(A.local_angles([[1., 0., 0.]])['intervals_deg'], [[90., 270.]])
         self.assertEqual(A.local_angles([[-1., 0., 0.]])['intervals_deg'], [[0., 90.], [270., 360.]])
-        self.assertEqual(A.local_angles([[0., 1., 0.]])['intervals_deg'], [[0., 360.]])
+        self.assertEqual(A.local_angles([[0., 0., 1.]])['intervals_deg'], [[0., 360.]])
 
     def test_opposed_planes_retain_isolated_tangent_directions(self):
         result = A.local_angles([[1., 0., 0.], [-1., 0., 0.]])
@@ -23,17 +23,17 @@ class AngleTests(unittest.TestCase):
         self.assertEqual(result['isolated_angles_deg'], [90., 270.])
 
     def test_configuration_obstacle_uses_insertion_sign(self):
-        head = trimesh.creation.box([.2, .2, .2]);head.apply_translation(COORD.polar([.1, 0., 1.]))
-        triangle = COORD.polar(np.array([[0., -1., 0.], [0., 1., 0.], [0., 0., 2.]]))
+        head = trimesh.creation.box([.2, .2, .2]);head.apply_translation(np.asarray([.1, 0., 1.]))
+        triangle = np.asarray(np.array([[0., -1., 0.], [0., 1., 0.], [0., 0., 2.]]))
         arcs = A.obstacle_shadow(triangle, head, 2.)
         self.assertTrue(contains(arcs, 1.))
         self.assertFalse(contains(arcs, 180.))
 
     def test_local_angles_do_not_hide_a_remote_obstacle(self):
-        object1 = trimesh.creation.box([1., 1., 1.]);object1.apply_translation(COORD.polar([0., 0., 1.]))
-        obstacle = trimesh.creation.box([.4, .5, .5]);obstacle.apply_translation(COORD.polar([-1.5, 0., 1.]))
+        object1 = trimesh.creation.box([1., 1., 1.]);object1.apply_translation(np.asarray([0., 0., 1.]))
+        obstacle = trimesh.creation.box([.4, .5, .5]);obstacle.apply_translation(np.asarray([-1.5, 0., 1.]))
         mesh = trimesh.util.concatenate([object1, obstacle])
-        head = trimesh.creation.box([.1, .2, .2]);head.apply_translation(COORD.polar([-.55, 0., 1.]))
+        head = trimesh.creation.box([.1, .2, .2]);head.apply_translation(np.asarray([-.55, 0., 1.]))
         study = A.AngleStudy(mesh, [head]);result = study.classify([[-1., 0., 0.]])
         self.assertFalse(study.test_angle(0.)['clear'])
         self.assertTrue(study.test_angle(60.)['clear'])
@@ -46,8 +46,8 @@ class AngleTests(unittest.TestCase):
             if contains(result['geometry_blocked_intervals_deg'], angle):self.assertGreater(volume,1e-9)
 
     def test_sector_encloses_intermediate_angles(self):
-        mesh=trimesh.creation.box([.1,.1,.1]);mesh.apply_translation(COORD.polar([-2.,0.,1.]))
-        head=trimesh.creation.box([.1,.1,.1]);head.apply_translation(COORD.polar([0.,0.,1.]))
+        mesh=trimesh.creation.box([.1,.1,.1]);mesh.apply_translation(np.asarray([-2.,0.,1.]))
+        head=trimesh.creation.box([.1,.1,.1]);head.apply_translation(np.asarray([0.,0.,1.]))
         study=A.AngleStudy(mesh,[head])
         self.assertTrue(study.test_angle(-12.)['clear'])
         self.assertTrue(study.test_angle(12.)['clear'])

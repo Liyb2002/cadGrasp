@@ -31,7 +31,7 @@ def specification(object_name):
     data = json.loads(path.read_text())
     first = data['load']
     if (samples['object'] != object_name or data['object'] != object_name
-            or first['gravity_force_mg'] != [0., -1., 0.]
+            or first['gravity_force_mg'] != [0., 0., -1.]
             or first.get('magnitude_range_mg') != [0., first['K']]):
         raise ValueError('Object identity or physical load range does not match the sampled domain')
     alpha = float(np.deg2rad(first['cone_half_deg']))
@@ -70,7 +70,7 @@ def specification(object_name):
         },
         'load': {'magnitude_K': first['K'], 'magnitude_varies': True,
                  'magnitude_range_mg': [0., first['K']],
-                 'gravity_force_mg': [0., -1., 0.], 'cone_half_deg': first['cone_half_deg']},
+                 'gravity_force_mg': [0., 0., -1.], 'cone_half_deg': first['cone_half_deg']},
         'parameter_domain': {
             'coordinates': ['u', 'v', 'theta', 'phi', 'magnitude_mg'],
             'dimension': 5,
@@ -78,7 +78,7 @@ def specification(object_name):
                 'variables': ['u', 'v'],
                 'inequality_convention': 'matrix @ [u,v] <= upper',
                 'matrix': [[-1., 0.], [0., -1.], [1., 1.]],
-                'upper': [0., 1., 0.],
+                'upper': [0., 0., 1.],
                 'nested_intervals': ['0 <= u <= 1', '0 <= v <= 1-u'],
                 'boundary_included': True,
             },
@@ -99,7 +99,7 @@ def specification(object_name):
         },
         'demand_image': {
             'pair_order': ['Fx', 'Fy', 'Fz', 'tau_x', 'tau_y', 'tau_z'],
-            'force_formula': '-([0,-1,0] + F_push)',
+            'force_formula': '-([0,0,-1] + F_push)',
             'moment_formula': '-cross(pt_f(x)-c,F_push)',
             'D': 'union_f {Psi_f(x) : x in U_f}',
             'ambient_dimension': 6,
@@ -146,7 +146,7 @@ def specification(object_name):
                 r'\;=\;\left(F_D,\;\tau_D\right)$'),
             'pair_expanded': (
                 r'$\left(F_D,\;\tau_D\right)'
-                r'\;=\;\left(mg\,\hat{y}-F_{\rm push},\;'
+                r'\;=\;\left(mg\,\hat{z}-F_{\rm push},\;'
                 r'-(\mathrm{pt}-c)\times F_{\rm push}\right)$'),
             'definitions': (
                 r'$\mathrm{pt}$: push location   ·   $F_{\rm push}$: applied force'

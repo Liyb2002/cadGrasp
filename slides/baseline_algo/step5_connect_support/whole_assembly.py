@@ -37,7 +37,7 @@ def common_directions(records):
 
 
 def open_base(mesh, required, angle, expansion=1.):
-    """U opens along insertion +a; its back and arms clear the full object XZ."""
+    """U opens along insertion +a; its back and arms clear the full object XY."""
     basis = G.frame(angle); scale = float(mesh.extents.max())
     obstacle = mesh.vertices@basis.T
     q = COORD.lift_floor(required)@basis.T
@@ -58,7 +58,7 @@ def open_base(mesh, required, angle, expansion=1.):
         polygons.append(COORD.floor(xy))
     return parts, dict(bearing_deg=float(angle), expansion=float(expansion),
         direction=basis[0].tolist(), width_m=width, height_m=height,
-        pads_xz_m=[p.tolist() for p in polygons], back_local_x_m=back-width/2,
+        pads_xy_m=[p.tolist() for p in polygons], back_local_x_m=back-width/2,
         back_local_y_bounds_m=[low, high], opening='insertion direction +a',
         construction='One continuous U base; footprint hull is not a filled plate')
 
@@ -67,7 +67,7 @@ def footprint(parts, pivot, required, scale):
     """Extract actual bottom triangles, including unexpected added ground material."""
     triangles = []
     for part in parts:
-        on_floor = np.all(np.abs(part.triangles[:, :, 1]) <= scale*1e-10, axis=1)
+        on_floor = np.all(np.abs(part.triangles[:, :, 2]) <= scale*1e-10, axis=1)
         triangles.extend(part.triangles[on_floor])
     tri = np.asarray(triangles).reshape(-1, 3, 3)
     if not len(tri):
@@ -75,7 +75,7 @@ def footprint(parts, pivot, required, scale):
     points = np.vstack([COORD.floor(tri.reshape(-1, 3)), COORD.floor(pivot)])
     covered, hull = G.hull_coverage(required, points, scale*1e-9)
     maximum = float(np.max(required@hull.equations[:, :2].T+hull.equations[:, 2]))
-    return dict(passed=bool(covered.all()), supplied_hull_xz_m=points[hull.vertices].tolist(),
+    return dict(passed=bool(covered.all()), supplied_hull_xy_m=points[hull.vertices].tolist(),
         required_vertex_count=len(required), maximum_outside_distance_m=max(0., maximum),
         original_object_floor_point_included=True, floor_triangle_count=len(tri)), tri
 
@@ -165,7 +165,7 @@ def search(mesh, contacts, records, required, pivot, depth, work=None, edge_budg
                     for factor in DEPTH_FACTORS:
                         grouped = [D.Analyzer(mesh, depth*factor).heads(c) for c in contacts]
                         heads = [p for group in grouped for p in group]
-                        if any(p.vertices[:, 1].min() <= scale*1e-10 for p in heads): continue
+                        if any(p.vertices[:, 2].min() <= scale*1e-10 for p in heads): continue
                         if not M.sweep_check(mesh, heads, direction)['passed']: continue
                         if work is not None and not work.check_parts(heads)['passed']: continue
                         attempt = dict(bearing_deg=angle, expansion=expansion, depth_factor=factor,
@@ -264,7 +264,7 @@ def build(name, edge_budget=2000):
         labels = ['preview_part']*len(parts)
         np.savez_compressed(out/'preview_geometry.npz', **S.pack_parts(parts, labels, joined))
         I.save(out/'progress.json', dict(complete=False, attempt=attempt, candidate_geometry_only=True))
-    geometry, module = search(domain.mesh, contacts, directions['contacts'], floor['required_hull_xz_m'],
+    geometry, module = search(domain.mesh, contacts, directions['contacts'], floor['required_hull_xy_m'],
         floor['original_pivot_m'], directions['normal_depth_m'], work, edge_budget, progress)
     mechanics = dict(sampled_passed=False, continuous_passed=False, status='no_complete_geometry')
     artifacts = {}
@@ -348,15 +348,15 @@ def audit(name):
             points = np.vstack([c['triangles_m'].reshape(-1, 3), c['triangles_m'].mean(axis=1)])
             gap = surface_distances(joined, points).max()
             assert gap <= domain.mesh.extents.max()*1e-9
-        ground, tri = footprint(parts, floor['original_pivot_m'], floor['required_hull_xz_m'], float(domain.mesh.extents.max()))
+        ground, tri = footprint(parts, floor['original_pivot_m'], floor['required_hull_xy_m'], float(domain.mesh.extents.max()))
         assert ground['passed']; np.testing.assert_array_equal(tri, a['floor_triangles_m'])
-        rebuilt_base, base = open_base(domain.mesh, floor['required_hull_xz_m'], angle, report['geometry']['base']['expansion'])
+        rebuilt_base, base = open_base(domain.mesh, floor['required_hull_xy_m'], angle, report['geometry']['base']['expansion'])
         assert base == report['geometry']['base']
         saved_base = [part for part, label in zip(parts, a['part_labels']) if str(label).startswith('ground_strip_')]
         assert len(saved_base) == len(rebuilt_base)
         for p, q in zip(saved_base, rebuilt_base): np.testing.assert_array_equal(p.vertices, q.vertices)
         for part, label in zip(parts, a['part_labels']):
-            if not str(label).startswith('ground_strip_'): assert part.vertices[:, 1].min() > domain.mesh.extents.max()*1e-10
+            if not str(label).startswith('ground_strip_'): assert part.vertices[:, 2].min() > domain.mesh.extents.max()*1e-10
         exported = trimesh.load(out/'support.stl', process=False)
         np.testing.assert_array_equal(exported.triangles, joined.triangles)
         trajectory = json.loads((out/'trajectory.json').read_text())

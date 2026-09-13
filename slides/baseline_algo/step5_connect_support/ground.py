@@ -7,8 +7,8 @@ from step2_local_support import insertion as D
 
 def frame(bearing_deg):
     angle = np.deg2rad(bearing_deg)
-    a = np.array([np.cos(angle), 0., np.sin(angle)])
-    return np.array([a, -np.cross([0, 1, 0], a), [0., 1., 0.]])
+    a = np.array([np.cos(angle), np.sin(angle), 0.])
+    return np.array([a, np.cross([0, 0, 1], a), [0., 0., 1.]])
 
 def box(low, high, basis):
     mesh = trimesh.creation.box(extents=np.asarray(high)-low)

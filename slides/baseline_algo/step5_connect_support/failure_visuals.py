@@ -53,7 +53,7 @@ def find_event(domain,parts,labels,direction,known=None):
             moved=p.copy();moved.vertices=p.vertices+distance*d
             volume=scene.volume(moved)
             if volume>1e-11*scene.scale**3:bad.append(i);volumes.append((volume,i,moved))
-            if moved.vertices[:,1].min() < -1e-10*scene.scale:floor.append(i)
+            if moved.vertices[:,2].min() < -1e-10*scene.scale:floor.append(i)
         last=distance
         if bad or floor:
             volume,index,moved=max(volumes,key=lambda row:row[0]) if volumes else (0.,floor[0],None)
@@ -95,7 +95,7 @@ def diagnostic_directions(domain,contacts,geometry):
     for c in contacts:
         n=domain.mesh.face_normals[c['source_faces']]
         seeds.append((f'Away from {c["candidate_id"]}',(n*c['triangle_areas_m2'][:,None]).sum(axis=0)))
-    seeds += [('World +X',np.array([1.,0,0])),('World -X',np.array([-1.,0,0])),('World +Y',np.array([0.,1.,0]))]
+    seeds += [('World +X',np.array([1.,0,0])),('World -X',np.array([-1.,0,0])),('World +Z',np.array([0.,0,1.]))]
     for label,d in seeds:
         if np.linalg.norm(d)<1e-10:continue
         d=d/np.linalg.norm(d)
@@ -168,7 +168,7 @@ def render(name,domain,contacts,parts,labels,geometry,status,out,static_only=Fal
             value=float(np.min(domain.mesh.face_normals[c['source_faces']]@d))
             if value < -X.NORMAL_TOLERANCE:blockers.append(dict(candidate_id=c['candidate_id'],minimum_normal_dot=value))
         e.update(name=label,normal_constraint_blockers=blockers,direction_was_search_candidate=bool(geometry.get('attempts')),
-                 floor_direction_constraint_violated=bool(d[1]<-1e-10),material_stage=stage)
+                 floor_direction_constraint_violated=bool(d[2]<-1e-10),material_stage=stage)
         if inter is not None and len(inter.faces):
             filename=f'failure_collision_{i+1:02d}_mm.stl';copy=inter.copy();copy.apply_scale(1000);copy.export(out/filename,file_type='stl_ascii');e['collision_mesh']=filename
         events.append(e);intersections.append(inter)
@@ -177,7 +177,7 @@ def render(name,domain,contacts,parts,labels,geometry,status,out,static_only=Fal
     failed_pose=joined.copy();failed_pose.vertices=(failed_pose.vertices+np.asarray(event['translation_m']))*1000
     failed_pose.export(out/'failure_pose_mm.stl',file_type='stl_ascii')
     # A view roughly perpendicular to the motion exposes the displacement.
-    d=np.asarray(event['direction']);h=np.linalg.norm(COORD.floor(d));sight=np.array([d[2],.6*h,-d[0]]) if h>1e-5 else np.array([.68,.65,-1.])
+    d=np.asarray(event['direction']);h=np.linalg.norm(COORD.floor(d));sight=np.r_[d[1],-d[0],.6*h] if h>1e-5 else np.array([.68,-1.,.65])
     basis=V.R.axes(sight);points=np.vstack([domain.mesh.vertices,joined.vertices,joined.vertices+np.asarray(event['translation_m'])])
     view=V.camera(domain,[],basis=basis,points=points)
     close=V.fit(np.vstack([parts[i].vertices+np.asarray(event['translation_m']) for i in event['colliding_parts']]) if event['colliding_parts'] else joined.vertices,basis,margin=1.9)
@@ -236,7 +236,7 @@ def render(name,domain,contacts,parts,labels,geometry,status,out,static_only=Fal
             clearance_envelope_not_actual_material=e.get('clearance_envelope_not_actual_material',False),
             description=description+f" 终点见证的相交体积 {e['intersection_volume_m3']*1e9:.6g} mm³。",material_note=note,
             focus=(np.asarray(e['focus_m'])*1000).tolist(),focus_width=e['focus_width_m']*1000))
-    payload=dict(coordinate_system='y_up_xz_floor',title=f'{name} / {pose_name()} · Step5 失败形状',stage='实际构造阶段：'+stage+'。'+note,
+    payload=dict(coordinate_system='z_up_xy_floor',title=f'{name} / {pose_name()} · Step5 失败形状',stage='实际构造阶段：'+stage+'。'+note,
         reason=REASONS.get(status,status),object=object_mesh,floor=pack_mesh(floor),
         shapes=[[dict(pack_mesh(p),label=l) for p,l in zip(parts,labels)]],events=viewer_events,primary_event=primary,
         center=(points.min(axis=0)+points.max(axis=0)).tolist(),width=float(np.ptp(points,axis=0).max())*1250)
@@ -270,7 +270,7 @@ def no_heads(name,domain,out,inputs=()):
     event=dict(name='No selected heads',direction=[0,0,0],translation=[0,0,0],anchor=center,
         colliding_parts=[],collision=None,description=REASONS['no_selected_heads'],
         material_note='没有支撑材料；没有可导出的支撑 STL。',focus=center,focus_width=width)
-    payload=dict(coordinate_system='y_up_xz_floor',title=f'{name} / {pose_name()} · 未选出支撑头',stage=event['material_note'],
+    payload=dict(coordinate_system='z_up_xy_floor',title=f'{name} / {pose_name()} · 未选出支撑头',stage=event['material_note'],
         reason=REASONS['no_selected_heads'],object=object_mesh,floor=None,shapes=[[]],
         events=[event],primary_event=0,center=center,width=width)
     template=Path(__file__).with_name('failure_viewer.html').read_text()

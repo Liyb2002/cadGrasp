@@ -10,9 +10,9 @@ DEPTH_FACTORS=(1., .75, .5, .25, .125)
 
 def pad_parts(foot):
     parts=[]
-    for polygon in foot['pads_xz_m']:
+    for polygon in foot['pads_xy_m']:
         xy=np.asarray(polygon,float);bottom=COORD.lift_floor(xy)
-        parts.append(D.engine.hull_mesh(np.vstack([bottom,bottom+[0,foot['height_m'],0]])))
+        parts.append(D.engine.hull_mesh(np.vstack([bottom,bottom+[0,0,foot['height_m']]])))
     return parts
 
 
@@ -54,7 +54,7 @@ def build_one(mesh,contact,direction,foot,depth,work,edge_budget=800):
     # All non-pad material must stay above the floor, so the saved Step 4
     # footprint remains the complete actual bearing region.
     backings=[(factor,heads) for factor,heads in backings
-              if all(head.vertices[:,1].min()>scale*1e-10 for head in heads)]
+              if all(head.vertices[:,2].min()>scale*1e-10 for head in heads)]
     if not backings:
         report['status']='contact_backing_adds_unrecorded_floor_contact';return report,None
     # Try inexpensive shapes across the whole angle menu before spending a
@@ -68,7 +68,7 @@ def build_one(mesh,contact,direction,foot,depth,work,edge_budget=800):
                          spatial_search_enabled=allow_roadmap)
             report['attempts'].append(attempt)
             routes=[];bars=[];labels=[]
-            for index,polygon in enumerate(foot['pads_xz_m']):
+            for index,polygon in enumerate(foot['pads_xy_m']):
                 anchor=np.asarray(polygon).mean(axis=0)
                 route=router.connect(heads,anchor,float(foot['height_m']),allow_roadmap=allow_roadmap)
                 if route is None:
@@ -79,7 +79,7 @@ def build_one(mesh,contact,direction,foot,depth,work,edge_budget=800):
             print('  ',cid,'angle',angle,'backing',factor,'roadmap',allow_roadmap,
                   'connected pads',len(routes),'/',len(pads),flush=True)
             if len(routes)!=len(pads):continue
-            if any(part.vertices[:,1].min()<=scale*1e-10 for part in bars):
+            if any(part.vertices[:,2].min()<=scale*1e-10 for part in bars):
                 attempt['rejection']='connector_adds_unrecorded_floor_contact';continue
             parts=list(heads)+bars+pads
             labels=[f'contact_head_{k:03d}' for k in range(len(heads))]+labels+[f'ground_pad_{k:03d}' for k in range(len(pads))]
@@ -100,11 +100,11 @@ def build_one(mesh,contact,direction,foot,depth,work,edge_budget=800):
                     attempt['rejection']='contact_interface_not_preserved';continue
             except (ValueError,RuntimeError) as error:
                 attempt['rejection']=str(error);continue
-            corners=COORD.lift_floor(np.concatenate(foot['pads_xz_m']))
+            corners=COORD.lift_floor(np.concatenate(foot['pads_xy_m']))
             plan=dict(candidate_id=cid,bearing_deg=angle,direction=router.direction,
                 backing_depth_factor=factor,routes=routes,ground_height_m=foot['height_m'],
-                ground_polygons_xz_m=[np.asarray(p) for p in foot['pads_xz_m']],ground_corners_m=corners,
-                ground_area_m2=foot['bearing_area_m2'],anchor_xz_m=np.asarray(foot['center_xz_m']),
+                ground_polygons_xy_m=[np.asarray(p) for p in foot['pads_xy_m']],ground_corners_m=corners,
+                ground_area_m2=foot['bearing_area_m2'],anchor_xy_m=np.asarray(foot['center_xy_m']),
                 construction='Retained contact backing and routed bars to every fixed Step 4 pad')
             report.update(passed=True,status='individual_connection_and_insertion_verified',
                 bearing_deg=angle,backing_depth_factor=factor,solid=solid,

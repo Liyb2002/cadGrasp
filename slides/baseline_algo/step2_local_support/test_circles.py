@@ -106,13 +106,13 @@ class CircleTests(unittest.TestCase):
                              [[0,1,2],[0,2,3],[0,3,4],[0,4,5]],process=False)
         polygons={i:p for i,p in enumerate(mesh.triangles)}
         mesh.apply_transform(trimesh.transformations.rotation_matrix(3*np.pi/4,[0,1,0]))
-        mesh.apply_translation([0, 5, 0])
+        mesh.apply_translation([0, 0, 5])
         polygons={i:p for i,p in enumerate(mesh.triangles)}
         self.assertAlmostEqual(P.normal_spread(mesh,polygons)['wrap_angle_degrees'],90.)
         self.assertTrue(P.LocalClearance(mesh,.01).check(polygons)['valid'])
 
     def test_connected_thin_wall_cannot_wrap_onto_its_back(self):
-        mesh=trimesh.creation.box([1., .02, 1.]);mesh.apply_translation([0, 1, 0])
+        mesh=trimesh.creation.box([1., 1., .02]);mesh.apply_translation([0, 0, 1])
         center=np.array([.48,0.,1.01]);face=int(mesh.nearest.on_surface(center[None])[2][0])
         surface=P.SurfaceCircles(mesh,{i:p for i,p in enumerate(mesh.triangles)})
         polygons,report=surface.fit(center,face,.01*mesh.area)

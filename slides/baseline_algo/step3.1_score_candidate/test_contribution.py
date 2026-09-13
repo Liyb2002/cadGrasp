@@ -84,22 +84,22 @@ class ContributionTests(unittest.TestCase):
         domain, data, _, S, floor = V.context('B')
         index = int(np.flatnonzero(data.valid)[0])
         full = V.columns(domain, data, index, floor, S.scale)
-        for force in ([64.,1.,0.],[-64.,1.,0.],[0.,1.,64.],[0.,1.,-64.]):
+        for force in ([64.,0.,1.],[-64.,0.,1.],[0.,64.,1.],[0.,-64.,1.]):
             expected = np.r_[np.r_[force, np.cross(floor-domain.com, force)]*S.scale,0.]
             self.assertLess(np.linalg.norm(full-expected, axis=1).min(), 1e-13)
         a,b = data.offsets[index:index+2]
         normal = -domain.mesh.face_normals[data.source_faces[a]]
         point = data.triangles[a,0]
-        expected = np.r_[np.r_[normal, np.cross(point-domain.com, normal)]*S.scale,normal[1]]
+        expected = np.r_[np.r_[normal, np.cross(point-domain.com, normal)]*S.scale,normal[2]]
         self.assertLess(np.linalg.norm(full-expected, axis=1).min(), 1e-13)
 
     def test_actual_stored_pairs_have_no_injected_gravity_case(self):
-        for name in ('B',):
+        for name in V.OBJECTS:
             domain, _, _, _, _ = V.context(name)
             samples, targets = V.read_samples(name, domain)
             self.assertEqual(len(targets), samples['count'])
             self.assertNotIn('boundary_checks', samples)
-            assert_allclose(targets[:, :3]+samples['force_push_mg'], np.broadcast_to([0,1,0], (len(targets),3)))
+            assert_allclose(targets[:, :3]+samples['force_push_mg'], np.broadcast_to([0,0,1], (len(targets),3)))
 
     def test_real_circle_facets_keep_all_original_rays(self):
         domain, data, _, S, floor = V.context('B')

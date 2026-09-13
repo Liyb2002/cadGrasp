@@ -130,6 +130,16 @@ class CompletionTests(unittest.TestCase):
                 run_all.run(['test'],from_step=5,connection_workers=0)
             invoke.assert_not_called()
 
+    def test_force_directions_recomputes_even_with_resume(self):
+        with patch.object(run_all.subprocess, 'run') as invoke:
+            invoke.return_value.returncode = 0
+            self.assertEqual(run_all.run(['test'], from_step=2, through_step=2,
+                                         resume=True, force_directions=True), 0)
+            commands = [c.args[0] for c in invoke.call_args_list]
+            forced = [c for c in commands if '--force' in c]
+            self.assertEqual(len(forced), 1)
+            self.assertTrue(forced[0][1].endswith('/insertion_directions.py'))
+
     def test_resume_reuses_completed_failed_search_but_replays_its_audit(self):
         checkpoint=dict(status='candidates_exhausted',continuous_coverage_proved=False)
         with patch.object(run_all,'completed_schedule',return_value=checkpoint), \

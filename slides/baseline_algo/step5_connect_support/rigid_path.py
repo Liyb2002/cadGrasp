@@ -19,7 +19,7 @@ def constraints(mesh, contacts, floor_points, origin, scale):
         normals = np.repeat(mesh.face_normals[c['source_faces']], 3, axis=0)
         rows.append(np.c_[normals, np.cross((points-origin)/scale, normals)])
     points = np.asarray(floor_points).reshape(-1, 3)
-    normals = np.tile([0., 1., 0.], (len(points), 1))
+    normals = np.tile([0., 0., 1.], (len(points), 1))
     rows.append(np.c_[normals, np.cross((points-origin)/scale, normals)])
     return np.unique(np.vstack(rows), axis=0)
 
@@ -38,7 +38,7 @@ def local_motions(mesh, contacts, floor_points, origin, scale):
         if np.min(matrix@motion) < -2e-9: continue
         if all(np.linalg.norm(motion-other) > 1e-5 for other in motions): motions.append(motion)
     # Explicit pure translations are useful when the LP returns a rotational
-    # extreme. Floor constraints rule out downward withdrawal from y=0.
+    # extreme. Floor constraints rule out downward withdrawal from z=0.
     for v in np.vstack([np.eye(3), -np.eye(3)]):
         motion = np.r_[v, np.zeros(3)]
         if np.min(matrix@motion) >= -2e-9 and all(np.linalg.norm(motion-m) > 1e-5 for m in motions):
@@ -57,7 +57,7 @@ def rotation_enclosure(points, origin, motion, scale, first, last):
     """Sagitta padding stays in the rotation plane; exact sinusoid floor minimum."""
     points=np.asarray(points); omega=np.asarray(motion[3:]); speed=float(np.linalg.norm(omega))
     p=transform(points,origin,scale,motion,first);q=transform(points,origin,scale,motion,last)
-    if speed < 1e-14:return np.vstack([p,q]),float(min(p[:,1].min(),q[:,1].min()))
+    if speed < 1e-14:return np.vstack([p,q]),float(min(p[:,2].min(),q[:,2].min()))
     axis=omega/speed;r=points-origin
     parallel=(r@axis)[:,None]*axis; radial=r-parallel; cross=np.cross(axis,radial)
     radius=float(np.linalg.norm(radial,axis=1).max());angle=speed*(last-first)
@@ -67,8 +67,8 @@ def rotation_enclosure(points, origin, motion, scale, first, last):
     enclosure=(np.vstack([p,q])[:,None,:]+corners).reshape(-1,3)
     # z(s)=C+A*cos(speed*s)+B*sin(speed*s)+D*s. Evaluate endpoints
     # and every derivative zero within this (at most pi/3) interval.
-    A=radial[:,1];B=cross[:,1];C=origin[1]+parallel[:,1];D=scale*motion[1]
-    low=float(min(p[:,1].min(),q[:,1].min()))
+    A=radial[:,2];B=cross[:,2];C=origin[2]+parallel[:,2];D=scale*motion[2]
+    low=float(min(p[:,2].min(),q[:,2].min()))
     amp=np.hypot(A,B);ids=np.flatnonzero((amp>1e-15*scale)&(abs(D)<=speed*amp))
     for k in ids:
         phi=np.arctan2(A[k],B[k]);theta=np.arccos(np.clip(-D/(speed*amp[k]),-1,1))
@@ -117,7 +117,7 @@ def separated(scene, points):
 
 def search(scene, contacts, parts, origin, interval_budget=240):
     vertices = np.vstack([p.vertices for p in parts])
-    floor = vertices[np.abs(vertices[:, 1]) <= scene.scale*1e-10]
+    floor = vertices[np.abs(vertices[:, 2]) <= scene.scale*1e-10]
     motions, local = local_motions(scene.mesh, contacts, floor, origin, scene.scale)
     report = dict(passed=False, status='no_nonzero_first_order_exit_found' if not motions else 'no_trajectory_in_finite_menu',
         local_motion=local, attempts=[], rotation_allowed=True,

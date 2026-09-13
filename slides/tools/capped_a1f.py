@@ -291,7 +291,7 @@ def search(targets, avail, tiles, cuts=14, milp_seconds=420.0):
     test the bound is attained and the count is minimal rather than merely found.
     """
     note, mag = [], np.linalg.norm(targets, axis=1)
-    Y = tiles[tiles[:, 1] <= 1e-12]                 # y.up <= 0 is the whole admissible set
+    Y = tiles[tiles[:, 2] <= 1e-12]                 # y.up <= 0 is the whole admissible set
     Y = Y[(Y @ targets.T).max(axis=1) > 1e-9]       # a row demanding nothing constrains nothing
     n, t0, bound = len(avail), time.time(), 0
     incumbent = None
@@ -449,7 +449,7 @@ def main() -> None:
         mag = np.linalg.norm(targets, axis=1)
         unit = targets / mag[:, None]
 
-        on_floor = (part.triangles_center @ R.T + t)[:, 1] <= CONTACT_EPS
+        on_floor = (part.triangles_center @ R.T + t)[:, 2] <= CONTACT_EPS
         off = np.flatnonzero(~inside & ~on_floor)
         push = -(part.face_normals[off] @ R.T)
         push /= np.linalg.norm(push, axis=1, keepdims=True)

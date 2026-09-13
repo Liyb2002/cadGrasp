@@ -38,7 +38,7 @@ def interpolate(first,last,t):
 
 
 def search(scene, contacts, parts, origin, iterations=1800):
-    vertices=np.vstack([p.vertices for p in parts]); floor=vertices[np.abs(vertices[:,1])<=scene.scale*1e-10]
+    vertices=np.vstack([p.vertices for p in parts]); floor=vertices[np.abs(vertices[:,2])<=scene.scale*1e-10]
     motions,local=P.local_motions(scene.mesh,contacts,floor,origin,scene.scale)
     report=dict(passed=False,status='no_piecewise_path_in_finite_search',local_motion=local,
         method='seeded rigid-motion tree with continuously checked SE3 edges',
@@ -51,7 +51,7 @@ def search(scene, contacts, parts, origin, iterations=1800):
     def accept(parent,target):
         nonlocal checked
         moved=transform(vertices,origin,target)
-        if moved[:,1].min() < -scene.scale*1e-10:return False
+        if moved[:,2].min() < -scene.scale*1e-10:return False
         if np.max(np.abs(target[:3,3]))>3*scene.scale:return False
         if any(not scene.clear(p,ground=True) for p in moved_parts(parts,origin,target)):return False
         okay,count=edge(scene,parts,origin,nodes[parent],target);checked+=count
@@ -77,7 +77,7 @@ def search(scene, contacts, parts, origin, iterations=1800):
         for direction in directions:
             goal=pose.copy();goal[:3,3]+=direction*scene.scale*2.5
             points=transform(vertices,origin,goal)
-            if points[:,1].min() < -scene.scale*1e-10 or not P.separated(scene,points):continue
+            if points[:,2].min() < -scene.scale*1e-10 or not P.separated(scene,points):continue
             if accept(end,goal):
                 ids=[len(nodes)-1]
                 while parents[ids[-1]]>=0:ids.append(parents[ids[-1]])

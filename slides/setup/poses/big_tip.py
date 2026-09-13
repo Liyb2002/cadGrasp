@@ -308,7 +308,7 @@ QUANTUM = 0.005         # the largest share of the surface one face may hold
                         # that every bearing came back a roll (`candidates`)
 SEED = 20260827
 TMP = "_big_tip_tmp"
-Z = np.array([0.0, 1.0, 0.0])  # historical symbol; world up is Y
+Z = np.array([0.0, 0.0, 1.0])
 
 
 # ------------------------------------------------------------ the geometry ---
@@ -356,8 +356,8 @@ def rest_pose(mesh, T_place):
     hull = mesh.convex_hull
     R = T_place[:3, :3]
     n = np.asarray(hull.face_normals) @ R.T
-    j = int(np.argmin(n[:, 1]))
-    tilt = float(np.degrees(np.arccos(np.clip(-n[j, 1], -1.0, 1.0))))
+    j = int(np.argmin(n[:, 2]))
+    tilt = float(np.degrees(np.arccos(np.clip(-n[j, 2], -1.0, 1.0))))
     assert tilt < TILT, (
         f"the most downward-facing hull facet of this placement stands {tilt:.2f} "
         f"deg off level, so the recorded pose is not resting on it")
@@ -365,12 +365,12 @@ def rest_pose(mesh, T_place):
     out = np.eye(4)
     out[:3, :3], out[:3, 3] = F @ R, F @ T_place[:3, 3]
     V = np.asarray(mesh.vertices) @ out[:3, :3].T + out[:3, 3]
-    drop = float(V[:, 1].min())
-    out[1, 3] -= drop
+    drop = float(V[:, 2].min())
+    out[2, 3] -= drop
     # the placement is STABLE, which is what makes it something to tip FROM: the
     # weight comes down inside the polygon the part stands on
     P = np.asarray(hull.vertices) @ out[:3, :3].T + out[:3, 3]
-    foot = COORD.floor(P[P[:, 1] <= TOUCH])
+    foot = COORD.floor(P[P[:, 2] <= TOUCH])
     com = COORD.floor(out[:3, :3] @ mesh.center_mass + out[:3, 3])
     poly = ConvexHull(foot)
     deep = float((poly.equations[:, :2] @ com + poly.equations[:, 2]).max())
@@ -406,8 +406,8 @@ def refine(mesh, rounds=6):
     got = 0
     if len(f) <= COARSE:
         for got in range(1, rounds + 1):
-            v, f = trimesh.remesh.subdivide(v, COORD.faces(f))
-            f = COORD.faces(f)
+            v, f = trimesh.remesh.subdivide(v, np.asarray(f))
+            f = np.asarray(f)
             m = trimesh.Trimesh(v, f, process=False)
             if (m.area_faces / m.area).max() <= QUANTUM:
                 break
@@ -620,15 +620,15 @@ def candidates(mesh, T_rest):
     """
     V = np.asarray(mesh.vertices) @ T_rest[:3, :3].T + T_rest[:3, 3]
     com = T_rest[:3, :3] @ mesh.center_mass + T_rest[:3, 3]
-    floor = np.flatnonzero(V[:, 1] <= TOUCH)
+    floor = np.flatnonzero(V[:, 2] <= TOUCH)
     out = []
     for k in range(NB):
         th = 2 * np.pi * k / NB
-        e1 = np.array([np.cos(th), 0.0, np.sin(th)])
+        e1 = np.array([np.cos(th), np.sin(th), 0.0])
         x = V @ e1
         j = int(floor[np.argmax(x[floor])])
         q = V[j]
-        dx, dz = x - x[j], V[:, 1] - q[1]
+        dx, dz = x - x[j], V[:, 2] - q[2]
         r = np.hypot(dx, dz)
         on = r > 1e-9                           # what sits ON the axis never moves
         phi = np.arctan2(dz[on], dx[on])
@@ -695,7 +695,7 @@ def candidates(mesh, T_rest):
         if depth > DEPTH:
             continue
         # where the weight ends up: the com in the plane of the tip, turned
-        xc, zc = float((com - q) @ e1), float(com[1] - q[1])
+        xc, zc = float((com - q) @ e1), float(com[2] - q[2])
         s = float((com - q) @ np.cross(Z, e1))          # and out of that plane
         t = np.radians(tip)
         ahead = xc * np.cos(t) + zc * np.sin(t)
@@ -829,14 +829,14 @@ def hull_places(mesh, used):
     out = []
     for j in range(len(N)):
         F = down(N[j])
-        drop = -float((V @ F.T)[:, 1].min())
+        drop = -float((V @ F.T)[:, 2].min())
         P = HV @ F.T
-        P[:, 1] += drop
-        foot = COORD.floor(P[P[:, 1] <= TOUCH])
+        P[:, 2] += drop
+        foot = COORD.floor(P[P[:, 2] <= TOUCH])
         if len(foot) < 3:
             continue
         com = F @ mesh.center_mass
-        com[1] += drop
+        com[2] += drop
         try:
             poly = ConvexHull(foot)
         except QhullError:
@@ -849,7 +849,7 @@ def hull_places(mesh, used):
                for m in seen):
             continue            # the same face of the workpiece, already offered
         T = np.eye(4)
-        T[:3, :3], T[1, 3] = F, drop
+        T[:3, :3], T[2, 3] = F, drop
         out.append((j, T, float(-deep)))
         seen.append(N[j])
     return out
@@ -865,7 +865,7 @@ def admissible(mesh, T_star):
     """
     n = mesh.face_normals @ T_star[:3, :3].T
     c = mesh.triangles_center @ T_star[:3, :3].T + T_star[:3, 3]
-    up = (n[:, 1] > GUN_MIN_ELEVATION) & (c[:, 1] > CONTACT_EPS)
+    up = (n[:, 2] > GUN_MIN_ELEVATION) & (c[:, 2] > CONTACT_EPS)
     seen = ~mesh.ray.intersects_any(
         ray_origins=mesh.triangles_center + 1e-5 * mesh.face_normals,
         ray_directions=mesh.face_normals)
@@ -1080,12 +1080,12 @@ def one(name, d, mesh, got, k, tied):
     def turn(a):
         R = rot_about_line(axis, point, np.radians(a)) @ T_rest
         V = np.asarray(mesh.vertices) @ R[:3, :3].T + R[:3, 3]
-        R[1, 3] -= float(V[:, 1].min())
+        R[2, 3] -= float(V[:, 2].min())
         return R
 
     T_star, T_mid = turn(tip), turn(mid)
     lift = float(T_star[2, 3]
-                 - (rot_about_line(axis, point, np.radians(tip)) @ T_rest)[1, 3])
+                 - (rot_about_line(axis, point, np.radians(tip)) @ T_rest)[2, 3])
 
     # the pose is legal, checked on the drawing's own transform rather than on
     # the closed form that chose it.  THE CONTACT IS READ BACK OFF THE DRAWN
@@ -1095,19 +1095,19 @@ def one(name, d, mesh, got, k, tied):
     # the point the rotation was built about.  `roll` is the distance between
     # those two, and it is the contact migration this page allows and prints.
     V = np.asarray(mesh.vertices) @ T_star[:3, :3].T + T_star[:3, 3]
-    low = float(V[:, 1].min())
-    contact = V[int(np.argmin(V[:, 1]))].copy()
-    contact[1] = 0.0
+    low = float(V[:, 2].min())
+    contact = V[int(np.argmin(V[:, 2]))].copy()
+    contact[2] = 0.0
     roll = float(np.linalg.norm(COORD.floor(contact) - COORD.floor(point)))
     point = contact
-    touch = int((V[:, 1] <= TOUCH).sum())
-    band = int((V[:, 1] <= CONTACT_EPS).sum())
+    touch = int((V[:, 2] <= TOUCH).sum())
+    band = int((V[:, 2] <= CONTACT_EPS).sum())
     spread = float(np.linalg.norm(
-        COORD.floor(V[V[:, 1] <= TOUCH]) - COORD.floor(contact), axis=1).max())
+        COORD.floor(V[V[:, 2] <= TOUCH]) - COORD.floor(contact), axis=1).max())
     # and the same width read at the 1.5 mm tolerance, which is the generous
     # reading of "touching" and the one a sceptic would ask for
     wide = float(np.linalg.norm(
-        COORD.floor(V[V[:, 1] <= CONTACT_EPS]) - COORD.floor(contact), axis=1).max())
+        COORD.floor(V[V[:, 2] <= CONTACT_EPS]) - COORD.floor(contact), axis=1).max())
     assert low > -1e-12, f"{name}: the target pose puts the workpiece " \
                          f"{-1000 * low:.3f} mm through the floor"
     assert low < 1e-9, f"{name}: the target pose floats {1000 * low:.3f} mm " \

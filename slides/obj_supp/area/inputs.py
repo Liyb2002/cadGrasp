@@ -67,7 +67,7 @@ def demand_table(name, mesh, record, log=print):
     T, take = record['T_star'], record['take']
     com = T[:3, :3] @ mesh.center_mass + T[:3, 3]
     q, d = cone_pushes(mesh, T, take, POINTS, DIRS, SEED, CONE_HALF_DEG)
-    F = np.array([0., 1., 0.]) - K * d
+    F = np.array([0., 0., 1.]) - K * d
     M = -1000.0 * K * np.cross(q - com, d)
     assert np.max(np.abs(np.linalg.norm(d, axis=1) - 1)) < 1e-12
     assert np.max(np.abs(np.einsum('ij,ij->i', M, d))) < 1e-10

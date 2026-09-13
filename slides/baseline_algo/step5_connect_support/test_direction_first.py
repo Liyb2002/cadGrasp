@@ -13,11 +13,11 @@ from step2_local_support.surface import areas
 
 class DirectionFirstTests(unittest.TestCase):
     def setUp(self):
-        self.mesh=trimesh.creation.box([1., 1., 1.]);self.mesh.apply_translation([0., 1., 0.])
+        self.mesh=trimesh.creation.box([1., 1., 1.]);self.mesh.apply_translation([0., 0., 1.])
         self.work=np.flatnonzero(self.mesh.face_normals[:,0]>.9)
         self.domain=SimpleNamespace(mesh=self.mesh,work_ids=self.work,com=self.mesh.center_mass)
         cloud=np.array([[-.7,-.7],[.7,-.7],[.7,.7],[-.7,.7]])
-        self.floor=dict(floor_demands_xz_m=cloud,continuous_floor_enclosure_xz_m=cloud,original_pivot_m=np.zeros(3))
+        self.floor=dict(floor_demands_xy_m=cloud,continuous_floor_enclosure_xy_m=cloud,original_pivot_m=np.zeros(3))
 
     def test_step5_uses_only_scheduled_survivors_and_reports_untried_ids(self):
         from step2_local_support import withdrawal as W
@@ -47,11 +47,11 @@ class DirectionFirstTests(unittest.TestCase):
 
     def test_work_back_is_a_preference_and_floor_is_a_constraint(self):
         np.testing.assert_allclose(X.preferred_direction(self.mesh,self.work),[-1,0,0])
-        top=np.flatnonzero(self.mesh.face_normals[:,1]>.9)
+        top=np.flatnonzero(self.mesh.face_normals[:,2]>.9)
         directions,report=X.propose_directions(self.mesh,contacts(self.mesh),top)
-        np.testing.assert_allclose(report['preferred_withdrawal_direction'],[0,-1,0])
+        np.testing.assert_allclose(report['preferred_withdrawal_direction'],[0,0,-1])
         self.assertTrue(directions)
-        self.assertTrue(all(d[1]>=0 for d in directions))
+        self.assertTrue(all(d[2]>=0 for d in directions))
         self.assertFalse(report['global_impossibility_claimed'])
 
     def test_incompatible_fixed_heads_are_rejected_before_frame_construction(self):
@@ -65,14 +65,14 @@ class DirectionFirstTests(unittest.TestCase):
         self.assertFalse(report['rotation_searched'])
 
     def test_clearance_rejects_a_noncolliding_but_too_close_member(self):
-        part=trimesh.creation.box([.1, .1, .1]);part.apply_translation([-.551, 1, 0])
+        part=trimesh.creation.box([.1, .1, .1]);part.apply_translation([-.551, 0, 1])
         scene=X.SweptScene(self.mesh,np.array([-1.,0,0]),.02)
         self.assertTrue(scene.clear(part,clearance=0))
         self.assertFalse(scene.clear(part))
 
     def test_full_ray_rejects_a_remote_obstacle_after_initial_separation(self):
-        obstacle=trimesh.creation.box([.2, .2, .2]);obstacle.apply_translation([2., .5, 0])
-        part=trimesh.creation.box([.1, .1, .1]);part.apply_translation([0., .5, 0])
+        obstacle=trimesh.creation.box([.2, .2, .2]);obstacle.apply_translation([2., 0, .5])
+        part=trimesh.creation.box([.1, .1, .1]);part.apply_translation([0., 0, .5])
         scene=X.SweptScene(obstacle,np.array([1.,0,0]))
         self.assertTrue(B.Scene.clear(scene,part))
         self.assertFalse(scene.clear(part))

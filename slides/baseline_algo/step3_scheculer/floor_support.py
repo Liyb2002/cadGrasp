@@ -11,8 +11,8 @@ COEFFICIENT = 64.0
 
 def rays():
     mu = COEFFICIENT
-    return np.array([[mu, 1., 0.], [-mu, 1., 0.],
-                     [0., 1., mu], [0., 1., -mu]])
+    return np.array([[mu, 0., 1.], [-mu, 0., 1.],
+                     [0., mu, 1.], [0., -mu, 1.]])
 
 
 def columns(point, com):
@@ -23,6 +23,6 @@ def columns(point, com):
 def description():
     return dict(model='four_ray_coulomb_inner_pyramid', coefficient=COEFFICIENT,
                 location='original_workpiece_floor_contact', unilateral=True,
-                inequality='abs(Fx) + abs(Fz) <= coefficient * Fy; Fy >= 0',
+                inequality='abs(Fx) + abs(Fy) <= coefficient * Fz; Fz >= 0',
                 independent_contact_moment=False,
                 scope='Finite sufficient-friction assumption, matching the largest Step5 coefficient; not a measured material coefficient.')

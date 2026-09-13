@@ -24,7 +24,7 @@ import argparse
 from pathlib import Path
 
 import mujoco
-from yup_render import Renderer as YUpRenderer
+from mujoco import Renderer
 import numpy as np
 import trimesh
 from PIL import Image, ImageDraw, ImageFont
@@ -98,7 +98,7 @@ def disturbances(mesh: trimesh.Trimesh, T: np.ndarray, pivot: np.ndarray,
     pts, nrm = sample_surface(mesh, n, seed)
     p = pts @ R.T + t
     n_out = nrm @ R.T
-    keep = p[:, 1] > CONTACT_EPS          # the ground patch cannot be pushed on
+    keep = p[:, 2] > CONTACT_EPS          # the ground patch cannot be pushed on
     p, n_out = p[keep], n_out[keep]
     push = -n_out                         # a rigid contact can only push inwards
 
@@ -133,7 +133,7 @@ def paint_surface(mesh: trimesh.Trimesh, T: np.ndarray, pivot: np.ndarray,
     push = -(mesh.face_normals @ R.T)
     along = np.cross(centre - pivot, push) @ fall_axis
 
-    on_ground = centre[:, 1] <= CONTACT_EPS
+    on_ground = centre[:, 2] <= CONTACT_EPS
     groups = [("ground_patch", on_ground),
               ("adds", ~on_ground & (along > NEUTRAL)),
               ("holds", ~on_ground & (along <= NEUTRAL))]
@@ -184,7 +184,7 @@ def render(name: str, T: np.ndarray, d: dict, parts, px: int, azimuth: float,
     cam.distance = 1.55 * float(np.linalg.norm(hi - lo)) / 2 / np.tan(
         np.deg2rad(model.vis.global_.fovy / 2))
 
-    with YUpRenderer(model, px, px, max_geom=20000) as r:
+    with Renderer(model, px, px, max_geom=20000) as r:
         r.update_scene(data, camera=cam)
         scn = r.scene
         if arrows is not None:

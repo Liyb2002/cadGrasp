@@ -1,6 +1,6 @@
 # Step 3.1：计算本轮各候选的联合贡献
 
-**所有头最终连接为一个刚体，允许局部下压，但每个输入的同一组反力必须满足 `sum(head_force_on_workpiece_y) >= 0`，不计物体脚底反力。** 这条整体约束与力、力矩平衡同时求解，不是每头分别限制，也不是先求解再筛选。[passive_supports.md](passive_supports.md) 保留先前独立支撑假设下的历史讨论。[Step 5](../step5_connect_support/README.md) 负责实际单体连接和完整承载、滑入检查。
+**所有头最终连接为一个刚体，允许局部下压，但每个输入的同一组反力必须满足 `sum(head_force_on_workpiece_z) >= 0`，不计物体脚底反力。** 这条整体约束与力、力矩平衡同时求解，不是每头分别限制，也不是先求解再筛选。[passive_supports.md](passive_supports.md) 保留先前独立支撑假设下的历史讨论。[Step 5](../step5_connect_support/README.md) 负责实际单体连接和完整承载、滑入检查。
 
 每轮读取同一个物体的需求，以及此前 Step 3.3 固定的全部接触区。对每个尚未选中、Step 2 几何合格的候选，合并其真实曲面顶点反力列与已固定接触的反力列，再求六维共同平衡：
 

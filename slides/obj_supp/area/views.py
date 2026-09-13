@@ -36,7 +36,7 @@ def overview_cameras(S, masks):
     for elev in (-60, -40, -20, 0, 20, 40, 60):
         for azim in range(0, 360, 30):
             cam = P.fit(elev, azim, box)
-            if cam.eye[1] < .001 or S.mesh.contains(((cam.eye-S.t) @ S.R)[None])[0]:
+            if cam.eye[2] < .001 or S.mesh.contains(((cam.eye-S.t) @ S.R)[None])[0]:
                 continue
             seen, facing = visible(S, ids, cam)
             visibility = np.array([S.skin.area[ids][seen & m[ids]].sum()/S.skin.area[m].sum()
@@ -66,7 +66,7 @@ def detail_camera(S, mask, seed):
         base = P.fit(elev, azim, vertices)
         for factor in (1., 3.):
             cam = base._replace(dist=base.dist*factor, eye=base.lookat-base.dist*factor*base.fwd)
-            if cam.eye[1] < .001 or S.mesh.contains(((cam.eye-S.t)@S.R)[None])[0]:
+            if cam.eye[2] < .001 or S.mesh.contains(((cam.eye-S.t)@S.R)[None])[0]:
                 continue
             seen, facing = visible(S, ids, cam)
             fraction = float(S.skin.area[ids][seen].sum()/S.skin.area[ids].sum())
@@ -77,8 +77,8 @@ def detail_camera(S, mask, seed):
             evaluate(elev, azim)
     for normal in (S.skin.ns[seed], np.average(S.skin.ns[ids], axis=0, weights=S.skin.area[ids])):
         normal = normal/np.linalg.norm(normal)
-        evaluate(float(np.degrees(np.arcsin(normal[1]))),
-                 float(np.degrees(np.arctan2(normal[2], normal[0]))))
+        evaluate(float(np.degrees(np.arcsin(normal[2]))),
+                 float(np.degrees(np.arctan2(normal[1], normal[0]))))
     key = lambda v: (round(v[1], 3), v[2])
     best = max(candidates, key=key)
     if best[1] < .995:
