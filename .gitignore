@@ -1,34 +1,34 @@
-# Project planning doc (private)
-cad_grasp.md
+# Python, compiled helpers and local editor/cache files
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+.venv/
+.pytest_cache/
+.DS_Store
 
-# Dataset (downloaded, not version-controlled)
+# Local datasets and generated results (at any directory depth)
+objects/
+output/
 dataset/
 
-# Python
-__pycache__/
-*.pyc
-.venv/
-
-# Demo build artifacts (generated meshes + renders)
-demo/assets/
-demo/out/
-gripper_examples/out/
-gen_gripper/out/
-
-# SmolVLA rendered videos (generated artifacts)
-output/
-
-# Generated per-sample insertion shapes (deterministic; regenerate via tasks/insertion/shape_gen.py)
-objects/insertion/samples/
-
-# Third-party robot models (fetch via MuJoCo Menagerie)
-demo/menagerie/
-
-# Downloaded reference papers
+# Private research material and downloaded papers
+cad_grasp.md
+proposals/
 papers/
 
-# Private grant/research proposals (NEVER commit)
-proposals/
+# Generated slide data and media; keep the source and documentation in Git
+slides/**/*.json
+slides/**/*.npz
+slides/**/*.png
+slides/**/*.jpg
+slides/**/*.jpeg
+slides/**/*.gif
+slides/**/*.mp4
+slides/**/*.stl
+slides/**/*.obj
+slides/**/*.log
 
-# macOS
-.DS_Store
+# Small fixed regression inputs are part of the test code
+!slides/**/fixtures/*.json
+!slides/**/fixtures/*.npz
