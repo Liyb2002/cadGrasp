@@ -1,5 +1,7 @@
 # Slide figures
 
+**2026-09-13 渲染更新：** 当前讲解图统一为 B / pose 2，共用白底、灰色工件、柔和绿色工作面和小地面。运行 `python slides/render.py`；图目与数据来源见 [slides/README.md](slides/README.md)。Baseline 和姿态数据只读，旧多物体实验需显式 `--legacy`。以下早期图目及数值按日期区分。
+
 **2026-09-12 更新：** Baseline 已移至 `slides/baseline_algo/`，世界坐标统一为 Y-up（地面 `y=0`），图像画布为纯白。B/pose_1 与 B/pose_2 已完整重跑并通过验证；运行说明见 [baseline_algo.md](slides/baseline_algo/baseline_algo.md)。Git 保存代码、Markdown、渲染模板和固定测试样例；`objects/`、所有 `output/` 及生成的图片、视频和数据保留在本地。新检出环境需要另行准备物体与姿态数据，才能运行完整案例。
 
 > **当前职责（2026-09-11）：** 加工射线禁区关闭，实际工作面仍须避开。Step3 保留原贪心算法；A1-f/pose_3 上游未完成。Step4 只输出地面需求点和连续外包点；Step5 先找共同退出方向，再造有间隙的框架、需求凸包对应的开口底座和粗连接，最后验证整件轨迹与共享承载，见[当前代码](slides/baseline_algo/step5_connect_support/README.md)。输出统一位于 `output/{object_name}/{pose}/{step_directory}/`，沿用现有阶段目录名。独立汇总和候选目录已删除，不自动恢复；先前接触调整候选也未通过整件承载。下方旧模型及结果须按日期区分。

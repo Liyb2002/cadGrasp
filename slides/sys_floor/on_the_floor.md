@@ -1,3 +1,29 @@
+# Floor loads: B / pose 2
+
+The current [landing cloud](on_the_floor_B.png) and [resultant diagram](row3.png)
+share the workpiece, camera, colours and compact floor of `head_total_force.png`.
+Run `python slides/render.py --only floor` in the cadgrasp environment.
+
+`presentation.py` reads the saved B/pose_2 paired loads without changing baseline
+outputs. It independently recomputes all 32,768 landings and checks them against
+Step4's corresponding rows (the saved array also begins with a gravity-only row).
+Hidden floor points are occluded by the workpiece. The cloud is sampled, not a
+continuous boundary certificate.
+
+World coordinates are Y-up. About the floor origin, let
+`W = -mg e_y + F_push`, `M = c x (-mg e_y) + q x F_push`, and `N = -W_y`.
+For positive N the required floor point is `p = (-M_z/N, 0, M_x/N)`.
+The illustration's downward process force and gravity are parallel; their
+weighted application point defines the resultant line. No intersection of skew
+3-D force lines is assumed. Convex-hull containment is necessary for tipping
+resistance; friction and yaw still require a joint bearing check.
+
+`on_the_floor.py` and `row3.py` now render the current diagrams by default.
+Their earlier algorithms remain available with `--legacy`; the numbers and
+coordinate conventions below describe those earlier experiments only.
+
+## Historical experiments
+
 # `on_the_floor` — the target pose, with the landings on the ground
 
 **2026-09-11 接入 baseline：** `support_polygon.cop` 的整体压力中心公式被新 Step4 的等价六维需求映射采用；当前 baseline 使用 Step1 的当前姿态及 0–0.5mg 全范围，含零加工力，并另存连续外包。下面的旧图、固定力度和旧姿态样本不作为当前认证。见 [Step4](../baseline_algo/step4_floor_contact/README.md)。

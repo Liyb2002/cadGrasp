@@ -437,4 +437,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # The current presentation uses a fixed B/pose_2 snapshot. Preserve the
+    # historical experiment and its library functions behind an explicit flag.
+    import runpy
+    import sys
+    if '--legacy' in sys.argv:
+        sys.argv.remove('--legacy')
+        main()
+    elif len(sys.argv) > 1:
+        raise SystemExit('Use slides/render.py for current figures; --legacy enables historical options.')
+    else:
+        runpy.run_path(str(Path(__file__).with_name('presentation.py')), run_name='__main__')

@@ -3,8 +3,9 @@
 Actual B pose_2 contact C139 and the saved side frame are reused. Candidate
 C023 sits on the crown with an overhead arm; C151 sits below the chin. The
 ground plane is visible, without the ground-base ring.
-All arrows point outward: force FROM the workpiece ON the support. Magnitudes
-are illustrative; no load-case, bearing, or trajectory claim is made.
+Orange/blue arrows point outward: force FROM the workpiece ON the support.
+A red arrow presses downward on the green work region. Magnitudes are
+illustrative; no load-case, bearing, or trajectory claim is made.
 """
 from pathlib import Path
 import sys
@@ -15,7 +16,9 @@ import trimesh
 from PIL import Image, ImageDraw
 
 HERE=Path(__file__).resolve().parent
-BASE=HERE.parent/'baseline_algo'
+sys.path.insert(0,str(HERE.parents[1]/'tools'))
+import slide_scene as SC
+BASE=HERE.parents[1]/'baseline_algo'
 sys.path.insert(0,str(BASE))
 from step1.cases import selected_pose
 from step3_scheculer import contacts as I
@@ -23,11 +26,12 @@ from step3_scheculer.stage_imports import load_stage
 from step2_local_support import render as R, insertion_directions as ID
 from step5_connect_support import solids as S
 C=load_stage('score','contribution')
-PAPER=(255, 255, 255)
+PAPER=SC.PAPER
 INK='#151515'
-HIGH=(226,126,49)
-LOW=(45,124,177)
-FRAME=(106,138,157)
+HIGH=SC.ORANGE
+LOW=SC.BLUE
+FRAME=SC.FRAME
+APPLIED=SC.RED
 
 
 def arrow(draw,a,b,color,width=9):
@@ -128,22 +132,29 @@ def run():
         selected.append(len(parts));parts.append(lip);labels.append(f'flared_lip_{key}')
         blue_lips.append({'candidate_id':key,'radius_m':radius,'depth_m':.007,
                           'scope':'Illustrative widened contact lip, not a recomputed contact patch'})
-    extent=np.vstack([domain.mesh.vertices,R.floor_triangles(domain).reshape(-1,3)]+[parts[i].vertices for i in selected])
-    basis=R.axes([.8,-1,.12])
+    extent=np.vstack([domain.mesh.vertices,SC.floor(domain).reshape(-1,3)]+[parts[i].vertices for i in selected])
+    # Preserve the original view after migrating the world coordinates to Y-up.
+    view_vector=SC.VIEW.tolist()
+    basis=R.axes(view_vector)
     bounds=np.vstack([(extent@basis.T).min(0),(extent@basis.T).max(0)])
     focus=bounds.mean(0)@basis
-    width=1.32*max(bounds[1,:2]-bounds[0,:2])
+    width=SC.CAMERA_MARGIN*max(bounds[1,:2]-bounds[0,:2])
     size=1100
     image=Image.new('RGB',(2400,1400),PAPER);draw=ImageDraw.Draw(image)
     centered(draw,(1200,66),"The heads' total force",54)
     centered(draw,(1200,122),'B / pose 2     |     Schematic unanchored support; support weight neglected',28)
     draw.line((1200,190,1200,1280),fill='#dbdbd7',width=2)
     metadata={}
+    load_face=SC.LOAD_FACE
+    assert load_face in domain.work_ids
+    load_point=domain.mesh.triangles_center[load_face]
+    load_direction=np.array([0.,-1.,0.])
+    load_arrow_length=.045
     for panel,ids in enumerate([upper_only,selected]):
         x=40+1200*panel;y=182
-        tri=[R.floor_triangles(domain),domain.mesh.triangles]
-        palette=[np.tile((230,232,231),(2,1)),np.tile((184,189,191),(len(domain.mesh.faces),1))]
-        palette[-1][domain.work_ids]=(163,186,157)
+        tri=[SC.floor(domain),domain.mesh.triangles]
+        palette=[np.tile(SC.FLOOR,(2,1)),np.tile(SC.GREY,(len(domain.mesh.faces),1))]
+        palette[-1][domain.work_ids]=SC.GREEN
         for i in ids:
             tri.append(parts[i].triangles)
             label=labels[i]
@@ -155,6 +166,13 @@ def run():
         picture,_=R.raster(np.concatenate(tri),np.concatenate(palette),focus,basis,width,size,unlit=[0,1])
         image.paste(picture,(x,y))
         centered(draw,(x+550,204),'(a) One upper contact' if panel==0 else '(b) One upper and two lower contacts',31)
+        # The arrowhead lands on the actual green work face; the applied force
+        # acts ON the workpiece, unlike the contact reaction arrows below.
+        load_end=R.project(load_point,focus,basis,width,size)[:2]+[x,y]
+        load_start=R.project(load_point-load_arrow_length*load_direction,focus,basis,width,size)[:2]+[x,y]
+        arrow(draw,load_start,load_end,APPLIED,10)
+        draw.text((load_start[0]-22,load_start[1]+24),'Applied force',
+                  font=R.font(25),fill=APPLIED,anchor='rm')
         for key,color,force_length in [('C023',HIGH,.036)]+([('C139',LOW,.026),('C151',LOW,.034)] if panel else []):
             h=contacts[key];p=h['center_m'];n=domain.mesh.face_normals[h['center_face']]
             assert n[1]>0 if key=='C023' else n[1]<0
@@ -177,10 +195,13 @@ def run():
     report={
         'case':'B/pose_2','depicted_heads':['C023','C139','C151'],
         'arrow_magnitudes':'illustrative, not calculated reactions',
-        'arrow_convention':'All arrows are workpiece forces ON the support, along actual outward contact normals.',
-        'arrow_counts_by_panel':[1,3],'forces':metadata,
+        'arrow_convention':'Red: downward applied force ON the workpiece. Orange/blue: workpiece forces ON the support, along actual outward contact normals.',
+        'arrow_counts_by_panel':[2,4],'contact_reaction_arrow_counts_by_panel':[1,3],'forces':metadata,
+        'applied_force':{'source_face':load_face,'point_m':load_point.tolist(),
+            'direction':load_direction.tolist(),'on_body':'workpiece','region':'green work region',
+            'illustrative_arrow_length_m':load_arrow_length,'shown_in_both_panels':True},
         'ground_plane_depicted':True,'floor_base_depicted':False,'floor_force_depicted':False,
-        'camera_view_vector':[.8,-1,.12],'camera_basis':basis.tolist(),
+        'camera_view_vector':view_vector,'camera_basis':basis.tolist(),
         'focus_m':focus.tolist(),'width_m':width,
         'rendered_parts_panel_a':[labels[i] for i in upper_only],
         'rendered_parts_panel_b':[labels[i] for i in selected],

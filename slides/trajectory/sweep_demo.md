@@ -1,3 +1,27 @@
+# Common insertion: B / pose 2
+
+![The connected support during insertion and installed](sweep_demo.png)
+
+The current figure uses the actual connected support and saved straight
+trajectory from B/pose_2 Step5. The two panels show the same fixed workpiece
+**during insertion** and **installed**, using the common slide camera and compact
+floor. `presentation.py` independently replays the continuous full-assembly
+trajectory before rendering. It does not rebuild geometry or write baseline
+outputs. The displayed approach pose is on the saved path, at most 60 mm from
+the installed pose; it is not labelled as the start of the whole path.
+
+Run `python slides/render.py --only trajectory` in the cadgrasp environment.
+Both `sweep_demo.png` and `sweep_eq.png` are generated. Equations use Y-up, floor
+`y=0`, insertion direction `a` and withdrawal direction `-a`. This saved path is a
+pure horizontal translation and reaches a separating plane before its finite
+checked endpoint; continued withdrawal therefore remains clear.
+
+`sweep_demo.py` and `sweep_eq.py` default to this presentation. Their earlier
+planar/block and two-corridor demonstrations require `--legacy`. The old blocked
+volume and clearance figures below do not describe the current images.
+
+## Historical corridor illustration
+
 # `sweep_demo` — does the support's swept volume hit the workpiece?
 
 **Current procedure (2026-09-06): [problem_statement.md](../problem_statement.md#当前决定与讨论记录).** The robot holds the

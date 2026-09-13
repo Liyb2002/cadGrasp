@@ -178,14 +178,14 @@ def main() -> None:
     for y, who, row in (
             (0.885, "the supports", (r"$F_{\rm supp}$  what it presses with",
                                      r"$r_{\rm supp}$  its arm",
-                                     r"$\hat{z}$  up")),
+                                     r"$\hat{y}$  up")),
             (0.835, "the process", (r"$F_{\rm push}$  the push, one vector",
                                     r"$r_{\rm push}$  its arm",
                                     r"$q$  where it lands"))):
         t(y, who, x=COL[0], ha="left", fs=SUB, c=INK)
         for x, cell in zip(COL[1:], row):
             t(y, cell, x=x, ha="left", fs=SUB, c=MUTED)
-    t(0.790, r"$mg$  the workpiece's weight, so gravity is $-mg\,\hat{z}$   ·   "
+    t(0.790, r"$mg$  the workpiece's weight, so gravity is $-mg\,\hat{y}$   ·   "
              r"$c$  the centre of mass, which both arms are measured from",
       x=COL[0], ha="left", fs=SUB, c=MUTED)
     t(0.742, r"$F_{\rm supp}$ points along the skin's own inward normal   ·   "
@@ -199,7 +199,7 @@ def main() -> None:
     for y, lab, eq in (
             (0.600, "force",
              r"$\int_{\rm supp\_obj}\; F_{\rm supp} \; dA \;=\;"
-             r" -\left( -mg\,\hat{z} \;+\; F_{\rm push} \right)$"),
+             r" -\left( -mg\,\hat{y} \;+\; F_{\rm push} \right)$"),
             (0.450, "torque",
              r"$\int_{\rm supp\_obj}\; r_{\rm supp} \times F_{\rm supp}"
              r" \; dA \;=\; -\left( " + RHS + r" \right)$"),
@@ -211,7 +211,7 @@ def main() -> None:
     t(0.212, r"$\rm sys$ is the workpiece and its supports as one body, and its "
              r"contacts with the floor all point up", x=EQ_X, ha="left",
       fs=SUB, c=MUTED)
-    t(0.158, r"the same row, on that footprint   ·   $F_{\rm supp}\parallel\hat{z}$, "
+    t(0.158, r"the same row, on that footprint   ·   $F_{\rm supp}\parallel\hat{y}$, "
              r"pressing up, is what makes it the support polygon", x=EQ_X,
       ha="left", fs=SUB, c=MUTED)
     t(0.088, r"gravity is in the force row and not the turning rows: acting at "

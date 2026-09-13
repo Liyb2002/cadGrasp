@@ -1,3 +1,24 @@
+# Current setup slide: B / pose 2
+
+![B / pose 2](target_pose.png)
+
+`presentation.py` reads the fixed B/pose_2 snapshot. The current figure uses the
+same camera, grey workpiece, muted green work region and finite floor as the
+head-force illustration. A red force presses down on actual work face 213.
+It depicts a held target pose and does not assert a new placement trajectory.
+
+Run `python slides/render.py --only setup` in the cadgrasp environment.
+The current page is written to `target_pose.png` and the deck's existing
+`tip_B.png` path. `big_tip.py` also renders this page by default; `--legacy`
+explicitly invokes the earlier multi-object tipping search documented below.
+Imported geometry/search functions retain their existing behaviour.
+
+The pose catalogue, all `setup.npz` inputs, and A1/C5 historical figures are
+preserved. `target_poses.py` remains a dataset builder, not the presentation entry
+point. In particular, rerendering does not regenerate baseline inputs.
+
+## Historical tipping search
+
 # `big_tip` — flat on the floor, then over onto ONE point
 
 The setup slide, in three pictures a row: **a workpiece nobody designed for this was

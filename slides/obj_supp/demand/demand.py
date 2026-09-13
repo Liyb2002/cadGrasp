@@ -12,10 +12,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import io
-import shutil
 import sys
-import tempfile
 from pathlib import Path
 
 import matplotlib
@@ -26,16 +23,14 @@ from matplotlib.lines import Line2D
 from mpl_toolkits.mplot3d import proj3d
 import numpy as np
 from scipy.spatial import cKDTree
-import trimesh
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 sys.path[:0] = [str(ROOT / "slides/tools"), str(ROOT / "slides/setup/poses")]
 import cover as C
-from cone_model import CONE_HALF_DEG, cone_pushes
+import slide_scene as SC
 
 K = 0.5
-POINTS, DIRS, SEED = 1440, 384, 1000
 SUBDIVISIONS = 4
 SHEET_ROUNDS = 3
 VIEW_ELEVATION = -20.0             # see the southern -F cap; shared by both balls
@@ -47,40 +42,16 @@ OUT = HERE / "demand_pairs.png"
 
 
 def sample_current_pose():
-    """Setup's current B tip 1, with every intermediate generated file in /tmp."""
-    import big_tip as G
-    import tip_sequence as S
-    with tempfile.TemporaryDirectory(prefix="cadgrasp-demand-setup-") as work:
-        work = Path(work)
-        obj = work / "B"
-        obj.mkdir()
-        for filename in ("mesh.stl", "poses.json"):
-            shutil.copy2(ROOT / "objects/B" / filename, obj / filename)
-        old = G.HERE, G.obj_path, S.obj_path
-        try:
-            G.HERE = work
-            G.obj_path = S.obj_path = lambda name: obj
-            with contextlib.redirect_stdout(io.StringIO()):
-                rec = G.sweep("B")[0]
-            mesh, _ = G.refine(trimesh.load(obj / "mesh.stl", force="mesh"))
-            T = rec["T_star"]
-            com = T[:3, :3] @ mesh.center_mass + T[:3, 3]
-            pt, direction = cone_pushes(mesh, T, rec["take"], POINTS, DIRS,
-                                       SEED, CONE_HALF_DEG)
-        finally:
-            G.HERE, G.obj_path, S.obj_path = old
-    force = np.array([0.0, 0.0, 1.0]) - K * direction
-    moment = -1000 * K * np.cross(pt - com, direction)
-    assert np.allclose(np.linalg.norm(direction, axis=1), 1, atol=1e-12)
-    assert np.max(np.abs(force + K * direction - [0, 1, 0])) < 1e-12
-    assert np.max(np.abs(np.einsum("ij,ij->i", moment, direction))) < 1e-10
-    # The area's retained load table must describe this same pose/COM.
-    with np.load(HERE.parent / "area/demand_B_tip1.npz") as old_table:
-        assert float(old_table["K"]) == K
-        assert np.max(np.abs(old_table["moment_wmm"]
-                            + 1000 * K * np.cross(old_table["q_m"] - com,
-                                                  old_table["d"]))) < 1e-9
-    return dict(pt=pt, d=direction, force=force, moment=moment, com=com)
+    """Read paired loads for the exact B/pose_2 shown throughout the deck."""
+    domain = SC.load()
+    samples = SC.samples(domain)
+    magnitude = np.linalg.norm(samples['push'], axis=1)
+    assert np.all(magnitude > 0) and np.all(magnitude <= K+1e-12)
+    direction = samples['push']/magnitude[:, None]
+    return dict(pt=samples['q'], d=direction, push=samples['push'],
+                magnitude=magnitude, force=samples['wrench'][:, :3],
+                moment=1000*samples['wrench'][:, 3:], com=domain.com,
+                sample_seed=samples['seed'])
 
 
 def direction_fields(data):
@@ -175,7 +146,7 @@ def draw(data, ico):
             rings_front=True)
     fig.text(.5, .955, "Force–moment demand", ha="center", fontsize=28, color=C.INK)
     fig.text(.5, .907,
-             rf"B · target pose 1 · {len(data['force']):,} sampled pushes · $|F_{{\rm push}}|=0.5\,mg$",
+             rf"B / pose 2 · {len(data['force']):,} sampled pushes · $0\leq|F_{{\rm push}}|\leq0.5\,mg$",
              ha="center", fontsize=15, color=C.MUTED)
     fig.text(.245, .853, "Force coverage", ha="center", fontsize=22, color=C.INK)
     fig.text(.245, .815, r"[FORCE dirs] · displayed at $-F_D$", ha="center", fontsize=14, color=C.MUTED)
@@ -220,6 +191,10 @@ def main():
     ico, _ = direction_fields(data)
     with shared_globe_view():
         ids = draw(data, ico)
+    SC.record(HERE/'demand_pairs.json', sample_count=len(data['force']),
+              sample_seed=data['sample_seed'], highlighted_ids=ids.tolist(),
+              moment_units='mg mm', moment_relief_max=float(data['top']),
+              scope='Finite paired demand samples, not joint coverage or a continuous boundary')
     print(f"Wrote {OUT}; {len(data['force'])} paired samples")
     print("Shared c / m:", data["com"].tolist())
     print("Force bins: raw", int(data["force_raw"].sum()), "closed", int(data["force_sheet"].sum()))
@@ -231,7 +206,7 @@ def main():
               f"|F|={data['force_norm'][idx]:.9f}, |tau|={data['moment_norm'][idx]:.9f}")
     if args.audit:
         np.savez_compressed(args.audit, **data, highlighted_ids=ids,
-                            K=K, seed=SEED, points=POINTS, directions=DIRS)
+                            K=K, seed=data['sample_seed'])
         print("Audit:", args.audit)
 
 

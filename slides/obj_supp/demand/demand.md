@@ -15,11 +15,11 @@ notation and unbroken equations from [the supplied reference](pasted-movie.png):
 \[
 \operatorname{demand}(F_{\rm push},\mathrm{pt})=(F_D,\tau_D)\in\mathbb R^6,
 \qquad
-(F_D,\tau_D)=\left(mg\hat z-F_{\rm push},\;-(\mathrm{pt}-c)\times F_{\rm push}\right).
+(F_D,\tau_D)=\left(mg\hat y-F_{\rm push},\;-(\mathrm{pt}-c)\times F_{\rm push}\right).
 \]
 
 `F_push` is the applied process force, `pt` its location in the work region,
-`c` the workpiece center of mass, and `z` points upward. The figure shows
+`c` the workpiece center of mass, and `y` points upward. The figure shows
 `0 <= |F_push| <= 0.5 mg`, as in the reference.
 
 For each covered load, find **one** passive contact reaction field that
@@ -32,7 +32,7 @@ encloses the following conditions in one box to show their shared unknowns:
 \]
 
 \[
-\sum_{\rm heads}F_{\rm supp}\cdot\hat z\geq0.
+\sum_{\rm heads}F_{\rm supp}\cdot\hat y\geq0.
 \]
 
 The external demand remains six-dimensional. No uplift restricts the feasible
@@ -108,76 +108,50 @@ The former step-1 demand picture used
 the same red language but a nonlinear `L/2` height map; this page uses step 2's
 linear height mechanism instead.
 
-## Sampling, signs and scales
+## Sampling, signs and scales (B / pose 2, 2026-09-13)
 
-Both fields come from **547,488 paired process samples** on current setup **B,
-target pose 1**. The shared sampler requests 1,440 area-weighted work-region
-points × 384 directions (`seed=1000`), within the 15-degree local inward-normal
-cone; obstructed incoming rays are rejected. This is the existing dense drawing
-rung, applied to the current setup pose at `K=0.5`. The 2,141-row load table
-[`area/demand_B_tip1.npz`](../area/demand_B_tip1.npz) is read only to check that
-the pose and centre of mass agree. Its load rows were retained from the former
-`invoices/` page when the area demos became self-contained.
+Both fields now use the **32,768 paired B/pose_2 samples** already saved in
+`baseline_algo/output/B/pose_2/step_1_needs/samples.json`. Positions are sampled
+by work-surface area, directions in the reachable 30-degree inward cone, and
+magnitudes uniformly between zero and 0.5 mg (`seed=20260907`). The saved
+six-dimensional demand is checked by direct substitution in the Y-up equations.
+No pose search, temporary object copy or historical tip-1 table is used.
 
-- **Force coverage:** each `F_D/|F_D|` is displayed at its antipode, **`-F_D/|F_D|`**,
-  following the pipeline's “where the force comes from” convention. This display
-  sign does not change the equation. Red is the occupied demand-direction domain,
-  not the directions a support can provide or pass. On the 5,120-tile icosphere,
-  196 bins are occupied. The existing three-round sheet closing is used; on this
-  dense sample it changes no bins. All force magnitudes remain in the paired
-  data; highlighted magnitudes are printed. The full range is
-  `1.165401–1.500000 mg`.
-- **Moment relief:** bins are indexed by **`+tau_D/|tau_D|`**, with no sign reversal.
-  Each bin stores the largest **actual sampled** `|tau_D|` assigned to it, in
-  `mg mm`. There are 3,694 occupied bins. Unsampled bins remain bare at radius 1;
-  bare is not a proof that the continuous domain contains no such direction.
-  The measured largest bin value is `26.280395 mg mm`. The map is exactly
-  `h = 0.55 M / 26.280395`, with the full-precision measured maximum used in
-  code, and radius `r = 1+h`. No values are clipped. Ring heights use the same
-  map at `5, 10, 15, 20, 25 mg mm`. This is a drawing scale, not a force cap or
-  an `L/2` physical bound.
-
-Both balls use the same world axes and camera: azimuth −62° from the original
-renderer, elevation −20° so the southern force patch and its labels are visible.
-The renderer's light is recomputed for that shared view. No sample is moved to
-separate labels.
+- Force directions are displayed at **-F_D/|F_D|**, preserving the original
+  arrival-direction convention. Of 5,120 sphere tiles, 234 contain samples;
+  the visual three-round closing paints 236. Closing is a display operation,
+  not evidence about additional physical directions.
+- Moment directions are **+tau_D/|tau_D|**. Each occupied bin retains the actual
+  sample of greatest moment magnitude; 3,836 bins are occupied. The maximum is
+  34.967017135 mg mm. Relief height is `0.55 * M / max(M)`, without clipping,
+  and rings mark 5, 10, 15, 20, 25 and 30 mg mm.
+- Spheres retain their own common directional-space camera so the force cap is
+  readable. They represent vector spaces; they do not rotate the physical pose.
 
 ## Pair provenance
 
-Three complete rows are highlighted with matching colour and number. There are
-no connectors between the force sphere and the moment sphere.
-**Each is the real winning sample of its own moment bin.** The force partner is
-read from that same row; a different sample's bin maximum is never attached to it.
-Moment markers use the original sample's axis and its actual height, projected as
-annotations over the relief. The numbers below the balls are
-`(|F_D|, |tau_D|)`, not replacements for the stored vectors.
+Matching colour and number refer to the **same load row** on both spheres.
+Every highlighted row is the actual winner of its moment bin.
 
-| Number | Dense sample row, zero-based | Moment bin | `|F_D| / mg` | `|tau_D| / (mg mm)` |
+| Number | Sample row (zero-based) | Moment bin | Force / mg | Moment / (mg mm) |
 |---|---:|---:|---:|---:|
-| 1 | 193790 | 2812 | 1.324598150 | 2.916676727 |
-| 2 | 185836 | 4108 | 1.470938968 | 19.202837561 |
-| 3 | 188428 | 3400 | 1.312589624 | 20.909362924 |
+| 1 | 10069 | 2944 | 1.094621329 | 30.317094330 |
+| 2 | 25655 | 2624 | 1.454827592 | 29.992314486 |
+| 3 | 17608 | 2152 | 1.371919002 | 14.328746494 |
 
-This is a finite sampled domain and a per-direction-bin maximum. At fixed `K`,
-it does **not** assert that all moments from zero to that maximum are available.
-Separate displays also do not test joint force–moment feasibility; the underlying
-paired rows and shared contact reactions still matter. No contact-count or
-coverage-solver result is shown.
+These finite directional projections do not certify joint contact feasibility
+or complete continuous-domain coverage. Empty bins are unsampled, not proved
+impossible. The earlier B/tip-1 numerical values no longer describe this figure.
 
 ## Reproduce and verify
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 /Users/yuanboli/miniforge3/envs/cadgrasp/bin/python slides/obj_supp/demand/demand.py
+python slides/render.py --only demand
+# Optional complete audit data:
+python slides/obj_supp/demand/demand.py --audit /tmp/cadgrasp-demand-pairs.npz
 ```
 
-Only `demand_pairs.png` is written. Setup pose/region selection and its intermediate
-meshes, XML and renders run with object copies in a temporary directory. Importing
-the module generates nothing. Other figures, source files and area load tables are
-unchanged. For a complete external audit table, append
-`--audit /tmp/cadgrasp-demand-relief-pairs.npz`.
-
-The script checks paired equations, unit process directions, moment perpendicularity,
-agreement with the original invoice centre of mass, bin-winner provenance and
-linear height scaling. The optional audit records all `(pt,d,F_D,tau_D)` rows,
-bin assignments, maxima, winners and final highlighted IDs. The current centre
-of mass is `(0.013601859, -0.066934468, 0.061937985) m`.
+The generator writes `demand_pairs.png` and `demand_pairs.json` in this folder;
+baseline and setup inputs remain unchanged. The optional audit contains the
+complete paired samples, bin assignments, maxima and highlighted IDs. The
+current centre of mass is `(0.025843321, 0.080612977, -0.003417037) m`.

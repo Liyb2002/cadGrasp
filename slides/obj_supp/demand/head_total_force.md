@@ -9,7 +9,7 @@ This is a conceptual comparison using the B / pose 2 workpiece and contact geome
 
 Both blue contact ends have broad, shallow flared lips, tapering back to their narrower necks. The lower lip has an 18 mm radius and the chin lip a 14 mm radius. These are illustrative cup-shaped contact outlines; the underlying patches and the force directions are unchanged, and no suction force is implied.
 
-Every arrow now represents **workpiece force on support**, along the actual outward normal at the contact center. No floor-force arrow is shown. The original camera `[0.8, -1, 0.12]` is shared by both panels. Contact IDs are recorded in the source and metadata, not printed on the illustration.
+In both panels, a **red applied-force arrow** presses vertically downward onto actual green work-region face 213. It illustrates the external loading that tends to rock the workpiece and lift the upper contact. This arrow acts **on the workpiece**. The orange and blue arrows represent **workpiece force on support**, along the actual outward normal at each contact center. No floor-force arrow is shown. Both panels preserve the original view, now expressed as `[0.8, 0.12, -1]` in Y-up coordinates. Contact IDs are recorded in the source and metadata, not printed on the illustration.
 
 The upper contact is the actual Step2 crown patch C023, replacing the previous C024 contact. Its outward center normal has a vertical component of about 0.93, making the opposite force on the workpiece clearly downward. A new illustrative overhead arm connects it to the saved side frame. The existing bottom contact is C139; its saved Step5 contact material and necks are reused. The saved C011 head and neck are omitted; the rear joint remains part of the side frame. The new C151 head uses actual Step2 contact material, but its blue neck is an illustrative connection, not a new Step5 solution.
 
@@ -21,4 +21,4 @@ Regenerate with:
 PYTHONDONTWRITEBYTECODE=1 /Users/yuanboli/miniforge3/envs/cadgrasp/bin/python slides/obj_supp/demand/head_total_force.py
 ```
 
-`head_total_force.json` records the source hashes, actual contact normals, new overhead arm, added blue neck, rendered parts, original camera, and the one-arrow/three-arrow convention. The previous connectivity certificate for the earlier geometry is deliberately not reused.
+`head_total_force.json` records the source hashes, actual contact normals, new overhead arm, added blue neck, rendered parts, camera, and applied-force point and direction. Each panel has one applied-force arrow in addition to its one/three contact-reaction arrows. The previous connectivity certificate for the earlier geometry is deliberately not reused.

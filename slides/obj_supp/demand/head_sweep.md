@@ -27,6 +27,6 @@ The proof concerns the given finite surface-matched patches and their actual fac
 /Users/yuanboli/miniforge3/envs/cadgrasp/bin/python slides/obj_supp/demand/head_sweep.py
 ```
 
-Both panels use camera `[1, -0.25, 0.18]`. The purple head remains behind the ear and may be occluded; the camera does not turn toward the rear to expose it. The orange chest contact and blue contact face approximately opposite ways. No candidate IDs appear in the figure.
+Both panels now use the shared Y-up camera `[0.8, 0.12, -1]`, muted work-region green and compact finite floor from `tools/slide_scene.py`. The purple head remains behind the ear and may be occluded; the camera does not turn toward the rear to expose it. The orange chest contact and blue contact face approximately opposite ways. No candidate IDs appear in the figure.
 
 The script checks that the patches do not include work faces, each displayed full head ray is clear, their certified catalogue intersection is empty, all six continuous local-cone certificates pass, the heads and connectors form one watertight solid, and the bridge meshes have no volumetric intersection with the object (tolerance 1e-14 m^3). It does not rerun or change the baseline pipeline.

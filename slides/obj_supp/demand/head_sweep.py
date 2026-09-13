@@ -15,7 +15,9 @@ from scipy.optimize import linprog
 from PIL import Image, ImageDraw
 
 HERE = Path(__file__).resolve().parent
-BASE = HERE.parent / 'baseline_algo'
+sys.path.insert(0, str(HERE.parents[1] / 'tools'))
+import slide_scene as SC
+BASE = SC.BASE
 sys.path.insert(0, str(BASE))
 from step1.needs import ContinuousNeeds
 from step5_connect_support import solids as S
@@ -23,7 +25,7 @@ from step2_local_support import insertion_directions as ID, withdrawal as W, ren
 
 CASE = BASE / 'output/B/pose_2'
 IDS = ('C104', 'C118', 'C015')
-VIEW = [1., -.25, .18]
+VIEW = SC.VIEW.tolist()
 COLORS = (np.array([229., 135., 53.]), np.array([52., 137., 180.]), np.array([164., 92., 173.]))
 BELT = np.array([57., 158., 143.])
 INK = '#111111'
@@ -223,17 +225,18 @@ def surface_arrow_starts(heads, directions, basis):
 
 def draw_scene(domain, heads, contacts, directions, starts, connector, linked, depth, size=1000):
     basis=R.axes(VIEW)
-    focus,width=R.overall_camera(domain,basis)
-    width *= 1.17
-    tris=[R.floor_triangles(domain),domain.mesh.triangles]
-    colors=[np.tile(R.FLOOR,(2,1)), np.tile(R.GREY,(len(domain.mesh.faces),1))]
-    colors[1][domain.work_ids]=R.GREEN
+    extra=np.concatenate([m.vertices for group in heads for m in group]+[m.vertices for m in connector])
+    cam=SC.camera(domain,size=size,extra=extra)
+    focus,width=cam.focus,cam.width
+    tris=[SC.floor(domain),domain.mesh.triangles]
+    colors=[np.tile(SC.FLOOR,(2,1)), np.tile(SC.GREY,(len(domain.mesh.faces),1))]
+    colors[1][domain.work_ids]=SC.GREEN
     for hs,col in zip(heads,COLORS):
         tt=np.concatenate([h.triangles for h in hs]); tris.append(tt);colors.append(np.tile(col,(len(tt),1)))
     if linked:
         for m in connector:
             tris.append(m.triangles);colors.append(np.tile(m.metadata.get('figure_color',BELT),(len(m.faces),1)))
-    unlit=[]
+    unlit=[0,1]
     if not linked:
         # Render actual 3-D arrows with the same depth buffer as the bunny.
         # A ray behind the work region must not be painted over its surface.

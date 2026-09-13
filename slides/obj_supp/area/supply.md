@@ -1,3 +1,37 @@
+# Contact area: B / pose 2
+
+The current [area figure](area_B.png) uses the shared slide renderer and the exact
+B/pose_2 workpiece, working surface and final contact patches. Run
+`python slides/render.py --only area` (in the cadgrasp environment).
+
+| Configuration | Sampled joint coverage |
+|---|---:|
+| One small contact at C139 | 3.573608% |
+| Three times that contact area (the final C139 patch) | 45.358276% |
+| Final C139 + C024 patches | 86.547852% |
+| Final C139 + C024 + C011 patches | 100.000000% |
+
+These are **32,768-sample percentages**, not the historical deterministic
+integrals below. All rows use the same B/pose_2 paired loads, with process
+magnitudes in [0, 0.5] mg and the 30-degree reachable inward cone. The force and
+moment equations share one nonnegative reaction allocation. The Step3 shared
+no-uplift constraint and original-floor four-ray friction model (mu=64) are
+included. This comparison does not certify final structure or insertion.
+
+The small patch is clipped to the actual connected non-work surface; its area is
+one third of the saved C139 patch within 1e-5 relative error. The last two rows
+add the remaining saved patches to the larger first patch. Numbered insets show
+the actual contact surfaces from their outward side, with the floor omitted
+and a fixed scale for each contact across rows; main views share the same camera. `area_B_pose2.json` records the measured ratio, per-row areas, counts and
+independently replayed primal/dual checks; `area_B_pose2.npz` stores the masks.
+
+The original A1/C5 figures and tip-1 experimental data remain historical records.
+`area.py` defaults to this current presentation; `area.py --legacy ...` explicitly
+runs the earlier search/integration workflow and may overwrite its old images.
+The historical B numbers below do not describe the current `area_B.png`.
+
+## Historical experiments (2026-09-06)
+
 # Area：三个物体，每个四种支撑方案
 
 2026-09-06。只保留三张正式图：[A1-f](area_A1-f.png)、[B 兔子](area_B.png)、
