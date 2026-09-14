@@ -8,7 +8,6 @@ from PIL import Image, ImageDraw
 import study as R
 import angles as A
 from step2_local_support import render as D
-from step4_floor_contact import draw as FD
 from step5_connect_support import visual_details as V
 
 CLEAR='#238d80';LOCAL='#c3645e';REMOTE='#85539a';UNKNOWN='#daa634'
@@ -24,7 +23,7 @@ def composite(paper, picture, ids, opacity=1.):
 def view(domain, patch, cells, size, angle=None, length=None, hit=None):
     basis=D.axes([.65,-.85,.65])
     vertices=np.vstack([domain.mesh.vertices,*[p.vertices for p in cells]])
-    focus,width=FD.fit(vertices,basis,margin=1.28)
+    focus,width,basis=V.fit(vertices,basis,margin=1.28)
     object_image,_=D.raster(domain.mesh.triangles,np.tile(D.GREY,(len(domain.mesh.faces),1)),focus,basis,width,size)
     paper=Image.blend(Image.new('RGB',(size,size),D.PAPER),object_image,.28)
     if angle is not None:
@@ -172,7 +171,7 @@ def run(name):
         images.append(patch['candidate_id']+'.png')
     R.I.save(out/'views.json',dict(object=name,angles_sha256=R.P.sha256(out/'angles.json'),
         audit_sha256=R.P.sha256(out/'audit.json'),drawing_code_sha256=R.P.sha256(__file__),
-        rendering_code=R.I.hashes([Path(D.__file__),Path(FD.__file__),Path(V.__file__)]),
+        rendering_code=R.I.hashes([Path(D.__file__),Path(V.__file__)]),
         images={p:R.P.sha256(out/p) for p in images},
         object_transparency='28% opacity X-ray backdrop; heads and collision evidence in foreground',
         corridors='True per-convex-cell sweeps, clipped only by the image frame; no whole-head convex hull',

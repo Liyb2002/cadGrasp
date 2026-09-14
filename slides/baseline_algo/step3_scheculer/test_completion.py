@@ -9,7 +9,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from step3_scheculer import completion as Q
 from step4_floor_contact import floor_contact as F
-from step5_connect_support import connect as C
+from step5_connect_support import whole_assembly as C
 from step3_scheculer import run_all
 class CompletionTests(unittest.TestCase):
     def test_rest_failure_or_four_heads_cannot_be_complete(self):
@@ -55,9 +55,11 @@ class CompletionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory,patch.object(C,'OUTPUTS',Path(directory)), \
                 patch.object(C.I,'check_report',return_value=self.complete()):
             root=Path(directory)/'test'/'pose_1'/'step3_scheculer';root.mkdir(parents=True)
-            (root/'status.json').write_text(json.dumps(dict(complete=False)))
-            with self.assertRaisesRegex(RuntimeError,'completed current search'):
-                C.read_inputs('test')
+            (root/'schedule.json').write_text(json.dumps(self.complete()))
+            for status in [dict(complete=False), dict(complete=True, schedule_sha256='stale')]:
+                (root/'status.json').write_text(json.dumps(status))
+                with self.assertRaises(AssertionError):
+                    C.read_inputs('test')
 
     def test_partial_objects_continue_through_step5_and_return_unsuccessful(self):
         for first in (4,5):

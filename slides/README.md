@@ -73,7 +73,9 @@ under the repository's existing ignore rules.
 
 ## 当前决定与讨论记录
 
-以下为 2026-09-13 按当前代码核对的模型和算法。此前逐次追加的旧流程说明已整理移除；当前 baseline 的完整操作定义、停止规则和结果统一见 [baseline_algo.md](baseline_algo/baseline_algo.md)。本次只更新说明，不改变算法或重跑结果。
+以下为 2026-09-13 按当前代码核对的模型和算法。此前逐次追加的旧流程说明已整理移除；当前 baseline 的完整操作定义、停止规则和结果统一见 [baseline_algo.md](baseline_algo/baseline_algo.md)。代码清理不改变下述搜索和验收规则。
+
+用户已确认保留：每轮纯重力平衡和整体不上抬硬约束；尺寸优化允许以部分覆盖换面积效率；Step5 首套几何/轨迹通过后的承载失败不触发重新搜索。具体边界见 [已确认规则](baseline_algo/baseline_algo.md#已确认的-baseline-规则)。
 
 ### 要解决的问题
 

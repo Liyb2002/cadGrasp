@@ -9,8 +9,7 @@ import trimesh
 
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from step2_local_support import work_volume as W
-from step5_connect_support import layout as L
-from step5_connect_support.test_connection import contact
+from step5_connect_support.fixtures import contact
 from step2_local_support import insertion as D
 
 
@@ -74,16 +73,16 @@ class WorkVolumeTests(unittest.TestCase):
         self.assertFalse(check['passed'])
         self.assertEqual(check['classification'],'solver_unresolved')
 
-    def test_actual_contact_in_work_surface_is_rejected_before_ground_search(self):
-        mesh=box([0,0,1.],[1,1,1]);head=contact(mesh,[0,0,1],0)
-        face=head['center_face']
-        work=W.WorkVolume(mesh.triangles[[face]],mesh.face_normals[[face]],[face],30.,1.)
-        directions=[dict(certified_directions=D.normalize(isolated=[0.]))]
-        points=np.array([[-.6,-.6],[.6,-.6],[.6,.6],[-.6,.6]])
-        result,_=L.search(mesh,[head],directions,points,np.zeros(3),.01,work_volume=work)
-        self.assertEqual(result['status'],'contact_surfaces_block_work_volume')
-        self.assertEqual(result['attempts'],[])
-        self.assertFalse(result['work_volume_head_precheck']['passed'])
+
+
+    def test_interface_boundary_contact_is_reported_separately(self):
+        work=W.WorkVolume([[[0,0,0],[1,0,0],[0,1,0]]],[[0,0,1]],[5],30.,1.)
+        patch=np.array([[[0,0,0],[-1,0,0],[0,-1,0]]])
+        check=work.check_surface(patch,[27])
+        self.assertFalse(check['passed'])
+        self.assertTrue(check['witness']['at_work_surface'])
+        self.assertEqual(check['contact_source_face'],27)
+        self.assertEqual(check['witness']['work_face_id'],5)
 
 
 if __name__=='__main__':unittest.main()

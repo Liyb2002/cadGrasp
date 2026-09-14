@@ -98,7 +98,7 @@ R_j=\sum_{i\in I_j}\lambda_i n_{i,z}\ge0.
 历史对照数值保留在上表；对应的 `passive_capacity.json` 已不在当前输出中，不作为本轮验证依据。
 
 ```sh
-python slides/baseline_algo/step3_scheculer/check_passive_capacity.py A1-f B C5
+# 历史容量实验入口已删除；当前模型使用整体不上抬约束，见 ../baseline_algo.md。
 ```
 
 ## 4. 可用于论文方法部分的英文段落

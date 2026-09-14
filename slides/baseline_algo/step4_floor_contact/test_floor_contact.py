@@ -5,15 +5,13 @@ import unittest
 from types import SimpleNamespace
 import numpy as np
 from scipy.optimize import linprog
-import trimesh
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from step1.needs import COORD
-from step4_floor_contact import equilibrium as Q, footprints as P, audit
+from step4_floor_contact import equilibrium as Q, audit
 
 
 def foot(x0, x1, y0=-1., y1=1.):
-    return dict(pads_xy_m=[P.rectangle([x0, y0], [x1, y1])])
+    return dict(pads_xy_m=[np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])])
 
 
 def feasible(matrix, target):
@@ -21,19 +19,7 @@ def feasible(matrix, target):
                    bounds=(0, None), method='highs')
 
 
-class IndependentFeetTests(unittest.TestCase):
-    def test_fixed_template_is_reproducible_and_preserves_input_contacts(self):
-        mesh = trimesh.creation.box([1., 1., 1.])
-        center = np.asarray(np.array([.1, .2, 1.]))
-        contacts = [dict(candidate_id='one', center_m=center.copy())]
-        first = P.fixed_layout(contacts, mesh)
-        self.assertEqual(first, P.fixed_layout(contacts, mesh))
-        np.testing.assert_array_equal(contacts[0]['center_m'], center)
-        self.assertTrue(P.check(first, mesh)['passed'])
-        self.assertTrue(first[0]['fixed_for_step5'])
-        self.assertEqual(first[0]['height_m'], .018)
-        self.assertEqual(first[0]['pad_side_m'], .025)
-        self.assertEqual(len(first[0]['pads_xy_m']), 4)
+class CoupledEquilibriumTests(unittest.TestCase):
 
     def test_pressure_center_includes_height_times_horizontal_force(self):
         point = np.asarray(np.array([.2, 0, .8])); force = np.asarray(np.array([-.3, 0, 1.]))
@@ -107,13 +93,6 @@ class IndependentFeetTests(unittest.TestCase):
         self.assertTrue(result['passed']); self.assertEqual(result['lp_count'], 1)
         self.assertFalse(solver.solve(-targets)['passed'])
 
-    def test_layout_material_is_separate_even_if_hulls_overlap(self):
-        mesh = trimesh.creation.box([1., 1., 1.])
-        contacts = [dict(candidate_id=str(j), center_m=np.asarray(np.array([0., 0., 1.]))) for j in range(2)]
-        feet = P.design(contacts, np.zeros((2, 2, 2)), mesh)
-        self.assertTrue(P.check(feet, mesh)['passed'])
-        from shapely.geometry import Polygon
-        self.assertGreater(Polygon(feet[0]['hull_xy_m']).intersection(Polygon(feet[1]['hull_xy_m'])).area, 0.)
 
     def test_duplicate_contact_locations_keep_their_owners(self):
         tri = np.asarray(np.array([[[0, 0, 1], [1, 0, 1], [0, 1, 1.]]]))
@@ -163,23 +142,6 @@ class IndependentFeetTests(unittest.TestCase):
         verified = audit.replay(arrays, 'sample', loads, 2, 2.)
         self.assertLess(verified['maximum_body_equilibrium_residual_conditioned'], 1e-9)
 
-    def test_continuous_cap_can_pass_after_conservative_box_fails(self):
-        from step4_floor_contact import floor_contact as F
-        rng = np.random.default_rng(97)
-        p = rng.uniform(-.4, .4, (80, 3)); p[:, 2] = .2
-        n = rng.uniform(-.5, .5, (80, 3)); n[:, 2] = 1.
-        owner = np.repeat([0, 1], 40); origin = np.asarray(np.array([0., 0., .5]))
-        mesh = trimesh.creation.box([.1, .1, 1.]); mesh.apply_translation([0, 0, .5])
-        work = np.flatnonzero(mesh.face_normals[:, 2] > .9)
-        domain = SimpleNamespace(mesh=mesh, work_ids=work, normals=-mesh.face_normals[work],
-            half_angle=np.pi/6, k=.5, gravity=np.asarray(np.array([0., 0., -1.])), com=origin)
-        matrix, _ = Q.grounded_matrix(p, n, owner, origin, np.ones(6), [foot(-2, 2), foot(-3, 3)], 2.)
-        report, loads, proof = F.continuous_check(SimpleNamespace(domain=domain, scale=np.ones(6)), Q.BatchSolver(matrix))
-        self.assertFalse(report['attempts'][0]['passed'])
-        self.assertEqual(report['status'], 'verified')
-        self.assertEqual(report['method'], 'triangle_tangent_cap_outer_polytope')
-        self.assertTrue(proof['passed'])
-        np.testing.assert_array_equal(loads[0], np.asarray([0., 0., 1., 0., 0., 0.]))
 
 
 if __name__ == '__main__': unittest.main()

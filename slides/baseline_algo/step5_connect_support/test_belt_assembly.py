@@ -9,7 +9,7 @@ import numpy as np
 import trimesh
 from step2_local_support.surface import areas
 from step5_connect_support import belt_geometry as B, rigid_path as P, whole_assembly as A
-from step5_connect_support.test_whole_assembly import contacts
+from step5_connect_support.fixtures import contacts
 
 
 class BeltTests(unittest.TestCase):
@@ -17,31 +17,8 @@ class BeltTests(unittest.TestCase):
         self.mesh = trimesh.creation.box([1., 1., 1.]); self.mesh.apply_translation([0, 0, 1.])
         self.scene = B.Scene(self.mesh)
 
-    def test_surface_belt_retains_heads_and_avoids_work_faces(self):
-        work = np.flatnonzero(self.mesh.face_normals[:, 2] > .9)
-        report, heads, ribbons, owners = B.belt(self.mesh, contacts(self.mesh), work, .01, self.scene)
-        self.assertTrue(report['passed'], report)
-        self.assertTrue(set(owners).isdisjoint(work))
-        self.assertGreater(report['gap_m'], 0)
-        self.assertTrue(all(self.scene.clear(p) for p in heads+ribbons))
 
-    def test_work_surface_barrier_is_not_routed_through(self):
-        c = contacts(self.mesh)
-        work = np.arange(len(self.mesh.faces))
-        report, *_ = B.belt(self.mesh, c, work, .01, self.scene)
-        self.assertFalse(report['passed'])
 
-    def test_disconnected_cells_of_one_head_are_all_connected(self):
-        faces = np.array([np.flatnonzero(self.mesh.face_normals[:, 0] < -.9)[0],
-                          np.flatnonzero(self.mesh.face_normals[:, 0] > .9)[0]])
-        triangles = self.mesh.triangles[faces]
-        centers = triangles.mean(axis=1)
-        patches = centers[:, None, :]+.3*(triangles-centers[:, None, :])
-        c = dict(candidate_id='C0', center_face=int(faces[0]), center_m=centers[0],
-            source_faces=faces, triangles_m=patches, triangle_areas_m2=areas(patches))
-        report, *_ = B.belt(self.mesh, [c], [], .01, self.scene)
-        self.assertTrue(report['passed'], report)
-        self.assertEqual(report['attached_head_cell_count'], 2)
 
     def test_real_detached_thin_material_is_not_removed(self):
         big = trimesh.creation.box([1., 1., 1.])

@@ -7,7 +7,7 @@ import numpy as np
 import trimesh
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from step5_connect_support import direction_first as X, belt_geometry as B, rigid_path as P, surface_check as U
-from step5_connect_support.test_whole_assembly import contacts
+from step5_connect_support.fixtures import contacts
 from step2_local_support.surface import areas
 
 

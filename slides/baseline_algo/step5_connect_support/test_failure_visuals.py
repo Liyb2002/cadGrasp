@@ -10,7 +10,7 @@ import numpy as np
 import trimesh
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from step5_connect_support import failure_visuals as F,direction_first as X,belt_geometry as B
-from step5_connect_support.test_whole_assembly import contacts
+from step5_connect_support.fixtures import contacts
 
 
 class FailureVisualTests(unittest.TestCase):
