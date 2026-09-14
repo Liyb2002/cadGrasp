@@ -1,8 +1,8 @@
 # Object library and stable placements
 
 Shared helpers for the slides and the object library. The current problem is in
-[problem_statement.md](../problem_statement.md), with model decisions in
-[problem_statement.md](../problem_statement.md#当前决定与讨论记录). Code lives only in `slides/` and `codes/`.
+[README.md](../README.md), with model decisions in
+[README.md](../README.md#当前决定与讨论记录). Code lives only in `slides/` and `codes/`.
 `cone_model.py` defines the shared direction cap; `mesh_export.py` exports display
 meshes for MuJoCo. Optional standalone figures go to `slides/tools/figures/`.
 

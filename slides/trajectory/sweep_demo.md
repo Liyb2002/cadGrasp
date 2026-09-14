@@ -10,7 +10,7 @@ trajectory before rendering. It does not rebuild geometry or write baseline
 outputs. The displayed approach pose is on the saved path, at most 60 mm from
 the installed pose; it is not labelled as the start of the whole path.
 
-Run `python slides/render.py --only trajectory` in the cadgrasp environment.
+Run `python slides/tools/render.py --only trajectory` in the cadgrasp environment.
 Both `sweep_demo.png` and `sweep_eq.png` are generated. Equations use Z-up, floor
 `z=0`, insertion direction `a` and withdrawal direction `-a`. This saved path is a
 pure horizontal translation and reaches a separating plane before its finite
@@ -24,7 +24,7 @@ volume and clearance figures below do not describe the current images.
 
 # `sweep_demo` — does the support's swept volume hit the workpiece?
 
-**Current procedure (2026-09-06): [problem_statement.md](../problem_statement.md#当前决定与讨论记录).** The robot holds the
+**Current procedure (2026-09-06): [README.md](../README.md#当前决定与讨论记录).** The robot holds the
 workpiece at `T*`; one or more independent rigid supports are inserted sequentially,
 each reaching its designed contacts with **perfect final fit**, before the robot
 releases. Different pieces may use different insertion directions. Check each path

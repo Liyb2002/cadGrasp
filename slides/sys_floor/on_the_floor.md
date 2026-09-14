@@ -1,15 +1,21 @@
 # Floor loads: five object/pose examples
 
-The current [five landing clouds](on_the_floor.png) and B/pose_2 [resultant diagram](row3.png)
+The [reference schematic](row3.png), restored from the construction in `ref.png`,
+shows the coplanar force lines intersecting at X and the resultant reaching the
+floor at p. Run `python slides/sys_floor/row3.py` to redraw it. The figure uses
+scalar force magnitude `F_push` and unit direction `d_push`, as in the reference.
+The scene verifies the intersection against the floor pressure-center formula.
+
+The current [five landing clouds](on_the_floor.png) and B/pose_2 [resultant diagram](resultant_B_pose_2.png)
 share the workpiece, camera, colours and compact floor of `head_total_force.png`.
-Run `python slides/render.py --only floor` in the cadgrasp environment.
+Run `python slides/tools/render.py --only floor` in the cadgrasp environment.
 
 `on_the_floor.png` combines the five scenes into one figure: three above, two
 centred below, with a shared title and legend and an object/pose label per scene.
 
 `presentation.py` reads saved paired loads for B/pose_2, B/pose_3, A1-f/pose_2,
-A1-f/pose_3 and C5/pose_2 without changing baseline outputs. Each case writes
-`on_the_floor_{object}_{pose}.png` and matching provenance JSON. It independently
+A1-f/pose_3 and C5/pose_2 without changing baseline outputs. It writes only
+`on_the_floor.png`, with all five cases recorded in `on_the_floor.json`. It independently
 recomputes all 32,768 landings per case and checks them against
 Step4's corresponding rows (the saved array also begins with a gravity-only row).
 Hidden floor points are occluded by the workpiece. The cloud is sampled, not a
@@ -23,7 +29,7 @@ weighted application point defines the resultant line. No intersection of skew
 3-D force lines is assumed. Convex-hull containment is necessary for tipping
 resistance; friction and yaw still require a joint bearing check.
 
-`on_the_floor.py` and `row3.py` now render the current diagrams by default.
+`on_the_floor.py` renders all floor diagrams; `row3.py` renders the reference schematic.
 Old figures were deleted. The numbers and coordinate conventions below describe
 earlier experiments only; they do not describe the current images.
 
@@ -33,7 +39,7 @@ earlier experiments only; they do not describe the current images.
 
 **2026-09-11 接入 baseline：** `support_polygon.cop` 的整体压力中心公式被新 Step4 的等价六维需求映射采用；当前 baseline 使用 Step1 的当前姿态及 0–0.5mg 全范围，含零加工力，并另存连续外包。下面的旧图、固定力度和旧姿态样本不作为当前认证。见 [Step4](../baseline_algo/step4_floor_contact/README.md)。
 
-**Current scope (2026-09-06): [problem_statement.md](../problem_statement.md#当前决定与讨论记录).** Only the full-load set
+**Current scope (2026-09-06): [README.md](../README.md#当前决定与讨论记录).** Only the full-load set
 `L_K={p(q,d,K)}`, `K=0.5`, is required. References below to varying `[0,K]` describe an
 optional extension and historical area measurements; they add no zero-load requirement.
 The floor hull check treats the workpiece and its supports as one assembly and uses the

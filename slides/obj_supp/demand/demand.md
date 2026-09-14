@@ -15,11 +15,12 @@ notation and unbroken equations from the earlier supplied reference (the old scr
 \[
 \operatorname{demand}(F_{\rm push},\mathrm{pt})=(F_D,\tau_D)\in\mathbb R^6,
 \qquad
-(F_D,\tau_D)=\left(mg\hat z-F_{\rm push},\;-(\mathrm{pt}-c)\times F_{\rm push}\right).
+(F_D,\tau_D)=\left(mg\hat z-F_{\rm push},\;-r_{\rm push}\times F_{\rm push}\right).
 \]
 
 `F_push` is the applied process force, `pt` its location in the work region,
-`c` the workpiece center of mass, and `y` points upward. The figure shows
+`c` the workpiece center of mass, and `r_push = pt - c` the push moment arm.
+The `z` axis points upward. The figure shows
 `0 <= |F_push| <= 0.5 mg`, as in the reference.
 
 For each covered load, find **one** passive contact reaction field that
@@ -27,12 +28,12 @@ simultaneously supplies this R6 demand and satisfies no uplift. The figure
 encloses the following conditions in one box to show their shared unknowns:
 
 \[
-\left(\sum_{\rm contacts}F_{\rm supp},\;
-\sum_{\rm contacts}r_{\rm supp}\times F_{\rm supp}\right)=(F_D,\tau_D),
+\left(\sum F_{\rm supp},\;
+\sum r_{\rm supp}\times F_{\rm supp}\right)=(F_D,\tau_D),
 \]
 
 \[
-\sum_{\rm heads}F_{\rm supp}\cdot\hat z\geq0.
+\sum F_{\rm supp}\cdot\hat z\geq0.
 \]
 
 The external demand remains six-dimensional. No uplift restricts the feasible
@@ -44,7 +45,8 @@ one fixed active force applied at every point. The reactions can depend on
 the applied load. The complete workpiece balance includes both head contacts
 and the workpiece's original contact with the ground. The no-uplift condition sums
 **head forces only**, excluding that original workpiece–floor reaction,
-because it concerns uplift of the connected support itself.
+because it concerns uplift of the connected support itself. The summation
+domains are explained in prose rather than printed below the sum signs.
 
 For one connected, massless, unanchored support, this total vertical force
 on the workpiece must be nonnegative. Individual heads may push downward.
@@ -146,7 +148,7 @@ impossible. The earlier B/tip-1 numerical values no longer describe this figure.
 ## Reproduce and verify
 
 ```sh
-python slides/render.py --only demand
+python slides/tools/render.py --only demand
 # Optional complete audit data:
 python slides/obj_supp/demand/demand.py --audit /tmp/cadgrasp-demand-pairs.npz
 ```

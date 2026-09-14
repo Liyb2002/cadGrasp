@@ -32,14 +32,14 @@ def main():
     x = .354
     text(x, .783, '01–03   One joint mechanics problem', 25, fontweight='bold')
     text(x, .687, r'$\mathrm{demand}(F_{\rm push},\mathrm{pt})=(F_D,\tau_D)\in\mathbb{R}^{6}$', 27)
-    text(x, .592, r'$(F_D,\tau_D)=\left(mg\,\hat z-F_{\rm push},\;-(\mathrm{pt}-c)\times F_{\rm push}\right)$', 25)
+    text(x, .592, r'$(F_D,\tau_D)=\left(mg\,\hat z-F_{\rm push},\;-r_{\rm push}\times F_{\rm push}\right)$', 25)
 
     fig.add_artist(Rectangle((.043, .239), .622, .292, transform=fig.transFigure,
                              facecolor='none', edgecolor=RULE, linewidth=1.4))
     text(x, .499, r'For each covered load, find one shared passive reaction field $F_{\rm supp}$:', 17)
-    text(x, .412, r'$\left(\sum_{\rm contacts}F_{\rm supp},\;'
-         r'\sum_{\rm contacts}r_{\rm supp}\times F_{\rm supp}\right)=(F_D,\tau_D)$', 27)
-    text(x, .301, r'$\sum_{\rm heads}F_{\rm supp}\cdot\hat z\geq0$', 27)
+    text(x, .412, r'$\left(\sum F_{\rm supp},\;'
+         r'\sum r_{\rm supp}\times F_{\rm supp}\right)=(F_D,\tau_D)$', 27)
+    text(x, .301, r'$\sum F_{\rm supp}\cdot\hat z\geq0$', 27)
     text(x, .207, 'Contacts = heads + workpiece–floor contact. The no-uplift sum includes heads only.', 15)
 
     x = .846
@@ -54,7 +54,7 @@ def main():
     text(x, .207, 'Search the allowed finite direction catalogue.', 13)
 
     line([.03, .97], [.174, .174])
-    text(.5, .137, 'pt: push location; c: center of mass; '
+    text(.5, .137, r'$r_{\rm push}=\mathrm{pt}-c$; '
          r'$r_{\rm supp}$: COM-to-contact vector; '
          r'$0\leq|F_{\rm push}|\leq0.5\,mg$; z points upward.', 16)
     text(.5, .090, 'Every round: gravity-only joint feasibility + a common head direction are required. '

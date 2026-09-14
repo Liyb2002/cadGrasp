@@ -1,6 +1,6 @@
 # Equations to solve — force balance, moment balance, and their joint solutions
 
-**Current scope (2026-09-06): [problem_statement.md](../problem_statement.md#当前决定与讨论记录).** Only `t=K=0.5` is
+**Current scope (2026-09-06): [README.md](../README.md#当前决定与讨论记录).** Only `t=K=0.5` is
 checked. Independent rigid supports may be inserted sequentially and fit perfectly at
 the endpoint. Indices below count contact generators, not separate support solids.
 
@@ -311,7 +311,7 @@ condition and numerical feasibility tests; a scalar arc-length sum does not repl
   ideal contact fit does not turn a pruning priority into their certificate.
 - **The removed METHOD.md used the old declarations** — `λ ≤ 1`, `K = 1` — so its §4.2, §11.7 and
   §11.9 numbers are not comparable with anything here, and its §1 rule about one use per
-  direction is superseded (§1). Current declarations remain here and in [slides/problem_statement.md](../problem_statement.md#当前决定与讨论记录).
+  direction is superseded (§1). Current declarations remain here and in [slides/README.md](../README.md#当前决定与讨论记录).
 
 **2026-09-06 numerical update.** `slides/tools/contact_cones.in_cone()` handles ranks 0/1/2/3, zero vectors,
 and nonnegative coefficients with floating-point tolerances. Carathéodory permits at most

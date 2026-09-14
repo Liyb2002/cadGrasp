@@ -650,6 +650,6 @@ if __name__ == "__main__":
         sys.argv.remove('--legacy')
         main()
     elif len(sys.argv) > 1:
-        raise SystemExit('Use slides/render.py for current figures; --legacy enables historical options.')
+        raise SystemExit('Use slides/tools/render.py for current figures; --legacy enables historical options.')
     else:
         runpy.run_path(str(Path(__file__).with_name('presentation.py')), run_name='__main__')

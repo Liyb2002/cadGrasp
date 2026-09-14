@@ -2,7 +2,7 @@
 
 **2026-09-13 rendering:** The current PNG uses world Z-up (`z=0` at the floor), matching B/pose_2 and the shared renderer. The derivation, saved arrays and renderer all use the same native Z-up convention.
 
-**Current declarations (2026-09-08): [problem_statement.md](../../problem_statement.md#当前决定与讨论记录).**
+**Current declarations (2026-09-08): [README.md](../../README.md#当前决定与讨论记录).**
 The local push cone has half-angle `30°`, and the magnitude interval is `0 ≤ t ≤ K=0.5`,
 including gravity alone. The robot holds the target pose while supports are inserted
 one at a time and reach perfect contact before it releases the workpiece.
@@ -270,4 +270,4 @@ not a realised perfectly fitting load-bearing support.
   demand counts are no longer on the paired-load page and have not been remeasured; the joint
   5–7 contact record covers only the 11 tips available in August.
 - METHOD and PIPELINE retain their historical `K=1` and capped-force/pressure models;
-  [problem_statement.md](../../problem_statement.md#当前决定与讨论记录) records what currently applies to slides.
+  [README.md](../../README.md#当前决定与讨论记录) records what currently applies to slides.

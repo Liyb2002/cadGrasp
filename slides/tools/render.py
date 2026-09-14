@@ -1,6 +1,6 @@
 """Render the current slide deck using the active Python environment.
 
-Usage: python slides/render.py [--only setup floor area demand heads equations trajectory]
+Usage: python slides/tools/render.py [--only setup floor area demand heads equations trajectory]
 Baseline code/results and setup data are read-only. Historic multi-object studies
 are not rerun. Generated media remain local, following the repository .gitignore.
 """
@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parents[1]
 RECIPES = {
     'setup': ['setup/poses/presentation.py', 'setup/working_area.py'],
     'floor': ['sys_floor/presentation.py'],
@@ -19,7 +19,8 @@ RECIPES = {
     'demand': ['obj_supp/demand/demand.py'],
     'heads': ['obj_supp/demand/head_total_force.py', 'obj_supp/demand/head_sweep.py'],
     'equations': ['setup/equations/three_equations.py', 'obj_supp/two_equations.py',
-                  'obj_supp/demand/demand_equation.py', 'obj_supp/solution/solution.py'],
+                  'obj_supp/demand/demand_equation.py', 'obj_supp/solution/solution.py',
+                  'tools/combined_equations.py'],
     'trajectory': ['trajectory/presentation.py'],
 }
 

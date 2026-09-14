@@ -36,7 +36,8 @@
 世界坐标竖直向上为 `ẑ`，所有力矩关于工件质心 `c`：
 
 ```text
-demand(F_push, pt) = (mg ẑ − F_push, −(pt − c) × F_push)
+r_push = pt − c
+demand(F_push, pt) = (mg ẑ − F_push, −r_push × F_push)
 ```
 
 导出的力按体重 `mg` 归一化，力矩单位为 `mg·m`，位置单位为 m。
@@ -77,7 +78,7 @@ covered ≈ 满足联合六维平衡的样本数 / count
 ## 文件与运行
 
 ```text
-output/<A1-f|B|C5>/step_1_needs/
+output/<A1-f|B|C5>/<pose>/step_1_needs/
   samples.json               搜索输入：采样六维需求
   needs.json                 连续物理定义和完整几何，仍供 Step 2 读取
   domain.json + domain.png   样本数量、文件引用和需求公式

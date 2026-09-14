@@ -2,6 +2,11 @@ r"""Row (3) in three steps, in `slides/setup/equations/three_equations.png`'s ow
 
     python slides/sys_floor/row3.py  ->  slides/sys_floor/row3.png
 
+Current export restores the planar construction in ref.png. Its labels use
+scalar F_push and unit d_push, while scene() computes vector forces internally.
+The B/pose_2 rendering is separately named resultant_B_pose_2.png.
+
+Historical drafting notes:
 `three_equations.png` writes row (3) as an integral, which is right and is not
 readable out loud.  This page is the same row said in three steps, and it takes
 the other page's names unchanged -- `F_push`, `q`, `mg`, `z`, `c`, `sys_floor`
@@ -184,7 +189,7 @@ def picture(ax, part, c, q, d, X, W, p):
 
     ax.text(*(c + 0.55 * G + [-0.06, 0]), r"$-mg\,\hat{z}$", color=PUSH,
             fontsize=SUB, ha="right", va="center")
-    ax.text(*(q - 0.56 * d + [-0.25, 0.04]), r"$F_{\rm push}$",
+    ax.text(*(q - 0.56 * d + [-0.25, 0.04]), r"$F_{\rm push}\,d_{\rm push}$",
             color=PUSH, fontsize=SUB, ha="center", va="bottom")
     ax.text(*(X + 0.30 * n + [0.08, 0]), r"$W$", color=LOAD, fontsize=EQ,
             ha="left", va="center")
@@ -212,7 +217,7 @@ def main():
 
     t(0.930, "The workpiece and its supports do not tip over", fs=32)
     for y, num, eq in (
-            (0.720, "1", (r"$W \;=\; -mg\,\hat{z} \;+\; F_{\rm push}$",)),
+            (0.720, "1", (r"$W \;=\; -mg\,\hat{z} \;+\; F_{\rm push}\,d_{\rm push}$",)),
             (0.500, "2", (r"$p \;=\; \mathrm{X} \;+\; t\,W$",
                           r"$t \;=\; -\,\frac{\mathrm{X} \cdot \hat{z}}"
                           r"{W \cdot \hat{z}}$")),
@@ -221,12 +226,14 @@ def main():
         t(y, num, x=NUM_X, fs=EQ, c=MUTED)
         for i, line in enumerate(eq):
             t(y - 0.108 * i, line, x=EQ_X, fs=EQ)
-    t(0.095, r"for every $q$ and admissible $F_{\rm push}$, "
-             rf"$|F_{{\rm push}}| = {K:g}\,mg$", x=EQ_X, c=MUTED, fs=SUB)
+    t(0.095, r"$F_{\rm push}$: magnitude; $d_{\rm push}$: unit direction",
+      x=EQ_X, c=MUTED, fs=16)
+    t(0.040, r"Coplanar illustration  ·  $z$ points upward  ·  friction checked separately",
+      x=EQ_X, c=MUTED, fs=14)
 
     picture(fig.add_axes([0.475, 0.075, 0.50, 0.80]), part, c, q, d, X, W, p)
 
-    fig.savefig(OUT, facecolor=PAPER)
+    fig.savefig(OUT, facecolor=PAPER, edgecolor=PAPER, transparent=False)
     plt.close(fig)
     im = plt.imread(str(OUT))
     ink = (im[:, :, :3] < 0.96).any(axis=2)
@@ -241,14 +248,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # The current presentation uses a fixed B/pose_2 snapshot. Preserve the
-    # historical experiment and its library functions behind an explicit flag.
-    import runpy
-    import sys
-    if '--legacy' in sys.argv:
-        sys.argv.remove('--legacy')
-        main()
-    elif len(sys.argv) > 1:
-        raise SystemExit('Use slides/render.py for current figures; --legacy enables historical options.')
-    else:
-        runpy.run_path(str(Path(__file__).with_name('presentation.py')), run_name='__main__')
+    main()

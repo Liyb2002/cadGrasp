@@ -1,5 +1,7 @@
 """Five-case floor overview, with independently computed Z-up landings."""
 from pathlib import Path
+import hashlib
+import json
 import sys
 import numpy as np
 from PIL import Image, ImageDraw
@@ -48,31 +50,22 @@ def floor_cloud(name='B', pose='pose_2'):
         if 0 <= ix < cam.size and 0 <= iy < cam.size and ids[iy, ix] in (0, 1):
             draw.ellipse((x-2, y-2, x+2, y+2), fill=S.ORANGE)
             shown += 1
-    page = Image.new('RGB', (1500, 1460), S.PAPER)
-    draw = ImageDraw.Draw(page)
-    S.text(draw, (750, 64), 'Where the load reaches the floor', 44)
-    S.text(draw, (750, 120), S.case_label(domain), 30, S.MUTED)
-    page.paste(picture, (150, 160))
-    S.text(draw, (750, 1340), 'Orange: required floor-resultant locations', 27)
-    S.text(draw, (750, 1398), '32,768 sampled loads  |  Gravity + process force from 0 to 0.5 mg', 25, S.MUTED)
-    stem = f'on_the_floor_{name}_{pose}'
-    page.save(HERE / f'{stem}.png')
-    if (name, pose) == ('B', 'pose_2'):
-        page.save(HERE/'on_the_floor_B.png')
-    S.record(HERE / f'{stem}.json', domain=domain, sample_count=len(points),
-             visible_points=shown, minimum_normal_mg=float(normal.min()),
-             baseline_floor_points_reproduced=True,
-             claim='Sampled aggregate floor locations; not full bearing or a continuous boundary certificate')
-    print(HERE / f'{stem}.png', flush=True)
-    return picture
+    source = S.case_path(domain) / 'step_1_needs/needs.json'
+    return picture, dict(object_name=name, pose=pose,
+                         source=str(source.relative_to(S.SLIDES)),
+                         source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+                         sample_count=len(points),
+                         visible_points=shown, minimum_normal_mg=float(normal.min()),
+                         baseline_floor_points_reproduced=True)
 
 
-def floor_overview(pictures):
+def floor_overview(cases):
     """One shared title and legend, with three cases above two centred cases."""
     page = Image.new('RGB', (2400, 1680), S.PAPER)
     draw = ImageDraw.Draw(page)
     S.text(draw, (1200, 65), 'Where the load reaches the floor', 58)
-    for i, (picture, (name, pose)) in enumerate(zip(pictures, S.PRESENTATION_CASES)):
+    for i, (picture, metadata) in enumerate(cases):
+        name, pose = metadata['object_name'], metadata['pose']
         row, column = divmod(i, 3)
         left = column*800 + (400 if row else 0)
         top = 140 + row*690
@@ -88,6 +81,11 @@ def floor_overview(pictures):
            29, S.MUTED)
     path = HERE/'on_the_floor.png'
     page.save(path)
+    metadata = dict(coordinate_system='Z-up; floor z=0', camera_vector=S.VIEW.tolist(),
+                    floor_margin_fraction=S.FLOOR_MARGIN, camera_margin=S.CAMERA_MARGIN,
+                    cases=[metadata for _, metadata in cases],
+                    claim='Sampled aggregate floor locations; not full bearing or a continuous boundary certificate')
+    (HERE/'on_the_floor.json').write_text(json.dumps(metadata, indent=2)+'\n')
     print(path, flush=True)
 
 
@@ -128,15 +126,17 @@ def resultant():
              fontsize=14, color=S.MUTED)
     ax = fig.add_axes([.50, .10, .48, .74], facecolor='white')
     ax.imshow(picture); ax.axis('off')
-    fig.savefig(HERE / 'row3.png', facecolor='white', edgecolor='white', transparent=False)
+    fig.savefig(HERE / 'resultant_B_pose_2.png', facecolor='white', edgecolor='white', transparent=False)
     plt.close(fig)
-    S.record(HERE / 'row3.json', q_m=q.tolist(), force_push_mg=push.tolist(),
+    S.record(HERE / 'resultant_B_pose_2.json', q_m=q.tolist(), force_push_mg=push.tolist(),
              floor_point_m=p.tolist(), normal_mg=float(normal),
              horizontal_moment_balance_verified=True)
-    print(HERE / 'row3.png', flush=True)
+    print(HERE / 'resultant_B_pose_2.png', flush=True)
 
 
 if __name__ == '__main__':
     pictures = [floor_cloud(name, pose) for name, pose in S.PRESENTATION_CASES]
     floor_overview(pictures)
     resultant()
+    from row3 import main as reference_schematic
+    reference_schematic()

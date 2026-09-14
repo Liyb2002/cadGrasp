@@ -5,7 +5,7 @@ r"""Open obj_supp with the two workpiece equilibrium equations.
 The equations and visual notation follow setup/equations/three_equations.py.
 Both rows use the same contact pressure field, including the workpiece's own
 floor contact. Moments are about the workpiece centre of mass. The required
-process load is fixed at K = 0.5; see ../problem_statement.md#当前决定与讨论记录.
+process load is fixed at K = 0.5; see ../README.md#当前决定与讨论记录.
 """
 from pathlib import Path
 

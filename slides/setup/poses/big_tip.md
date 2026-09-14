@@ -9,7 +9,7 @@ The separate [working-area diagram](../working_area.png) shows multiple possible
 process forces acting at different positions and directions on the green patch.
 These are separate possible loads, with illustrative arrow lengths.
 
-Run `python slides/render.py --only setup` in the cadgrasp environment.
+Run `python slides/tools/render.py --only setup` in the cadgrasp environment.
 Each selected case writes its own `pose.png`; `target_poses.png` collects all five.
 B/pose_2 also writes `target_pose.png` and `tip_B.png` for existing slide links.
 The figures depict held target poses; no new placement trajectory is asserted.

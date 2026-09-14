@@ -1,9 +1,10 @@
 r"""slides/sys_floor — the setup's own target pose, with the landings on the floor.
 
     python slides/sys_floor/on_the_floor.py
-        -> slides/sys_floor/on_the_floor_A1-f.png
-        -> slides/sys_floor/on_the_floor_B.png
-        -> slides/sys_floor/on_the_floor_C5.png
+        -> slides/sys_floor/on_the_floor.png (five-case overview)
+
+The default entry runs presentation.py. The notes and helpers below describe
+historical individual exports, available only through the explicit legacy mode.
 
 `slides/setup/poses/big_tip.py`'s target pose, unchanged -- same pose, same camera
 angles, same grey floor, same green work region -- with **the places the
@@ -335,6 +336,6 @@ if __name__ == "__main__":
         sys.argv.remove('--legacy')
         main()
     elif len(sys.argv) > 1:
-        raise SystemExit('Use slides/render.py for current figures; --legacy enables historical options.')
+        raise SystemExit('Use slides/tools/render.py for current figures; --legacy enables historical options.')
     else:
         runpy.run_path(str(Path(__file__).with_name('presentation.py')), run_name='__main__')

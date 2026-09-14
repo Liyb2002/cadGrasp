@@ -2,7 +2,7 @@
 
 The current [area figure](area_B.png) uses the shared slide renderer and the exact
 B/pose_2 workpiece, working surface and final contact patches. Run
-`python slides/render.py --only area` (in the cadgrasp environment).
+`python slides/tools/render.py --only area` (in the cadgrasp environment).
 
 | Configuration | Sampled joint coverage |
 |---|---:|
@@ -187,7 +187,7 @@ C5 为 69/256/2150/2150。它们只用于候选评分与采样图示，不再作
 都橙色也不能替代右侧的六维联合覆盖积分或连续全域证书。
 浮雕高度是同一批需求在方向格中的最大力矩，线性归一化到 0.55，标尺圈间距按实际力矩设置。
 
-沿用 [当前决定](../../problem_statement.md#当前决定与讨论记录)：`K=0.5`、只算满加工力，工件已在第一个
+沿用 [当前决定](../../README.md#当前决定与讨论记录)：`K=0.5`、只算满加工力，工件已在第一个
 目标姿态，支撑终点完美贴合。接触力沿内法向、非负且无上限；包含工件原地面支点
 的竖直反力。搜索阶段使用面片中心；连续比例使用完整接触三角面的供给锥，共同满足
 [前两个方程](../equations_to_solve.md)。整体与地面的平衡、支撑实体与插入路径由后续页面处理。
