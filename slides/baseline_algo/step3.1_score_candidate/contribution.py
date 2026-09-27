@@ -180,13 +180,14 @@ def verify_classification(full, targets, accepted):
 
 # The same score operation is used in every scheduler round, including round 1.
 from step3_scheculer import contacts as I
+from step3_scheculer import paths as PTH
 J = load_stage('score', 'joint_samples')
 OUTPUT_NAME = 'step3.1_score_candidate'
 
 
 def code_hashes():
     return I.hashes([Path(__file__), Path(W.__file__), Path(J.__file__), Path(I.__file__), Path(F.__file__), Path(U.__file__),
-                     BASELINE/'step3_scheculer/stage_imports.py'])
+                     BASELINE/'step3_scheculer/stage_imports.py', Path(PTH.__file__)])
 
 
 class Problem:
@@ -272,7 +273,7 @@ def run(name, round_number=1, state_path=None, problem=None):
     fixed, base, state_inputs = problem.load_state(state_path)
     assert len(fixed)+1 == round_number
     already = {p['candidate_index'] for p in fixed}
-    out = I.folder(name, OUTPUT_NAME, round_number)
+    out = PTH.folder(name, OUTPUT_NAME, round_number)
     out.mkdir(parents=True, exist_ok=True)
     I.save(out/'status.json', dict(object=name, complete=False, status='scoring'))
     fixed_full = problem.supply(fixed)
@@ -331,7 +332,7 @@ def run(name, round_number=1, state_path=None, problem=None):
 
 
 def read(name, round_number=1):
-    return I.check_report(I.folder(name, OUTPUT_NAME, round_number)/'contributions.json')
+    return I.check_report(PTH.folder(name, OUTPUT_NAME, round_number)/'contributions.json')
 
 
 if __name__ == '__main__':

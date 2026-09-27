@@ -103,7 +103,8 @@ def install(objects, workers, retry=True):
 if __name__ == '__main__':
     workers = int(os.environ.get('CADGRASP_SCORE_WORKERS', '6'))
     stage = Path(sys.argv[1]).resolve()
-    objects = [s for s in sys.argv[2:] if s in ('A1-f', 'B', 'C5')]
+    from step1.registry import active_objects
+    objects = [s for s in sys.argv[2:] if s in active_objects()]
     if len(objects) != 1 or workers < 1:
         raise ValueError('Expected one object and a positive score worker count')
     # runpy temporarily replaces __main__; spawned worker callables must be

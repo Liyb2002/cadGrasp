@@ -12,6 +12,22 @@ from step4_floor_contact import floor_contact as F
 from step5_connect_support import whole_assembly as C
 from step3_scheculer import run_all
 class CompletionTests(unittest.TestCase):
+    def test_hull_timeout_requires_a_fresh_run(self):
+        with self.assertRaisesRegex(ValueError, 'fresh run'):
+            run_all.run(['B'], from_step=3, through_step=3, resume=True, hull_timeout=60.)
+        for timeout in (0., -1., float('nan'), float('inf')):
+            with self.assertRaisesRegex(ValueError, 'finite and positive'):
+                run_all.run(['B'], from_step=3, through_step=3, hull_timeout=timeout)
+
+    def test_hull_timeout_wraps_every_step3_verification_process(self):
+        with patch.object(run_all.subprocess, 'run') as invoke:
+            invoke.return_value.returncode = 0
+            self.assertEqual(run_all.run(['B'], from_step=3, through_step=3, hull_timeout=60.), 0)
+        for call in invoke.call_args_list:
+            command = call.args[0]
+            self.assertIn('bounded_hull_retry.py', ' '.join(command))
+            self.assertEqual(command[command.index('--hull-timeout')+1], '60.0')
+
     def test_rest_failure_or_four_heads_cannot_be_complete(self):
         for change in [dict(contact_count=4),dict(round_limit=None),dict(rest_equilibrium_verified=False)]:
             with self.assertRaises(Q.IncompleteSchedule):
@@ -28,6 +44,8 @@ class CompletionTests(unittest.TestCase):
                     contact_count=2,round_limit=3,rest_equilibrium_verified=True,
                     sample_count=100, covered_count=100, continuous_domain_status='verified',
                     passive_support_no_uplift_verified=True,
+                    head_connection_witness_verified=True,common_connected_directions={'ids':[0]},
+                    connection={'passed':True,'directions':{'ids':[0]}},
                     passive_support_constraint=dict(mode='connected_massless_support_no_uplift',enforced=True),
                     continuous_coverage_proved=True, insertion_mode='common_rigid_withdrawal_3d',common_head_withdrawal_verified=True,common_withdrawal_directions={'ids':[0]},contact_heads_individually_insertable=True,
                     all_contact_areas_above_minimum=True,all_contact_heads_clear_of_work_volume=True)
@@ -42,6 +60,15 @@ class CompletionTests(unittest.TestCase):
         for changed in failures:
             with self.subTest(changed=changed),self.assertRaises(Q.IncompleteSchedule):
                 Q.require_passed(dict(self.complete(),**changed))
+
+    def test_connection_witness_and_same_direction_are_required(self):
+        for changed in [dict(head_connection_witness_verified=False), dict(connection={}),
+                        dict(common_connected_directions={'ids':[]}),
+                        dict(common_connected_directions={'ids':[1]}),
+                        dict(connection={'passed':False,'directions':{'ids':[0]}}),
+                        dict(connection={'passed':True,'directions':{'ids':[1]}})]:
+            with self.subTest(changed=changed), self.assertRaises(Q.IncompleteSchedule):
+                Q.require_passed(dict(self.complete(), **changed))
 
     def test_new_search_cannot_reuse_previous_success(self):
         with tempfile.TemporaryDirectory() as directory,patch.object(Q.I,'OUTPUTS',Path(directory)):
@@ -63,17 +90,17 @@ class CompletionTests(unittest.TestCase):
 
     def test_partial_objects_continue_through_step5_and_return_unsuccessful(self):
         for first in (4,5):
-            with self.subTest(first=first),patch.object(run_all,'floor_verified',return_value=False), \
+            with self.subTest(first=first),patch.object(run_all,'base_verified',return_value=True),patch.object(run_all,'floor_verified',return_value=False), \
                     patch.object(run_all,'connection_verified',side_effect=lambda n:n=='passed'), \
                     patch.object(run_all.subprocess,'run') as invoke:
                 invoke.return_value.returncode=0
                 self.assertEqual(run_all.run(['failed','passed'],from_step=first),2)
                 for call in invoke.call_args_list:
                     self.assertIn('failed',call.args[0]);self.assertIn('passed',call.args[0])
-                self.assertTrue(any('/step5_connect_support/' in c.args[0][1] for c in invoke.call_args_list))
+                self.assertTrue(any('/step6_connect_support/' in c.args[0][1] for c in invoke.call_args_list))
 
     def test_unsuccessful_completed_search_retains_partial_construction_diagnostics(self):
-        with patch.object(run_all,'read_passed',side_effect=Q.IncompleteSchedule('exhausted')), \
+        with patch.object(run_all,'base_verified',return_value=True),patch.object(run_all,'read_passed',side_effect=Q.IncompleteSchedule('exhausted')), \
                 patch.object(run_all,'floor_verified',return_value=False), \
                 patch.object(run_all,'connection_verified',return_value=False), \
                 patch.object(run_all.subprocess,'run') as invoke:
@@ -83,20 +110,20 @@ class CompletionTests(unittest.TestCase):
             stages=[call.args[0][1] for call in invoke.call_args_list]
             self.assertTrue(any(path.endswith('/verification.py') for path in stages))
             self.assertTrue(any('/step4_floor_contact/' in path for path in stages))
-            self.assertTrue(any('/step5_connect_support/' in path for path in stages))
+            self.assertTrue(any('/step6_connect_support/' in path for path in stages))
 
     def test_default_run_includes_fixed_foot_connector_and_audit(self):
-        with patch.object(run_all,'floor_verified',return_value=True), \
+        with patch.object(run_all,'base_verified',return_value=True),patch.object(run_all,'floor_verified',return_value=True), \
                 patch.object(run_all,'connection_verified',return_value=True), \
                 patch.object(run_all.subprocess,'run') as invoke:
             invoke.return_value.returncode=0
             self.assertEqual(run_all.run(['passed'],from_step=4),0)
             stages=[call.args[0][1] for call in invoke.call_args_list]
-            self.assertTrue(any(path.endswith('/step5_connect_support/audit.py') for path in stages))
-            self.assertTrue(any(path.endswith('/step5_connect_support/draw.py') for path in stages))
+            self.assertTrue(any(path.endswith('/step6_connect_support/audit.py') for path in stages))
+            self.assertTrue(any(path.endswith('/step6_connect_support/draw.py') for path in stages))
 
     def test_connection_budget_only_changes_connector_search(self):
-        with patch.object(run_all,'floor_verified',return_value=True), \
+        with patch.object(run_all,'base_verified',return_value=True),patch.object(run_all,'floor_verified',return_value=True), \
                 patch.object(run_all,'connection_verified',return_value=False), \
                 patch.object(run_all.subprocess,'run') as invoke:
             invoke.return_value.returncode=0
@@ -104,9 +131,9 @@ class CompletionTests(unittest.TestCase):
             commands=[c.args[0] for c in invoke.call_args_list]
             bounded=[c for c in commands if '--edge-budget' in c]
             self.assertEqual(len(bounded),1)
-            self.assertTrue(bounded[0][1].endswith('/step5_connect_support/connect.py'))
+            self.assertTrue(bounded[0][1].endswith('/step6_connect_support/connect.py'))
             self.assertEqual(bounded[0][-2:],['--edge-budget','200'])
-            self.assertTrue(any(c[1].endswith('/step5_connect_support/audit.py') for c in commands))
+            self.assertTrue(any(c[1].endswith('/step6_connect_support/audit.py') for c in commands))
 
     def test_invalid_connection_budget_cannot_start_or_clear_outputs(self):
         with patch.object(run_all.subprocess,'run') as invoke:
@@ -114,17 +141,27 @@ class CompletionTests(unittest.TestCase):
                 run_all.run(['test'],from_step=4,connection_edge_budget=0)
             invoke.assert_not_called()
 
+    def test_step5_only_stops_after_base_without_connection_or_video(self):
+        with patch.object(run_all, 'base_verified', return_value=True), \
+                patch.object(run_all, 'connection_verified') as connection, \
+                patch.object(run_all.subprocess, 'run') as invoke:
+            invoke.return_value.returncode = 0
+            self.assertEqual(run_all.run(['test'], from_step=5, through_step=5), 0)
+            stages = [Path(call.args[0][1]).parent.name for call in invoke.call_args_list]
+            self.assertEqual(stages, ['step5_base', 'step5_base'])
+            connection.assert_not_called()
+
     def test_one_body_search_keeps_audit_and_forwards_budget(self):
         with patch.object(run_all,'connection_verified',return_value=False), \
                 patch.object(run_all.subprocess,'run') as invoke:
             invoke.return_value.returncode=0
-            self.assertEqual(run_all.run(['test'],from_step=5,connection_edge_budget=200,connection_workers=4),2)
+            self.assertEqual(run_all.run(['test'],from_step=6,connection_edge_budget=200,connection_workers=4),2)
             commands=[c.args[0] for c in invoke.call_args_list]
-            self.assertTrue(commands[0][1].endswith('/step5_connect_support/connect.py'))
+            self.assertTrue(commands[0][1].endswith('/step6_connect_support/connect.py'))
             self.assertEqual(commands[0][-2:],['--edge-budget','200'])
             self.assertNotIn('--workers',commands[0])
-            self.assertTrue(commands[1][1].endswith('/step5_connect_support/audit.py'))
-            self.assertTrue(commands[2][1].endswith('/step5_connect_support/draw.py'))
+            self.assertTrue(commands[1][1].endswith('/step6_connect_support/audit.py'))
+            self.assertTrue(commands[2][1].endswith('/step6_connect_support/draw.py'))
 
     def test_invalid_connection_workers_cannot_start_outputs(self):
         with patch.object(run_all.subprocess,'run') as invoke:
@@ -142,15 +179,43 @@ class CompletionTests(unittest.TestCase):
             self.assertEqual(len(forced), 1)
             self.assertTrue(forced[0][1].endswith('/insertion_directions.py'))
 
-    def test_resume_reuses_completed_failed_search_but_replays_its_audit(self):
-        checkpoint=dict(status='candidates_exhausted',continuous_coverage_proved=False)
+    def test_resume_reuses_failed_search_and_checks_only_final_output(self):
+        from step3_scheculer.random_search import configuration
+        checkpoint=dict(status='candidates_exhausted',continuous_coverage_proved=False,search_config=configuration())
         with patch.object(run_all,'completed_schedule',return_value=checkpoint), \
                 patch.object(run_all.subprocess,'run') as invoke:
             invoke.return_value.returncode=0
             self.assertEqual(run_all.run(['test'],from_step=3,through_step=3,resume=True),2)
             paths=[call.args[0][1] for call in invoke.call_args_list]
-            self.assertEqual(len(paths),1)
-            self.assertTrue(paths[0].endswith('/step3_scheculer/audit.py'))
+            self.assertEqual(len(paths),4)
+            self.assertTrue(paths[0].endswith('/step3_scheculer/verification.py'))
+            self.assertFalse(any(path.endswith('/audit.py') for path in paths))
+            self.assertFalse(any(path.endswith('/scheduler.py') for path in paths))
+
+    def test_step3_default_keeps_verification_without_search_audit(self):
+        with patch.object(run_all.subprocess,'run') as invoke:
+            invoke.return_value.returncode=0
+            self.assertEqual(run_all.run(['test'],from_step=3,through_step=3),0)
+        paths=[call.args[0][1] for call in invoke.call_args_list]
+        self.assertTrue(paths[0].endswith('/scheduler.py'))
+        self.assertTrue(paths[1].endswith('/verification.py'))
+        self.assertFalse(any(path.endswith('/audit.py') for path in paths))
+
+    def test_checkpoint_without_audit_still_rejects_stale_state_and_geometry(self):
+        with tempfile.TemporaryDirectory() as directory,patch.object(run_all,'HERE',Path(directory)):
+            folder=Path(directory)/'output/test/pose_1/step3_scheculer'
+            folder.mkdir(parents=True)
+            artifact=folder/'final_contacts.npz';artifact.write_bytes(b'geometry')
+            schedule=dict(self.complete(),provenance=dict(inputs={},code={}),
+                          artifacts={'final_contacts.npz':Q.I.sha256(artifact)})
+            Q.I.save(folder/'schedule.json',schedule)
+            Q.I.save(folder/'status.json',dict(complete=True,schedule_sha256=Q.I.sha256(folder/'schedule.json')))
+            self.assertEqual(run_all.completed_schedule('test'),schedule)
+            artifact.write_bytes(b'changed geometry')
+            self.assertIsNone(run_all.completed_schedule('test'))
+            artifact.write_bytes(b'geometry')
+            Q.I.save(folder/'status.json',dict(complete=True,schedule_sha256='stale'))
+            self.assertIsNone(run_all.completed_schedule('test'))
 
     def test_rerun_invalidates_downstream_in_place_without_archiving(self):
         with tempfile.TemporaryDirectory() as directory,patch.object(Q.I,'OUTPUTS',Path(directory)):

@@ -14,9 +14,11 @@ A = load_stage('optimize', 'adjust')
 D = load_stage('select', 'draw')
 from step2_local_support import render as R
 from step3_scheculer import contacts as I
+from step3_scheculer import paths as PTH
 
 
 def curve(result):
+    joint = result.get('optimization_mode') == 'coordinate_all_contacts'
     paper = np.array(R.PAPER)/255
     fig, axes = plt.subplots(2, 1, figsize=(7.7, 8), dpi=130, sharex=True)
     fig.patch.set_facecolor(paper)
@@ -24,18 +26,20 @@ def curve(result):
     for ax, field, ylabel in zip(axes, ['efficiency', 'covered_percent'],
                                ['Joint coverage % / total area %', 'Joint covered samples (%)']):
         ax.set_facecolor(paper)
-        ax.plot([r['area_m2']*1e6 for r in rows], [r[field] for r in rows], '.--', color='#99aaa6', markersize=4)
-        ax.axvline(result['area_constraint']['minimum_area_m2']*1e6,
-                   color='#ad5634', linestyle=':', label='0.5% area limit')
+        ax.plot([r['update'] if joint else r['area_m2']*1e6 for r in rows], [r[field] for r in rows], '.--', color='#99aaa6', markersize=4)
+        if not joint:
+            ax.axvline(result['area_constraint']['minimum_area_m2']*1e6,
+                       color='#ad5634', linestyle=':', label='0.5% area limit')
         for key, color in [('initial', '#317fc3'), ('adjusted', '#ef8b25')]:
             row = result[key]
-            ax.scatter(1e6*row['area_m2'], row[field], s=100, color=color, label=key)
+            x = (0 if key=='initial' else len(rows)) if joint else 1e6*row['area_m2']
+            ax.scatter(x, row[field], s=100, color=color, label=key)
         ax.set_ylabel(ylabel)
         ax.spines[['top', 'right']].set_visible(False)
         ax.grid(alpha=.15)
     axes[0].legend()
     axes[0].set_title('Optimize coverage / total contact area', loc='left', fontsize=15)
-    axes[1].set_xlabel('Current contact area (mm²); previous contact areas fixed')
+    axes[1].set_xlabel('Coordinate update (all contact sizes can change)' if joint else 'Current contact area (mm²); previous contact areas fixed')
     axes[1].set_ylim(0, 102)
     fig.subplots_adjust(left=.15, right=.98, top=.93, bottom=.12, hspace=.17)
     stream = io.BytesIO()
@@ -47,8 +51,9 @@ def curve(result):
 
 def run(name, round_number=1):
     result = A.read(name, round_number)
-    out = I.folder(name, A.OUTPUT_NAME, round_number)
-    source = I.folder(name, A.M.OUTPUT_NAME, round_number)
+    joint = result.get('optimization_mode') == 'coordinate_all_contacts'
+    out = PTH.folder(name, A.OUTPUT_NAME, round_number)
+    source = PTH.folder(name, A.M.OUTPUT_NAME, round_number)
     sets = [I.read_contacts(source/'contacts_before_optimization.npz'), I.read_contacts(out/'contacts.npz')]
     domain, _, _ = A.P.read(name)
     data = [I.as_data(contacts) for contacts in sets]
@@ -59,7 +64,7 @@ def run(name, round_number=1):
     paper = Image.new('RGB', (2220, 1510), R.PAPER)
     ink = ImageDraw.Draw(paper)
     ink.text((35, 25), f'{name} / Step 3.3 / Round {round_number} / Optimize {result["candidate_id"]}', font=R.font(43), fill=R.INK)
-    ink.text((35, 88), 'Only the current contact changes. All previous contact geometry stays fixed.', font=R.font(28), fill=R.INK)
+    ink.text((35, 88), 'Contact centers fixed; all contact radii are adjusted in turn.' if joint else 'Only the current contact changes. All previous contact geometry stays fixed.', font=R.font(28), fill=R.INK)
     views = []
     for i, (state, label) in enumerate([('initial', 'Before'), ('adjusted', 'After')]):
         x = 25+700*i
@@ -83,7 +88,7 @@ def run(name, round_number=1):
             f'Each area > {1e6*result["area_constraint"]["minimum_area_m2"]:.2f} mm2 (0.5%)',
             'Scheduler checks completion AFTER this step.']):
         ink.text((1490, 1040+66*j), line, font=R.font(26), fill=R.INK)
-    ink.text((35, 1470), 'Blue: previously fixed contacts. Orange: current contact. Same camera and scale before/after. Coverage is measured on the stored samples.', font=R.font(21), fill='#65706c')
+    ink.text((35, 1470), 'Blue: earlier contacts. Orange: newest contact. Same camera and scale before/after. Coverage is measured on the stored samples.', font=R.font(21), fill='#65706c')
     paper.save(out/'adjustment.png')
     I.save(out/'adjustment_views.json', dict(object=name, round=round_number, views=views,
         adjustment_sha256=A.C.sha256(out/'adjustment.json'), same_camera_and_scale=True,

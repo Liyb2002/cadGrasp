@@ -1,37 +1,71 @@
-# Floor loads: five object/pose examples
+# B/pose_2：三个载荷，三个地面点
 
-The [reference schematic](row3.png), restored from the construction in `ref.png`,
-shows the coplanar force lines intersecting at X and the resultant reaching the
-floor at p. Run `python slides/sys_floor/row3.py` to redraw it. The figure uses
-scalar force magnitude `F_push` and unit direction `d_push`, as in the reference.
-The scene verifies the intersection against the floor pressure-center formula.
+当前图：[row3.png](row3.png)。三个独立图片：
+[1](row3_force_1.png)、[2](row3_force_2.png)、[3](row3_force_3.png)。
 
-The current [five landing clouds](on_the_floor.png) and B/pose_2 [resultant diagram](resultant_B_pose_2.png)
-share the workpiece, camera, colours and compact floor of `head_total_force.png`.
-Run `python slides/tools/render.py --only floor` in the cadgrasp environment.
+```sh
+python slides/sys_floor/row3.py
+python -m unittest discover -s slides/sys_floor -p 'test*.py'
+```
 
-`on_the_floor.png` combines the five scenes into one figure: three above, two
-centred below, with a shared title and legend and an object/pose label per scene.
+图直接读取 `objects/B/poses.json` 和 `objects/B/tasks/pose_2/setup.npz`，
+使用当前 pose_2 和已缩小的工作面（此姿态为总表面积的约 6.74%），
+不读取旧 baseline 的同名姿态，不修改姿态、工作面或 baseline 输出。
+三幅使用相同相机与比例，每幅只有一个加工力和重力：
 
-`presentation.py` reads saved paired loads for B/pose_2, B/pose_3, A1-f/pose_2,
-A1-f/pose_3 and C5/pose_2 without changing baseline outputs. It writes only
-`on_the_floor.png`, with all five cases recorded in `on_the_floor.json`. It independently
-recomputes all 32,768 landings per case and checks them against
-Step4's corresponding rows (the saved array also begins with a gravity-only row).
-Hidden floor points are occluded by the workpiece. The cloud is sampled, not a
-continuous boundary certificate.
+- 红色 `F_push` 作用于真实工作面上的 q，方向在保存的 30° 内向法线锥内。
+  第 1、2 幅均为 0.5 mg，作用位置和方向明显不同；第 3 幅为 0.1 mg，
+  与第 2 幅保持完全相同的作用位置和方向，只改变大小。每幅单独标注力度。
+- 蓝色 `mg` 从质心 c 竖直向下；蓝色虚线是它的作用线。
+- 黑点 X 是红、蓝两条作用线的真实交点，不是箭头端点，也不是两个作用点的加权平均。
+- 橙色 W 是合力；橙色虚线与 `z=0` 的交点 p 是该载荷对应的地面点。
 
-World coordinates are Z-up. About the floor origin, let
-`W = -mg e_z + F_push`, `M = c x (-mg e_z) + q x F_push`, and `N = -W_z`.
-For positive N the required floor point is `p = (M_y/N, -M_x/N, 0)`.
-The illustration's downward process force and gravity are parallel; their
-weighted application point defines the resultant line. No intersection of skew
-3-D force lines is assumed. Convex-hull containment is necessary for tipping
-resistance; friction and yaw still require a joint bearing check.
+三个力箭头共用同一屏幕长度／力大小比例：在 1100 像素单图中，1 mg 对应 240 像素，
+0.5 mg 为 120 像素，0.1 mg 为 24 像素。方向沿真实三维方向的投影；
+箭头表示力度而非位移，因此消除方向投影造成的长度缩短，让相同力度显示为相同长度。
+q、c、X、p 和辅助线仍使用准确的三维投影。红色实体箭头沿原作用线放在 X 沿受力方向的前方，
+箭尾与 X 至少相隔 64 像素，并与表面红点 q 留出间隙；红、蓝箭头向后的虚线延长线相交于 X，红色作用线经过 q。
+橙色实体箭头也沿合力作用线移开 X；这些平移不改变力的作用线或力矩。
+第三幅保留独立的短实体箭头，尖端不再被 q 的标记遮住。
+物体与工作面是原始几何的深度渲染；
+受力与辅助线作为自由体图叠加，因此物体内部质心处的重力仍可见。
+地面只标该幅的一个 p，没有把它画成物体原有的接地点，也不宣称该姿态已经稳定。
 
-`on_the_floor.py` renders all floor diagrams; `row3.py` renders the reference schematic.
-Old figures were deleted. The numbers and coordinate conventions below describe
-earlier experiments only; they do not describe the current images.
+## X 的核对与三维适用范围
+
+旧二维程序中的 X 数值确实同时落在重力和推力作用线上（交线残差小于 1e-12），
+问题在于箭头、延长线和标注让构造不够清楚。现在直接画当前物体的三维几何。
+
+三维中的任意两条作用线可能异面，不能总是假设存在 X。为说明“经过 X 的合力
+延伸至地面”这个构造，这三个载荷专门从当前工作面和载荷锥内选取**作用线相交**的例子。
+程序先在质心竖线上取 X，再检查由 X 指向 q 的推力是否在载荷锥内、是否能从外部到达 q，
+先选择两个作用位置与方向明显不同的 0.5 mg 例子，再将第二个的力度缩小为 0.1 mg。
+第二、三幅的 X 相同；减小力度后 p 更靠近质心的竖直投影。
+它们不代表整个三维载荷集合。
+
+世界坐标 Z 向上，力以 mg 为单位、位置以米为单位。令
+
+\[
+G=-mg\hat z,\quad W=G+F_{\rm push},\quad
+M=c\times G+q\times F_{\rm push},\quad N=-W_z>0.
+\]
+
+交线构造给出 `p = X - (X_z/W_z) W`。程序另用力矩公式
+`p = (M_y/N, -M_x/N, 0)` 独立复算，并验证完整三维残差
+`M - p × W = 0`，而不只检查两个水平力矩。
+这里采用作用点与力组成力矩 `r × F` 的标准 wrench 表示；参见
+[Modern Robotics §3.4](https://modernrobotics.northwestern.edu/nu-gm-book-resource/3-4-wrenches/)。
+
+一般异面载荷仍可用上述力矩公式求地面压力中心，但可能剩下绕竖直轴的力矩，
+不能将它画成一个纯合力作用点。回归测试包含这种反例，以及没有唯一 X 的平行力情况。
+这里不重新讨论摩擦大小；整套被动支撑是否可承载仍由完整平衡求解判断。
+
+## 其他保存图的来源
+
+`on_the_floor.png` 和 `resultant_B_pose_2.png` 保留的是旧 baseline 输入的图，
+不对应这次 `objects/` 中更新的姿态与工作面。`presentation.py` 重画它们时仍读取
+baseline 保存数据，并在末尾调用新的 `row3.py`；本次只重画 row3 的三个例子。
+下文记录更早的实验，不能作为当前图片的数值说明。
 
 ## Historical experiments
 
@@ -198,12 +232,12 @@ against a push of `K` body weights the contacts must produce `T = up − K·d`.
 default. The removed METHOD and PIPELINE documents used the historical `K = 1` model.
 
 In newtons, `K = 0.5` is **2.7 N** on A1-f (555 g), **3.6 N** on B (735 g) and **0.09 N**
-on C5 (17 g) — still several times a real spray gun's ~1 N on the two heavy parts. Which
-is the honest caveat about `K` itself: it is *dimensionless*, so one `K` for every object
-declares a different physical force for each, and a gun does not know what the part weighs.
-At a fixed 1 N a real gun would be `K` = 0.18 on A1-f, 0.14 on B and **5.9 on C5** — a
-17 g part fails this project's own premise of *too heavy to lift* long before its supports
-do.
+on C5 (17 g). Since `K` is dimensionless, one `K` for every object declares a different
+physical force for each. For an illustrative fixed 1 N load, `K` would instead be
+0.18 on A1-f, 0.14 on B and **5.9 on C5**; the last load is outside the current domain.
+Workpiece mass is selected to suit the experimental equipment and task. Pickup and
+reorientation are allowed during preparation. Changed mass, center of mass or task
+loads require checking the design against the resulting load domain.
 
 ### What sampling the cone's interior was costing
 

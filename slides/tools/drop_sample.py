@@ -7,7 +7,7 @@ yaw about the world z axis is free.  Settled trials are therefore clustered on
 that direction, and the most frequent distinct clusters are kept, with the
 cluster frequency reported as the probability of that placement.
 
-Writes objects/<name>/poses.json and objects/<name>/scene.xml.
+Writes objects/<name>/poses.json and objects/_simulation_assets/<name>/scene.xml.
 
     python slides/tools/drop_sample.py [--trials 40] [--keep 5] [--jobs 6]
 """

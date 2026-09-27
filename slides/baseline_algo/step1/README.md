@@ -4,10 +4,16 @@
 从连续的物理施力域采样，再映射为完整六维力—力矩需求；本步不做覆盖积分。
 所有候选应复用同一份样本，以便比较贡献。
 
+当前案例由 [`objects/cases.json`](../../../objects/cases.json) 选择，任务输入读取
+`objects/<name>/tasks/<pose>/setup.npz`。当前为 B、C5 各 4 个 pose，A2、A3、D3
+各 2 个 pose；A1-f 已移出当前集。准备新案例见
+[输入说明](../../../codes/setup/README.md#baseline-案例输入)。下表保留早期案例链接，
+不是当前实验集列表；历史结果不代表更换输入来源后的审计状态。
+
 | 物体 | 采样需求 | 数量与定义 | 公式图 | 三个说明例子 |
 |---|---|---|---|---|
 | A1-f | [samples.json](../output/A1-f/pose_1/step_1_needs/samples.json) | [domain.json](../output/A1-f/pose_1/step_1_needs/domain.json) | [domain.png](../output/A1-f/pose_1/step_1_needs/domain.png) | [proof.png](../output/A1-f/pose_1/step_1_needs/proof.png) |
-| B | [samples.json](../output/B/pose_1/step_1_needs/samples.json) | [domain.json](../output/B/pose_1/step_1_needs/domain.json) | [domain.png](../output/B/pose_1/step_1_needs/domain.png) | [proof.png](../output/B/pose_1/step_1_needs/proof.png) |
+| B（1+3 中的 pose1） | [samples.json](../output/B/pose1+3/step_1_needs/pose_1/samples.json) | [needs.json](../output/B/pose1+3/step_1_needs/pose_1/needs.json) | — | [examples.json](../output/B/pose1+3/step_1_needs/pose_1/examples.json) |
 | C5 | [samples.json](../output/C5/pose_1/step_1_needs/samples.json) | [domain.json](../output/C5/pose_1/step_1_needs/domain.json) | [domain.png](../output/C5/pose_1/step_1_needs/domain.png) | [proof.png](../output/C5/pose_1/step_1_needs/proof.png) |
 
 ## 数量与精度
@@ -112,7 +118,7 @@ import json
 import numpy as np
 from pathlib import Path
 
-folder = Path('slides/baseline_algo/output/B/pose_1/step_1_needs')
+folder = Path('slides/baseline_algo/output/B/pose1+3/step_1_needs/pose_1')
 samples = json.loads((folder / 'samples.json').read_text())
 needs = np.asarray(samples['need_wrench'])   # N×6
 weight = samples['weight_per_sample']

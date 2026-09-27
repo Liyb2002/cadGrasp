@@ -4,7 +4,7 @@ MuJoCo collides meshes as their convex hulls, so a hook or a C-shaped part would
 settle on a hull face that does not exist in reality. Each object is therefore
 split into convex pieces which become separate collision geoms.
 
-Writes objects/<name>/collision/part_XX.obj and adds the piece count to meta.json.
+Writes objects/_simulation_assets/<name>/collision/part_XX.obj and updates meta.json.
 
     python slides/tools/decompose.py [--force] [--jobs 6]
 """
@@ -17,7 +17,7 @@ from multiprocessing import Pool
 
 import trimesh
 
-from common import obj_path, objects_with_meshes, read_json, write_json
+from common import obj_path, simulation_assets_path, objects_with_meshes, read_json, write_json
 
 # Objects at least this close to their convex hull are kept as a single piece.
 CONVEX_TOL = 0.97
@@ -34,7 +34,7 @@ def prune_slivers(parts: list, total_volume: float) -> list:
 def decompose_one(args: tuple[str, bool]) -> tuple[str, int, int, float]:
     name, force = args
     d = obj_path(name)
-    col = d / "collision"
+    col = simulation_assets_path(name) / "collision"
     meta = read_json(d / "meta.json")
     t0 = time.time()
 

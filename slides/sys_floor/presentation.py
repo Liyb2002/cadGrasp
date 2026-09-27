@@ -38,7 +38,7 @@ def floor_cloud(name='B', pose='pose_2'):
     domain = S.load(name, pose)
     sample = S.samples(domain)
     points, normal = landings(sample['q'], sample['push'], domain.com)
-    with np.load(S.case_path(domain) / 'step4_floor_contact/floor_contact.npz') as saved:
+    with np.load(S.stage_path(domain, 'step4_floor_contact')/'floor_contact.npz') as saved:
         assert np.allclose(points[:, [0, 1]], saved['floor_demands_xy_m'][1:1+len(points)], atol=1e-10, rtol=0)
     picture, cam, ids = S.render(domain, size=1200, ground_points=points)
     draw = ImageDraw.Draw(picture)
@@ -50,7 +50,7 @@ def floor_cloud(name='B', pose='pose_2'):
         if 0 <= ix < cam.size and 0 <= iy < cam.size and ids[iy, ix] in (0, 1):
             draw.ellipse((x-2, y-2, x+2, y+2), fill=S.ORANGE)
             shown += 1
-    source = S.case_path(domain) / 'step_1_needs/needs.json'
+    source = S.stage_path(domain, 'step_1_needs')/'needs.json'
     return picture, dict(object_name=name, pose=pose,
                          source=str(source.relative_to(S.SLIDES)),
                          source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),

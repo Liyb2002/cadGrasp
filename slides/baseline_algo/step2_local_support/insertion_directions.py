@@ -12,6 +12,7 @@ from step3_scheculer import contacts as I
 from step2_local_support import withdrawal as D
 from step2_local_support import circles as P
 from step2_local_support import parallel_directions as PD
+from step2_local_support import installation as INIT
 
 from step1.cases import pose_name
 
@@ -47,7 +48,7 @@ def run(name, resume=True, workers=None):
     domain, data, source = P.read(name)
     out = path(name)
     inputs = [out.parent/'circles.json', out.parent/'circles.npz',
-              P.OUTPUTS/name/pose_name()/'step_1_needs/needs.json']
+              P.OUTPUTS/name/pose_name()/'step_1_needs/needs.json', *INIT.inputs(name)]
     provenance = dict(inputs=I.hashes(inputs), code=code_hashes())
     rows = []
     progress_path = out.with_name('insertion_directions_progress.json')
@@ -59,7 +60,8 @@ def run(name, resume=True, workers=None):
                 raise RuntimeError('Direction checkpoint must be an ordered candidate prefix')
     resumed_count = len(rows)
     direction_catalogue = D.make_catalogue(domain.mesh, domain.work_ids,
-        [candidate(data, source, i) for i in range(len(data.valid)) if data.valid[i]])
+        [candidate(data, source, i) for i in range(len(data.valid)) if data.valid[i]],
+        installation=INIT.scene(name,domain))
     pending = [candidate(data, source, i) if data.valid[i] else
                dict(candidate_index=i, candidate_id=source['patches'][i]['id'])
                for i in range(resumed_count, len(data.valid))]
@@ -113,5 +115,5 @@ if __name__ == '__main__':
         parser.error('--workers must be positive')
     for name in args.objects or P.OBJECTS:
         if name not in P.OBJECTS:
-            parser.error('objects must be A1-f, B or C5')
+            parser.error('objects must be active in objects/cases.json')
         run(name, resume=False, workers=args.workers) if args.force else ensure(name, workers=args.workers)

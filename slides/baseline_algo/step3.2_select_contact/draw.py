@@ -14,6 +14,7 @@ M = load_stage('select', 'choose')
 C = load_stage('score', 'contribution')
 from step2_local_support import render as R
 from step3_scheculer import contacts as I
+from step3_scheculer import paths as PTH
 BLUE = np.array([49., 127., 195.])
 ORANGE = R.ORANGE
 
@@ -92,7 +93,7 @@ def run(name, round_number=1):
     score = C.read(name, round_number)
     if selected['winner'] is None:
         return
-    out = I.folder(name, M.OUTPUT_NAME, round_number)
+    out = PTH.folder(name, M.OUTPUT_NAME, round_number)
     domain, _, _ = C.P.read(name)
     contacts = I.read_contacts(out/'contacts_before_optimization.npz')
     data = I.as_data(contacts)
@@ -121,8 +122,10 @@ def run(name, round_number=1):
     chart = ranking_plot(selected, score)
     chart.save(out/'ranking.png')
     picture.paste(chart.resize((765, 1040), Image.Resampling.LANCZOS), (1440, 175))
-    ink.text((1485, 1270), f'{len(selected["tied_best_ids"])} tied best; ordered by ID.', font=R.font(23), fill=R.INK)
-    ink.text((1485, 1320), 'Next: Step 3.3 optimizes the orange contact.', font=R.font(23), fill=R.INK)
+    sampling=selected.get('sampling')
+    label=f'Top {sampling["top_k"]}: sampled by marginal coverage.' if sampling else f'{len(selected["tied_best_ids"])} tied best; ordered by ID.'
+    ink.text((1485, 1270), label, font=R.font(23), fill=R.INK)
+    ink.text((1485, 1320), 'Next: optimize all contact sizes.' if sampling else 'Next: Step 3.3 optimizes the orange contact.', font=R.font(23), fill=R.INK)
     ink.text((35, 1470), 'Blue: previously fixed contacts. Orange: current selection. Green: working surface. Original floor reaction included; floor omitted from views.', font=R.font(20), fill='#65706c')
     picture.save(out/'selection.png')
     I.save(out/'selection_views.json', dict(object=name, round=round_number, views=views,

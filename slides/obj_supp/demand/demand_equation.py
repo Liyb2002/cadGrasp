@@ -1,11 +1,9 @@
-r"""Paired external demand, no uplift, and a common head-only sweep.
+r"""Contact-module requirements: mechanics, connectivity, and insertion.
 
 Regenerate: python slides/obj_supp/demand/demand_equation.py
-Items 1–3 form one mechanics block: a demand in R6, supplied by one passive
-reaction field which also obeys no uplift. Pure
-gravity is a hard feasibility check at each greedy round; working-load coverage
-may be partial. The separate insertion block uses the allowed finite direction catalogue.
-No uplift is necessary, not a full support equilibrium or tipping certificate.
+The force/moment pair and no-uplift equations retain their original notation.
+Connectivity and insertion refer to the SAME finite-thickness contact module.
+This is the target formulation; the baseline Step3 currently checks heads only.
 """
 from pathlib import Path
 import matplotlib
@@ -20,46 +18,61 @@ INK, PAPER, RULE = '#1b1b1a', '#ffffff', '#d9ddd8'
 
 def main():
     plt.rcParams.update({'font.family': ['DejaVu Sans'], 'mathtext.fontset': 'dejavusans'})
-    fig = plt.figure(figsize=(20, 8), dpi=200, facecolor=PAPER)
+    fig = plt.figure(figsize=(28, 9), dpi=200, facecolor=PAPER)
     def text(x, y, value, fs=22, **kw):
         return fig.text(x, y, value, ha='center', va='center', fontsize=fs, color=INK, **kw)
     def line(xs, ys):
         fig.add_artist(Line2D(xs, ys, transform=fig.transFigure, color=RULE, linewidth=1.4))
 
-    text(.5, .942, 'Step 3: joint mechanics and common insertion', 30)
-    text(.5, .878, 'Contact forces may change with the load. The selected heads and insertion direction stay fixed.', 18)
-    line([.703, .703], [.177, .825])
-    x = .354
-    text(x, .783, '01–03   One joint mechanics problem', 25, fontweight='bold')
+    text(.5, .942, 'Contact module: mechanics, connectivity and insertion', 32)
+    text(.5, .876, 'Contact forces may change with the load. One module and one insertion direction stay fixed.', 20)
+    line([.475, .475], [.195, .825])
+    line([.715, .715], [.195, .825])
+
+    x = .247
+    text(x, .783, '01–02   Joint mechanics', 26, fontweight='bold')
     text(x, .687, r'$\mathrm{demand}(F_{\rm push},\mathrm{pt})=(F_D,\tau_D)\in\mathbb{R}^{6}$', 27)
     text(x, .592, r'$(F_D,\tau_D)=\left(mg\,\hat z-F_{\rm push},\;-r_{\rm push}\times F_{\rm push}\right)$', 25)
-
-    fig.add_artist(Rectangle((.043, .239), .622, .292, transform=fig.transFigure,
+    fig.add_artist(Rectangle((.025, .270), .440, .255, transform=fig.transFigure,
                              facecolor='none', edgecolor=RULE, linewidth=1.4))
-    text(x, .499, r'For each covered load, find one shared passive reaction field $F_{\rm supp}$:', 17)
+    text(x, .499, r'For each load, one shared passive reaction field $F_{\rm supp}$:', 18)
     text(x, .412, r'$\left(\sum F_{\rm supp},\;'
          r'\sum r_{\rm supp}\times F_{\rm supp}\right)=(F_D,\tau_D)$', 27)
-    text(x, .301, r'$\sum F_{\rm supp}\cdot\hat z\geq0$', 27)
-    text(x, .207, 'Contacts = heads + workpiece–floor contact. The no-uplift sum includes heads only.', 15)
+    text(x, .318, r'$\sum F_{\rm supp}\cdot\hat z\geq0$', 27)
+    text(x, .224, 'Balance: all contacts. No uplift: heads only.', 17)
 
-    x = .846
+    x = .595
+    text(x, .783, '03   Connected structure', 25, fontweight='bold')
+    text(x, .687, r'$\exists\,V_{\rm support}\ \mathrm{connected}$', 25)
+    text(x, .592, r'$A_{\rm obj}\subseteq\partial V_{\rm support}$', 27)
+    text(x, .487, r'$V_{\rm support}\cap\mathrm{Forbidden}=\varnothing$', 23)
+    text(x, .390, 'Forbidden: object interior, working areas,', 17)
+    text(x, .342, 'and below-floor regions from all task poses.', 17)
+    text(x, .276, 'Contains all selected contact heads.', 17)
+    text(x, .224, 'A solid connection with finite thickness.', 17)
+
+    x = .854
     text(x, .783, '04   Common insertion', 25, fontweight='bold')
-    text(x, .690, r'One insertion direction $a$ for all heads.', 16)
-    text(x, .611, r'$\mathrm{Sweep}(\mathrm{supp},a)\cap\mathrm{int}(\mathrm{obj})=\varnothing$', 19)
-    text(x, .533, r'$\mathrm{Sweep}(\mathrm{supp},a)\cap\{z<0\}=\varnothing$', 19)
-    text(x, .447, r'$\mathrm{Sweep}(\mathrm{supp},a)=$', 20)
-    text(x, .389, r'$\{x-ta:\ x\in\mathrm{supp},\ t\geq0\}$', 19)
-    text(x, .315, 'Space swept out when withdrawing along −a.', 14)
-    text(x, .263, 'supp: selected heads; obj: workpiece.', 15)
-    text(x, .207, 'Search the allowed finite direction catalogue.', 13)
+    text(x, .690, r'$\exists\,d_0$ for the complete module.', 21)
+    text(x, .594, r'$\mathrm{Sweep}(V_{\rm support},d_0)\cap\mathrm{int}(\mathrm{obj})=\varnothing$', 21)
+    text(x, .504, r'$\mathrm{Sweep}(V_{\rm support},d_0)\cap\{z<0\}=\varnothing$', 21)
+    text(x, .412, r'$\mathrm{Sweep}(V_{\rm support},d_0)=$', 22)
+    text(x, .348, r'$\{x-t d_0:\ x\in V_{\rm support},\ 0\leq t\leq L\}$', 21)
+    text(x, .276, 'Initial installation scene; finite stroke L.', 17)
+    text(x, .224, 'The SAME module as in condition 03.', 17)
 
-    line([.03, .97], [.174, .174])
-    text(.5, .137, r'$r_{\rm push}=\mathrm{pt}-c$; '
+    line([.025, .975], [.174, .174])
+    text(.5, .125, r'$r_{\rm push}=\mathrm{pt}-c$; '
          r'$r_{\rm supp}$: COM-to-contact vector; '
-         r'$0\leq|F_{\rm push}|\leq0.5\,mg$; z points upward.', 16)
-    text(.5, .090, 'Every round: gravity-only joint feasibility + a common head direction are required. '
-         'Working-load coverage grows greedily; at most 3 heads.', 15)
-    text(.5, .043, 'No uplift assumes one massless, unanchored support. Step 5 checks full support equilibrium and the complete assembly trajectory.', 15)
+         r'$0\leq|F_{\rm push}|\leq0.5\,mg$; z points upward.', 18)
+    text(.5, .065, 'One fixed design across tasks; mechanics applies to every task and admissible load.', 19)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    for item in fig.texts:
+        bounds = item.get_window_extent(renderer)
+        if not fig.bbox.contains(bounds.x0, bounds.y0) or not fig.bbox.contains(bounds.x1, bounds.y1):
+            raise RuntimeError(f'Text exceeds canvas: {item.get_text()}')
     fig.savefig(OUT, facecolor=PAPER, edgecolor=PAPER, transparent=False)
     plt.close(fig)
     print(OUT)

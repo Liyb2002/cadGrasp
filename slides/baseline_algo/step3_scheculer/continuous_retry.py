@@ -45,7 +45,8 @@ def install(objects):
 if __name__ == '__main__':
     stage = Path(sys.argv[1]).resolve()
     if HERE not in stage.parents: raise ValueError('Stage must be inside baseline_algo')
-    objects = [v for v in sys.argv[2:] if v in ('A1-f', 'B', 'C5')]
+    from step1.registry import active_objects
+    objects = [v for v in sys.argv[2:] if v in active_objects()]
     if len(objects) != 1: raise ValueError('Use one object/pose per retry process')
     verification = install(objects)
     sys.argv = [str(stage)]+sys.argv[2:]

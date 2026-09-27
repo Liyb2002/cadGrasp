@@ -324,6 +324,31 @@ def independent_support_check(problem,contacts):
         current_pipeline_did_not_impose_this_constraint=True)
 
 
+def final_connection_check(problem, contacts, directions, catalogue):
+    """Check one actual final connection, without replaying search branches."""
+    from step3_scheculer import connection as B
+    from step2_local_support import withdrawal as D
+    A = load_stage('optimize', 'adjust')
+    if not contacts:
+        return dict(passed=False, status='no_contacts')
+    checker=B.for_problem(problem,catalogue)
+    connection=checker.check(contacts,directions['common_directions'])
+    if not connection['passed']:
+        return dict(passed=False,status='no_connection_witness')
+    analyzer=D.Analyzer(problem.domain.mesh,catalogue['normal_depth_m'],catalogue['direction_catalogue'])
+    parts=checker.parts(contacts,connection['witness'])
+    # The rear-frame witness contains the connecting structure, not all heads.
+    if connection['witness']['kind'] != 'single_head':
+        parts += [part for contact in contacts for part in analyzer.heads(contact)]
+    index=connection['directions']['ids'][0]
+    sweep=analyzer.test(parts,catalogue['direction_catalogue']['vectors'][index])
+    work=A.WC.ContactClearance(problem.domain.mesh,catalogue['normal_depth_m'],checker.work).check_parts(parts)
+    passed=bool(sweep['clear'] and work['passed'])
+    return dict(passed=passed,status='verified' if passed else 'final_connection_geometry_failed',
+                direction_id=index,sweep=sweep,work_clearance=work,
+                scope='Actual final heads and thick connection along one common direction; no search-history replay, base or robot validation.')
+
+
 def run(name):
     problem=C.Problem(name)
     root=C.OUTPUTS/name/pose_name()/'step3_scheculer'
@@ -343,7 +368,20 @@ def run(name):
             areas_m2=[float(c['triangle_areas_m2'].sum()) for c in contacts],
             radii_m=[c['radius_m'] for c in contacts],
             provenance=dict(inputs=I.hashes(problem.inputs+[path]),code=I.hashes([Path(__file__)])))
+        if variant == 'scheduled_contacts':
+            from step2_local_support import insertion_directions as K
+            from step3_scheculer import connection as B
+            schedule=I.check_report(root/'schedule.json')
+            result['schedule_sha256']=I.sha256(root/'schedule.json')
+            directions=I.check_report(root/'insertion_directions.json')
+            result['final_connection']=final_connection_check(problem,contacts,directions,K.read(name))
+            result['provenance']['inputs'].update(I.hashes([
+                root/'schedule.json',root/'insertion_directions.json',K.path(name)]))
+            result['provenance']['code'].update(B.code_hashes())
         I.save(folder/f'{variant}_verification.json',result)
+        if variant == 'scheduled_contacts' and schedule.get('head_connection_witness_verified'):
+            if not result['final_connection']['passed']:
+                raise RuntimeError('Final contact connection failed its actual-solid check')
         results[variant]=dict(continuous_contact_model=result['continuous_contact_model']['status'],
                              independent_floor_supports=result['independent_floor_supports']['status'])
         print(name,variant,results[variant],flush=True)

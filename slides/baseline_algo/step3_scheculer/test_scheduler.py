@@ -7,6 +7,16 @@ from step3_scheculer import scheduler as S
 
 
 class SchedulerTests(unittest.TestCase):
+    def test_full_coverage_cannot_complete_without_a_connection(self):
+        _,score,choose,optimize=self.callbacks([100])
+        def disconnected(number):
+            return dict(optimize(number), insertion=dict(
+                all_contacts_have_certified_direction=True,connection=dict(passed=False)))
+        rounds,status=S.iterate(score,choose,disconnected,
+            lambda *_: self.fail('Disconnected module must not reach load certification'))
+        self.assertEqual(status,'no_connection_witness_after_optimization')
+        self.assertEqual(len(rounds),1)
+
     def callbacks(self, counts):
         calls=[]
         def score(r):

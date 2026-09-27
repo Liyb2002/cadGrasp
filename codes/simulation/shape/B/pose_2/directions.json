@@ -1,0 +1,28 @@
+{
+  "coordinate_system": "world_z_up",
+  "object_fixed": true,
+  "withdrawal_unit_vector": [
+    0.868380974048194,
+    0.4958976546739355,
+    0.0
+  ],
+  "insertion_unit_vector": [
+    -0.868380974048194,
+    -0.4958976546739355,
+    -0.0
+  ],
+  "withdrawal_distance_m": 0.15576673229488222,
+  "insertion_start_translation_m": [
+    0.1352648667145341,
+    0.07724435722125486,
+    0.0
+  ],
+  "insertion_end_translation_m": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "rotation": "none",
+  "translation_reference": "offset relative to the seated support.stl vertices",
+  "baseline_continuous_sweep_verified": true
+}

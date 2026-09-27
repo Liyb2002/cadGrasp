@@ -1,16 +1,21 @@
 # Demand and Step 3 contact constraints
 
-[Joint mechanics and insertion](demand_equation.png) ·
+[Mechanics, connectivity and insertion](demand_equation.png) ·
 [Head total force: B / pose 2](head_total_force.png) ·
 [Common head sweep: B / pose 2](head_sweep.png) ·
 [Force and moment demand fields](demand_pairs.png)
 
-## Paired demand, no uplift, and common insertion
+## Contact-module requirements: mechanics, connectivity, and insertion
 
-The English figure groups **force demand**, **moment demand**, and **no uplift**
-into one mechanics block (01–03). Common insertion remains a separate geometric
-block (04). The force and moment form one paired demand in R6, retaining the
-notation and unbroken equations from the earlier supplied reference (the old screenshot has been removed):
+2026-09-21: the figure now states four target conditions: (1) the force/moment
+pair, (2) no uplift, (3) a connected contact module outside forbidden regions,
+and (4) a common insertion direction for that same complete module. Conditions
+01–02 share a mechanics block; 03 and 04 are geometric blocks. The original
+force/moment and no-uplift equations are unchanged.
+
+This is the intended contact-module formulation, not a claim that the existing
+baseline Step3 already constructs the module. Its implementation boundary is
+recorded below. The paired demand remains:
 
 \[
 \operatorname{demand}(F_{\rm push},\mathrm{pt})=(F_D,\tau_D)\in\mathbb R^6,
@@ -23,7 +28,7 @@ notation and unbroken equations from the earlier supplied reference (the old scr
 The `z` axis points upward. The figure shows
 `0 <= |F_push| <= 0.5 mg`, as in the reference.
 
-For each covered load, find **one** passive contact reaction field that
+For each task and admissible load, find **one** passive contact reaction field that
 simultaneously supplies this R6 demand and satisfies no uplift. The figure
 encloses the following conditions in one box to show their shared unknowns:
 
@@ -53,36 +58,94 @@ on the workpiece must be nonnegative. Individual heads may push downward.
 The redundant floor-normal equation is omitted from the figure. No uplift
 is necessary, not a certificate of full support equilibrium, friction or
 resistance to tipping. See [the force illustration](head_total_force.md).
-That illustration draws the opposite forces: the workpiece acting on the
-support. Their total vertical component must therefore be nonpositive;
-the definition of `F_supp` in the equations above remains unchanged.
+That illustration draws the same forces: the support acting on the
+workpiece. Their total vertical component must therefore be nonnegative,
+consistent with `F_supp` in the equations above.
 
-The fourth condition is independent of the applied load and holds once for
-the selected design. With `a` denoting insertion and `-a` withdrawal,
+## 03: one connected module outside the forbidden regions
+
+Find a solid contact module with a connected material interior and finite-thickness
+connections, preserving all selected head solids and their contact regions:
 
 \[
-\exists\text{ an allowed unit insertion direction }a:\quad
-\mathrm{Sweep}(\mathrm{supp},a)\cap\operatorname{int}(\mathrm{obj})=\varnothing,\qquad
-\mathrm{Sweep}(\mathrm{supp},a)\cap\{z<0\}=\varnothing,
+\exists\,V_{\rm support}\ \mathrm{connected},\qquad
+A_{\rm obj}\subseteq\partial V_{\rm support},\qquad
+V_{\rm support}\cap\mathrm{Forbidden}=\varnothing.
+\]
+
+`Forbidden` contains the object interior, all task working regions (and any
+specified working clearance volumes), and the below-floor halfspaces of all
+fixed task poses. Transform every region into the same object coordinate frame
+before taking their union. Surface contact with the object and floor is allowed
+where intended; penetration is not. Preserving head solids is an additional
+explicit requirement, not implied merely by the surface subset formula.
+
+A zero-width path, or two solids touching only at a point, does not count as a
+physical connection. Contact patches each avoiding the forbidden regions is not
+sufficient: their heads must admit one shared solid connection in the remaining
+space. Surface-only routing is valid only if a near-surface design domain is an
+explicit modeling restriction; otherwise the connection may route through 3-D
+space. See [the multi-pose floor and connectivity derivation](../../../codes/research_notes/multipose_belt_floor_connectivity.md).
+
+## 04: insert that same complete module
+
+Connectivity and insertion must hold for the **same** geometry. In the chosen
+initial installation frame, let d_0 point toward the seated state. A prescribed
+finite withdrawal stroke of length L defines the reverse insertion path:
+
+\[
+\exists\,d_0:\quad
+\mathrm{Sweep}(V_{\rm support},d_0)\cap\operatorname{int}(\mathrm{obj})=\varnothing,
+\qquad
+\mathrm{Sweep}(V_{\rm support},d_0)\cap\{z<0\}=\varnothing,
 \]
 \[
-\mathrm{Sweep}(\mathrm{supp},a)=\{x-ta:x\in\mathrm{supp},\ t\geq0\}.
+\mathrm{Sweep}(V_{\rm support},d_0)
+=\{x-t d_0:x\in V_{\rm support},\ 0\leq t\leq L\}.
 \]
 
-`supp` is the union of selected head solids and `obj` is the workpiece.
-`Sweep(supp,a)` is the space occupied as the heads withdraw along `-a`.
-The notation matches [the original sweep figure](../../trajectory/sweep_eq.png);
-the additional abbreviations `C(a)` and `H` are omitted.
-The direction is chosen from the finite catalogue after the work-side and floor
-filters. Step 3 certifies a common head sweep; exhaustion of this catalogue
-alone does not prove all directions impossible. Surface contact is allowed,
-interior penetration is not. The opposed-head illustration includes its own
-stronger local-direction check in [head_sweep.md](head_sweep.md).
+Here `V_support` includes heads and all their connecting material. Transform it
+and the object into the installation frame for these sweep equations. L must
+reach the intended pre-insertion state; it cannot be chosen as zero to bypass
+installation. The direction d_0 replaces the old symbol a, with the same sign
+convention: insertion along d_0, withdrawal along -d_0.
 
-Every greedy round requires gravity-only equilibrium with no uplift and a
-common head direction. Working-load coverage may be partial and grows as
-heads are selected; the schedule uses at most three heads. Step 5 constructs
-and checks the frame, base, connectors and complete assembly trajectory.
+Condition 03 checks every task floor at the final task pose. The floor in 04 is
+that of the initial installation scene; it does not require installing the blue
+module afresh in every task pose. Initial placement may be chosen to help
+installation, as agreed. The orange-base docking directions d_1,...,d_K are
+outside this figure's contact-module problem.
+
+## Current baseline implementation boundary
+
+As of 2026-09-21, single-pose Step3 jointly screens common head withdrawal
+and a finite-thickness connection witness before candidate scoring and at every
+trial size. The witness extends interior roots along a certified head direction,
+then joins them with a beam tree beyond the object. Its complete solid stays
+above both the initial-rest floor and the target-task floor, expressed in the
+same frame. Its withdrawal sweep uses the initial-rest floor, and contact
+triangles within 1.5 mm of that floor are excluded. Audit reconstructs the
+witness and independently checks its sweep.
+Every round still requires pure-gravity feasibility and no uplift, allows partial
+working-load coverage, and uses at most three heads.
+
+This is a sufficient construction for one connector family, not a complete
+arbitrary-path test. Failure means no witness was found in that family and the
+finite direction catalogue. Step3 stores construction parameters. Step5 builds
+the blue module and a separate stationary orange base with a rectangular
+peg/socket, checks blue installation at rest and whole-object-plus-blue
+vertical docking, and verifies object/blue/base equilibrium with shared
+unilateral interface reactions. The current socket model has zero nominal
+clearance and an end stop; it does not add a withdrawal latch or bolt the base
+to the floor. Step6 checks the geometric transport construction and illustrates
+installation, combined pickup, and docking in that order. Robot grasping is
+assumed feasible; joint trajectories and gripper collisions are not certified. The
+multi-pose union of forbidden regions is not yet part of the baseline search:
+each pose is solved independently. Working surfaces remain excluded, while
+extended process-access volumes remain disabled by the existing policy. The
+finite-stroke formula above is the target formulation; the implemented direction
+certificates retain their full-withdrawal scope. See the
+[implementation](../../baseline_algo/step3_scheculer/README.md).
 
 Regenerate the mathematics:
 
@@ -113,7 +176,7 @@ linear height mechanism instead.
 ## Sampling, signs and scales (B / pose 2, 2026-09-13)
 
 Both fields now use the **32,768 paired B/pose_2 samples** already saved in
-`baseline_algo/output/B/pose_2/step_1_needs/samples.json`. Positions are sampled
+`baseline_algo/output/B/pose2+8/step_1_needs/pose_2/samples.json`. Positions are sampled
 by work-surface area, directions in the reachable 30-degree inward cone, and
 magnitudes uniformly between zero and 0.5 mg (`seed=20260907`). The saved
 six-dimensional demand is checked by direct substitution in the Z-up equations.

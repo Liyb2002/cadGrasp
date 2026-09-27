@@ -7,7 +7,7 @@ from unittest.mock import patch
 import numpy as np
 from numpy.testing import assert_allclose
 
-from needs import ContinuousNeeds, OBJECTS, OUTPUTS, demand, sample_needs, sha256
+from needs import ContinuousNeeds, OBJECTS, OUTPUTS, demand, example_cases, sample_needs, sha256
 from step1.cases import pose_name
 
 
@@ -119,6 +119,15 @@ class SampledDemands(unittest.TestCase):
         for count, seed in [(0, 1), (-1, 1), (2.5, 1), (True, 1), (8, -1)]:
             with self.subTest(count=count, seed=seed), self.assertRaises(ValueError):
                 sample_needs(d, count, seed)
+
+    def test_illustrations_work_with_only_one_reachable_triangle(self):
+        d = self.domain()
+        with patch.object(d.mesh.ray, 'intersects_any', side_effect=lambda origins, directions: origins[:, 0] < 2):
+            cases = example_cases(d)['cases']
+        self.assertEqual(len(cases), 3)
+        self.assertEqual([c['work_face_index'] for c in cases], [1, 1, 1])
+        self.assertEqual(len({tuple(c['pt_m']) for c in cases}), 3)
+        self.assertTrue(all(c['tool_reachable'] for c in cases))
 
 
 class ExportedContinuousDomain(unittest.TestCase):

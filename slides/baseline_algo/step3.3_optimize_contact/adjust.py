@@ -24,46 +24,66 @@ from step2_local_support import circles as P, connectivity
 from step2_local_support import withdrawal as D
 from step2_local_support import work_volume as W, work_clearance as WC
 from step3_scheculer import contacts as I
+from step3_scheculer import connection as B
+from step3_scheculer import paths as PTH
 
 OUTPUT_NAME = 'step3.3_optimize_contact'
 
 
 def code_hashes():
-    paths = [Path(__file__), Path(size_search.__file__), Path(M.__file__), Path(P.__file__),
+    paths = [Path(__file__), Path(__file__).with_name('coordinate.py'), Path(__file__).with_name('marginal.py'), Path(size_search.__file__), Path(M.__file__), Path(P.__file__),
              Path(P.S.__file__), Path(P.G.__file__), Path(connectivity.__file__),
              Path(insertion_limit.__file__), Path(area_limit.__file__),
              Path(W.__file__), Path(W.V.__file__), Path(WC.__file__)]
-    return {**C.code_hashes(), **D.code_hashes(), **I.hashes(paths)}
+    return {**C.code_hashes(), **B.code_hashes(), **I.hashes(paths)}
 
 
 class SizeProblem:
-    def __init__(self, name, round_number=1, problem=None):
+    def __init__(self, name, round_number=1, problem=None, *, contacts=None,
+                 coordinate_index=None, direction_catalogue=None, allowed_directions=None,
+                 local_search=False):
         self.name, self.round_number = name, round_number
         self.problem = problem or C.Problem(name)
         self.domain, self.data, self.geometry_report = self.problem.domain, self.problem.data, self.problem.geometry
         self.scale, self.floor = self.problem.scale, self.problem.floor
         self.samples, self.targets = self.problem.samples, self.problem.targets
-        self.selection = M.read(name, round_number)
-        self.winner = self.selection['winner']
-        if self.winner is None:
-            raise ValueError('No selected candidate to optimize')
-        source = I.folder(name, M.OUTPUT_NAME, round_number)
-        before = I.read_contacts(source/'contacts_before_optimization.npz')
-        self.fixed, selected = before[:-1], before[-1]
+        if contacts is None:
+            self.selection = M.read(name, round_number)
+            self.winner = self.selection['winner']
+            if self.winner is None:
+                raise ValueError('No selected candidate to optimize')
+            source = PTH.folder(name, M.OUTPUT_NAME, round_number)
+            before = I.read_contacts(source/'contacts_before_optimization.npz')
+            self.fixed, selected = before[:-1], before[-1]
+            masks = I.load_npz(source/'sample_coverage.npz')
+            self.base_mask, self.initial_mask = masks['base'], masks['selected']
+            self.input_paths = self.problem.inputs+[source/'selection.json', source/'selected_contact.npz',
+                source/'contacts_before_optimization.npz', source/'sample_coverage.npz']
+        else:
+            selected = contacts[coordinate_index]
+            self.fixed = [p for i,p in enumerate(contacts) if i != coordinate_index]
+            self.winner = dict(index=selected['candidate_index'], id=selected['candidate_id'])
+            # A removed/resized contact invalidates previous coverage hints.
+            self.base_mask = np.zeros(len(self.targets), dtype=bool)
+            self.initial_mask = None
+            self.input_paths = list(self.problem.inputs)
         self.fixed_area = I.area(self.fixed)
         self.fixed_full = self.problem.supply(self.fixed)
         self.index = selected['candidate_index']
         self.center, self.seed, self.initial_radius = selected['center_m'], selected['center_face'], selected['radius_m']
-        assert self.index == self.winner['index'] and len(before) == round_number
-        masks = I.load_npz(source/'sample_coverage.npz')
-        self.base_mask, self.initial_mask = masks['base'], masks['selected']
+        assert self.index == self.winner['index']
         self.base_count = int(self.base_mask.sum())
-        self.input_paths = self.problem.inputs+[source/'selection.json', source/'selected_contact.npz',
-            source/'contacts_before_optimization.npz', source/'sample_coverage.npz']
-        _, polygons = P.eligible_polygons(self.domain)
-        self.surface = P.SurfaceCircles(self.domain.mesh, polygons)
+        self.local_search = local_search
+        shared = getattr(self.problem, '_sizing_geometry', None) if local_search else None
+        if shared is None:
+            _, polygons = P.eligible_polygons(self.domain)
+            surface = P.SurfaceCircles(self.domain.mesh, polygons)
+            clearance = P.LocalClearance(self.domain.mesh, self.geometry_report['normal_depth_m'])
+            shared = (polygons, surface, clearance)
+            if local_search:
+                self.problem._sizing_geometry = shared
+        polygons, self.surface, self.clearance = shared
         self.pool = self.surface.pool(self.seed)
-        self.clearance = P.LocalClearance(self.domain.mesh, self.geometry_report['normal_depth_m'])
         volume_folder = C.OUTPUTS/name/P.pose_name()/W.STAGE
         if P.POLICY.ENFORCE_PROCESS_ACCESS:
             self.input_paths += [volume_folder/f for f in ['work_volume.json','work_volume.npz','work_volume_audit.json']]
@@ -84,13 +104,21 @@ class SizeProblem:
         # of this checked head. Reuse that containment proof during shrinkage.
         if not self.geometry(self.initial_radius)['row']['geometry_valid']:
             raise ValueError('Selected initial head violates current clearance; rebuild Step 2')
-        self.minimum_radius, self.area_constraint = area_limit.radius_floor(
-            numerical_minimum, self.initial_radius, self.tolerance,
-            lambda radius: self.geometry(radius)['row']['area_m2'], self.minimum_area)
+        if local_search:
+            # Only actual trial areas need checking; do not binary-search the
+            # global area boundary with expensive collision checks per coordinate.
+            self.minimum_radius = numerical_minimum
+            self.area_constraint = dict(enforced=True, method='actual_area_checked_at_each_local_trial',
+                                        minimum_area_m2=self.minimum_area)
+        else:
+            self.minimum_radius, self.area_constraint = area_limit.radius_floor(
+                numerical_minimum, self.initial_radius, self.tolerance,
+                lambda radius: self.geometry(radius)['row']['area_m2'], self.minimum_area)
         self.area_constraint['total_object_area_m2'] = float(self.domain.mesh.area)
-        self.allowed_directions=None
-        filter_path=I.folder(name,'step3_scheculer',round_number)/'candidate_filter.json'
-        if str(filter_path.relative_to(C.ROOT)) in self.selection['provenance']['inputs']:
+        self.allowed_directions=allowed_directions
+        self.direction_catalogue=direction_catalogue
+        filter_path=PTH.folder(name,'step3_scheculer',round_number)/'candidate_filter.json'
+        if contacts is None and str(filter_path.relative_to(C.ROOT)) in self.selection['provenance']['inputs']:
             filtering=I.check_report(filter_path)
             assert filtering['eligible'][self.index]
             assert filtering['mode']==D.MODE
@@ -98,13 +126,38 @@ class SizeProblem:
             self.direction_catalogue=filtering['direction_catalogue']
         self.direction_analyzer=None
         self.direction_cache={}
+        self.inherited_direction_radius = None
+        self.inherited_directions = None
+        self.connection_checker = B.for_problem(self.problem, dict(
+            normal_depth_m=self.geometry_report['normal_depth_m'],
+            direction_catalogue=self.direction_catalogue)) if self.direction_catalogue is not None else None
 
     def insertion_directions(self,radius):
         if radius not in self.direction_cache:
+            # Near face-clipping boundaries, geometric validity can change within
+            # the scalar tolerance. A clear sweep alone cannot certify this size.
+            if not self.geometry(radius)['row']['geometry_valid']:
+                self.direction_cache[radius] = D.normalize([])
+                return self.direction_cache[radius]
             contact=self.contact(radius)
+            allowed=self.allowed_directions
+            if self.connection_checker is not None:
+                connection=self.connection_checker.check(self.fixed+[contact],allowed)
+                allowed=connection['directions']
+                if not D.nonempty(allowed):
+                    self.direction_cache[radius]=allowed
+                    return allowed
+            if (self.inherited_direction_radius is not None and radius <= self.inherited_direction_radius
+                    and self.inherited_directions is not None):
+                # Shrinking preserves head sweeps, not connector attachment
+                # geometry: recompute the connection before inheriting any ray.
+                inherited=D.intersect(self.inherited_directions,allowed)
+                if D.nonempty(inherited):
+                    self.direction_cache[radius]=inherited
+                    return inherited
             if self.direction_analyzer is None:
                 self.direction_analyzer=D.Analyzer(self.domain.mesh,self.geometry_report['normal_depth_m'],self.direction_catalogue)
-            record=self.direction_analyzer.analyze(contact,self.allowed_directions,stop_after_first=True)
+            record=self.direction_analyzer.analyze(contact,allowed,stop_after_first=True)
             self.direction_cache[radius]=record['certified_directions']
         return self.direction_cache[radius]
 
@@ -115,7 +168,7 @@ class SizeProblem:
             lambda r:D.nonempty(self.insertion_directions(r)))
         return radius,dict(record,enforced=True,allowed_common_directions=self.allowed_directions,
                            unconstrained_geometry_radius_m=maximum,
-                           scope='Conservative certified radius interval for nested contact areas; unresolved directions are excluded')
+                           scope='Certified endpoints with shared connection/insertion; interior sizes need their own connection check, with no connectivity monotonicity assumed')
 
     def geometry(self, radius):
         radius = float(radius)
@@ -209,6 +262,8 @@ class SizeProblem:
         assert contact['triangle_areas_m2'].sum() > self.minimum_area
         directions=self.insertion_directions(radius) if self.allowed_directions is not None else None
         if directions is not None:assert D.nonempty(directions)
+        connection=self.connection_checker.check(self.fixed+[contact],directions) if self.connection_checker is not None else None
+        if connection is not None: assert connection['passed']
         # Reconstruct the exported triangles' actual head, independently of
         # radius containment shortcuts used while searching.
         analyzer = D.H.Analyzer(self.domain.mesh, self.geometry_report['normal_depth_m'])
@@ -220,6 +275,7 @@ class SizeProblem:
                     hard_feasibility=hard,
                     work_volume_clearance=work_check,
                     certified_common_insertion_directions=directions,
+                    connection=connection,
                     force_checks=C.verify_classification(entry['full'], self.targets, entry['mask']))
 
 
@@ -233,7 +289,7 @@ def run(name, round_number=1, problem=None, curve_points=25,
         return C.gravity_check(full,problem.domain,problem.scale)['passed']
     problem.minimum_radius,rest_radius_limit=size_search.feasible_radius_floor(
         problem.minimum_radius,problem.initial_radius,problem.tolerance,rest_feasible)
-    out = I.folder(name, OUTPUT_NAME, round_number)
+    out = PTH.folder(name, OUTPUT_NAME, round_number)
     out.mkdir(parents=True, exist_ok=True)
     I.save(out/'status.json', dict(object=name, complete=False, status='optimizing'))
     initial = problem.score(problem.initial_radius)
@@ -255,7 +311,8 @@ def run(name, round_number=1, problem=None, curve_points=25,
         return row
 
     radius, search = maximize_efficiency(evaluate, grid, problem.initial_radius, problem.tolerance,
-                                         efficiency_tolerance, max_evaluations)
+                                         efficiency_tolerance, max_evaluations,
+                                         admissible=lambda r: problem.allowed_directions is None or D.nonempty(problem.insertion_directions(r)))
     adjusted = problem.score(radius)
     states = dict(initial=problem.initial_radius, adjusted=radius, maximum=maximum_radius)
     verification = {key: problem.verify(value) for key, value in states.items()}
@@ -306,7 +363,7 @@ def run(name, round_number=1, problem=None, curve_points=25,
 
 
 def read(name, round_number=1):
-    return I.check_report(I.folder(name, OUTPUT_NAME, round_number)/'adjustment.json')
+    return I.check_report(PTH.folder(name, OUTPUT_NAME, round_number)/'adjustment.json')
 
 
 if __name__ == '__main__':

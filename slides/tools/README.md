@@ -75,20 +75,26 @@ does not exist.
 
 ## Output layout
 
+This section describes the historical stable-placement pipeline. Current ordered
+robot-assisted targets and per-object videos are documented in
+[codes/setup/README.md](../../codes/setup/README.md). Collision assets now live
+under `objects/_simulation_assets/<name>/`, outside the per-object result folder.
+
 ```
 objects/
   index.json                 all objects: size, volume, mass, concavity
   contact_sheet.png          23 rows x 5 placements, the thing to look at
   <name>/
     mesh.stl                 as downloaded
-    collision/part_XX.obj    convex pieces (CoACD)
     meta.json                mass properties, extents, concavity
     poses.json               the stable placements (below)
-    scene.xml                MuJoCo scene; each placement is a keyframe
     renders/pose_XX.png      one render per placement, plus strip.png
+  _simulation_assets/<name>/
+    collision/part_XX.obj    convex pieces (CoACD)
+    scene.xml                MuJoCo scene
 ```
 
-`python -m mujoco.viewer --mjcf=objects/<name>/scene.xml` opens the scene; the
+`python -m mujoco.viewer --mjcf=objects/_simulation_assets/<name>/scene.xml` opens the scene; the
 keyframes step through the placements.
 
 Each entry of `poses.json` carries, besides `T_world_mesh` and its probability:

@@ -69,8 +69,9 @@ def install(objects):
 if __name__ == '__main__':
     stage = Path(sys.argv[1]).resolve()
     if HERE not in stage.parents: raise ValueError('Stage must be inside baseline_algo')
-    objects = [value for value in sys.argv[2:] if value in ('A1-f', 'B', 'C5')]
-    if not objects: objects = ['A1-f', 'B', 'C5']
+    from step1.registry import active_objects
+    objects = [value for value in sys.argv[2:] if value in active_objects()]
+    if not objects: objects = active_objects()
     install(objects)
     sys.argv = [str(stage)]+sys.argv[2:]
     runpy.run_path(str(stage), run_name='__main__')

@@ -1,0 +1,1388 @@
+{
+  "object": "B",
+  "pose": "pose_2",
+  "stage": "step6_connect_support",
+  "schema": "fixed_step5_base_assembly_v2",
+  "complete": true,
+  "passed": true,
+  "status": "fixed_base_support_verified",
+  "selected_ids": [
+    "C139",
+    "C024",
+    "C011"
+  ],
+  "step3_selection_changed": false,
+  "geometry": {
+    "passed": true,
+    "geometry_constructed": true,
+    "step3_selection_changed": false,
+    "direction_first": true,
+    "contact_interfaces_changed": false,
+    "global_impossibility_claimed": false,
+    "belt_closed_loop_required": false,
+    "belt_attempts": [
+      {
+        "direction": [
+          0.868380974048194,
+          0.4958976546739355,
+          0.0
+        ],
+        "passed": true,
+        "status": "loose_frame_connected",
+        "construction": "head-interior necks to rear joints; finite shortest-edge tree outside the workpiece",
+        "plane_offset_m": 0.103671847616349,
+        "rear_extension_m": 0.007629700825297719,
+        "gap_m": 0.0038148504126488594,
+        "neck_gap_m": 1.9074252063244298e-05,
+        "width_m": 0.00953712603162215,
+        "thickness_m": 0.0019074252063244297,
+        "terminals_m": [
+          [
+            0.0990016851406853,
+            0.035694195515215174,
+            0.016040603089640795
+          ],
+          [
+            0.10181640158222921,
+            0.03076526273616312,
+            0.1548175643712591
+          ],
+          [
+            0.08576328330161789,
+            0.058876350493160465,
+            0.14245409191421587
+          ]
+        ],
+        "edges": [
+          {
+            "first": 0,
+            "second": 2,
+            "length_m": 0.12920153926898498
+          },
+          {
+            "first": 2,
+            "second": 1,
+            "length_m": 0.034652435882762546
+          }
+        ],
+        "terminal_contact_ids": [
+          "contact_head_C139",
+          "contact_head_C024",
+          "contact_head_C011"
+        ],
+        "terminals_grouped_by_contact": true,
+        "head_cell_count": 95,
+        "frame_part_count": 5,
+        "neck_count": 95,
+        "closed_loop_required": false,
+        "contact_interfaces_changed": false,
+        "full_translation_sweep_checked": true,
+        "solid": {
+          "component_count": 1,
+          "boundary_component_count": 17,
+          "positive_boundary_shells": 1,
+          "cavity_count": 16,
+          "zero_boundary_shells": 0,
+          "cavity_containment_verified": true,
+          "cavity_outside_volume_m3": 0.0,
+          "cavity_containment_tolerance_m3": 6.939729655899662e-17,
+          "connectivity_rule": "One positive outer shell; all negative cavity shells contained; no separate positive or zero-volume shell",
+          "watertight": true,
+          "consistently_wound": true,
+          "volume_m3": 4.314266166320355e-05,
+          "one_solid": true,
+          "zero_thickness_surface_duplicates_removed": []
+        }
+      }
+    ],
+    "attempts": [
+      {
+        "direction": [
+          0.868380974048194,
+          0.4958976546739355,
+          0.0
+        ],
+        "head_sweep_passed": true,
+        "frame_passed": true,
+        "base_candidates": 1,
+        "status": "whole_assembly_sweep_verified",
+        "trajectory_verified": true
+      }
+    ],
+    "direction_budget": 48,
+    "frame_gap_fraction": 0.02,
+    "frame_width_fraction": 0.05,
+    "construction_order": [
+      "saved_step5_base",
+      "head_sweep",
+      "loose_frame",
+      "thick_links",
+      "whole_path"
+    ],
+    "direction_search": {
+      "candidate_count": 48,
+      "candidate_directions": [
+        [
+          0.9884855951683104,
+          0.15131499643046403,
+          0.0
+        ],
+        [
+          0.9895656100016502,
+          0.14408297436568332,
+          0.0
+        ],
+        [
+          0.9869056146988755,
+          0.16129881486184194,
+          0.0
+        ],
+        [
+          0.9862676697973538,
+          0.16515472597687855,
+          0.0
+        ],
+        [
+          0.9918412278307557,
+          0.12747932685411786,
+          0.0
+        ],
+        [
+          0.9844616706860609,
+          0.1755995983765615,
+          0.0
+        ],
+        [
+          0.9824537228066259,
+          0.18650652145006,
+          0.0
+        ],
+        [
+          0.993415583489985,
+          0.11456648060952516,
+          0.0
+        ],
+        [
+          0.9805737986377876,
+          0.19615051726941624,
+          0.0
+        ],
+        [
+          0.9790330408296277,
+          0.20370150947867938,
+          0.0
+        ],
+        [
+          0.9952157217350068,
+          0.09770193043880729,
+          0.0
+        ],
+        [
+          0.974419601592455,
+          0.22473637896967485,
+          0.0
+        ],
+        [
+          0.9738818178680498,
+          0.2270555104506886,
+          0.0
+        ],
+        [
+          0.9724389617637718,
+          0.23315759829737004,
+          0.0
+        ],
+        [
+          0.9719767991278275,
+          0.23507680012545443,
+          0.0
+        ],
+        [
+          0.9698413040118352,
+          0.24373724588708828,
+          0.0
+        ],
+        [
+          0.9691263263027637,
+          0.24656472510663224,
+          0.0
+        ],
+        [
+          0.9686501547894051,
+          0.24842881802734096,
+          0.0
+        ],
+        [
+          0.9672637797710079,
+          0.25377308829563316,
+          0.0
+        ],
+        [
+          0.9661300604425905,
+          0.2580556263854683,
+          0.0
+        ],
+        [
+          0.9659258262890683,
+          0.25881904510252074,
+          0.0
+        ],
+        [
+          0.9992405179093341,
+          0.03896649032548071,
+          0.0
+        ],
+        [
+          0.9992907937067114,
+          0.037655140592101836,
+          0.0
+        ],
+        [
+          0.9625380893096356,
+          0.27114650399397755,
+          0.0
+        ],
+        [
+          0.9536495495453285,
+          0.30091948533119617,
+          0.0
+        ],
+        [
+          0.9491548464320666,
+          0.31480958926709995,
+          0.0
+        ],
+        [
+          0.9336436988512224,
+          0.3582030759156152,
+          0.0
+        ],
+        [
+          0.9218516616375152,
+          0.38754291883113073,
+          0.0
+        ],
+        [
+          0.9217067179252868,
+          0.3878875173699147,
+          0.0
+        ],
+        [
+          0.9143644369006808,
+          0.4048921788961858,
+          0.0
+        ],
+        [
+          0.912140437846422,
+          0.4098778130679163,
+          0.0
+        ],
+        [
+          0.9001709147076737,
+          0.43553682314397946,
+          0.0
+        ],
+        [
+          0.8990964760764143,
+          0.4377505302189521,
+          0.0
+        ],
+        [
+          0.8973775109495448,
+          0.4412636432361041,
+          0.0
+        ],
+        [
+          0.8962265300675508,
+          0.44359667131649844,
+          0.0
+        ],
+        [
+          0.8938297526314416,
+          0.44840648223550045,
+          0.0
+        ],
+        [
+          0.8905726471173735,
+          0.45484102740007337,
+          0.0
+        ],
+        [
+          0.888740109499766,
+          0.4584114066712828,
+          0.0
+        ],
+        [
+          0.8780084545684005,
+          0.4786451229318118,
+          0.0
+        ],
+        [
+          0.868380974048194,
+          0.4958976546739355,
+          0.0
+        ],
+        [
+          0.8675398132309593,
+          0.49736774368588915,
+          0.0
+        ],
+        [
+          0.8660254037844387,
+          0.49999999999999994,
+          0.0
+        ],
+        [
+          0.9487603839068637,
+          0.31467875646778676,
+          0.0288273161565198
+        ],
+        [
+          0.8967693215121235,
+          0.44096458081960754,
+          0.03681062967776495
+        ],
+        [
+          0.8904184147346045,
+          0.44669512051193505,
+          0.08728411088131471
+        ],
+        [
+          0.9602327829034828,
+          0.22387330852004436,
+          0.1668344819565845
+        ],
+        [
+          0.8082792458482855,
+          0.5722553069415491,
+          0.13859482100049886
+        ],
+        [
+          0.847397023915985,
+          0.49578292888610825,
+          0.19004623459422648
+        ]
+      ],
+      "surviving_direction_ids": [
+        1,
+        691,
+        950,
+        826,
+        707,
+        604,
+        850,
+        544,
+        240,
+        796,
+        255,
+        767,
+        822,
+        974,
+        754,
+        818,
+        628,
+        740,
+        551,
+        846,
+        100,
+        910,
+        488,
+        643,
+        750,
+        914,
+        962,
+        926,
+        651,
+        655,
+        800,
+        807,
+        679,
+        918,
+        647,
+        858,
+        616,
+        774,
+        695,
+        792,
+        612,
+        101,
+        913,
+        917,
+        857,
+        821,
+        921,
+        965
+      ],
+      "chosen_direction_ids": [
+        1,
+        691,
+        950,
+        826,
+        707,
+        604,
+        850,
+        544,
+        240,
+        796,
+        255,
+        767,
+        822,
+        974,
+        754,
+        818,
+        628,
+        740,
+        551,
+        846,
+        100,
+        910,
+        488,
+        643,
+        750,
+        914,
+        962,
+        926,
+        651,
+        655,
+        800,
+        807,
+        679,
+        918,
+        647,
+        858,
+        616,
+        774,
+        695,
+        792,
+        612,
+        101,
+        913,
+        917,
+        857,
+        821,
+        921,
+        965
+      ],
+      "source": "Step3 actual optimized common head directions",
+      "preferred_withdrawal_direction": [
+        0.4475915642207198,
+        0.0685162396633934,
+        -0.8916093968441773
+      ],
+      "direction_convention": "support withdrawal +d; insertion reverses the same line",
+      "remaining_count": 48,
+      "untried_count": 0,
+      "global_impossibility_claimed": false,
+      "rotation_searched": false,
+      "scope": "Head rays already certified; frame/base/links and whole trajectory must still pass"
+    },
+    "step5_base_fixed": true,
+    "fixed_base_direction_id": 792,
+    "belt": {
+      "passed": true,
+      "status": "loose_frame_connected",
+      "construction": "head-interior necks to rear joints; finite shortest-edge tree outside the workpiece",
+      "plane_offset_m": 0.103671847616349,
+      "rear_extension_m": 0.007629700825297719,
+      "gap_m": 0.0038148504126488594,
+      "neck_gap_m": 1.9074252063244298e-05,
+      "width_m": 0.00953712603162215,
+      "thickness_m": 0.0019074252063244297,
+      "terminals_m": [
+        [
+          0.0990016851406853,
+          0.035694195515215174,
+          0.016040603089640795
+        ],
+        [
+          0.10181640158222921,
+          0.03076526273616312,
+          0.1548175643712591
+        ],
+        [
+          0.08576328330161789,
+          0.058876350493160465,
+          0.14245409191421587
+        ]
+      ],
+      "edges": [
+        {
+          "first": 0,
+          "second": 2,
+          "length_m": 0.12920153926898498
+        },
+        {
+          "first": 2,
+          "second": 1,
+          "length_m": 0.034652435882762546
+        }
+      ],
+      "terminal_contact_ids": [
+        "contact_head_C139",
+        "contact_head_C024",
+        "contact_head_C011"
+      ],
+      "terminals_grouped_by_contact": true,
+      "head_cell_count": 95,
+      "frame_part_count": 5,
+      "neck_count": 95,
+      "closed_loop_required": false,
+      "contact_interfaces_changed": false,
+      "full_translation_sweep_checked": true,
+      "solid": {
+        "component_count": 1,
+        "boundary_component_count": 17,
+        "positive_boundary_shells": 1,
+        "cavity_count": 16,
+        "zero_boundary_shells": 0,
+        "cavity_containment_verified": true,
+        "cavity_outside_volume_m3": 0.0,
+        "cavity_containment_tolerance_m3": 6.939729655899662e-17,
+        "connectivity_rule": "One positive outer shell; all negative cavity shells contained; no separate positive or zero-volume shell",
+        "watertight": true,
+        "consistently_wound": true,
+        "volume_m3": 4.314266166320355e-05,
+        "one_solid": true,
+        "zero_thickness_surface_duplicates_removed": []
+      }
+    },
+    "withdrawal_direction": [
+      0.868380974048194,
+      0.4958976546739355,
+      0.0
+    ],
+    "head_depth_m": 0.0019074252063244297,
+    "status": "direction_first_frame_trajectory_verified",
+    "base": {
+      "kind": "tight_demand_ring",
+      "offset_m": 0.0020981677269568725,
+      "width_m": 0.00953712603162215,
+      "height_m": 0.007629700825297719,
+      "clearance_m": 0.0038148504126488594,
+      "footprint_area_m2": 0.01303560423209724,
+      "material_area_m2": 0.003056540895482441,
+      "inner_xy_m": [
+        [
+          0.07824040109556221,
+          0.039095713356437536
+        ],
+        [
+          0.0861375165666515,
+          0.02865470226683249
+        ],
+        [
+          0.09676308168574746,
+          0.0036845600846296175
+        ],
+        [
+          0.09648609514578074,
+          0.0005136108003963798
+        ],
+        [
+          0.08636857341616974,
+          -0.024079690769767324
+        ],
+        [
+          0.0779240534797914,
+          -0.040319605637158695
+        ],
+        [
+          0.056167159271411596,
+          -0.04750329269839302
+        ],
+        [
+          0.033258324884905315,
+          -0.05330669484068065
+        ],
+        [
+          0.031396613998001935,
+          -0.053700445916468324
+        ],
+        [
+          0.01888436625219079,
+          -0.05512727739421556
+        ],
+        [
+          0.0049166075322063275,
+          -0.05019433135207367
+        ],
+        [
+          -0.013518781841844437,
+          -0.037579861998688235
+        ],
+        [
+          -0.022584794755558142,
+          -0.022476547506750495
+        ],
+        [
+          -0.030901434857954328,
+          0.002869160462300992
+        ],
+        [
+          -0.022157012925220293,
+          0.01874731841473548
+        ],
+        [
+          -0.0007854082006159253,
+          0.03288483644318594
+        ],
+        [
+          0.017124299290406216,
+          0.04043520691661807
+        ],
+        [
+          0.04263023224488595,
+          0.0494725162965317
+        ]
+      ],
+      "outer_xy_m": [
+        [
+          0.08394128000946945,
+          0.047368271740885634
+        ],
+        [
+          0.0944529492493804,
+          0.033470481401366686
+        ],
+        [
+          0.106471285802357,
+          0.005227317940624122
+        ],
+        [
+          0.10586027131788117,
+          -0.0017675921457560911
+        ],
+        [
+          0.09502652757107008,
+          -0.028101859985222785
+        ],
+        [
+          0.0845965775367933,
+          -0.048160016269290284
+        ],
+        [
+          0.05883660847628338,
+          -0.05666543779983704
+        ],
+        [
+          0.03541690656826259,
+          -0.0625982559402834
+        ],
+        [
+          0.03292705801510479,
+          -0.06312485787039561
+        ],
+        [
+          0.017781019931144483,
+          -0.06485203306228612
+        ],
+        [
+          0.0005622851622790169,
+          -0.0587709508191315
+        ],
+        [
+          -0.020623701051621434,
+          -0.04427437749518161
+        ],
+        [
+          -0.03131280254146609,
+          -0.02646711613631453
+        ],
+        [
+          -0.04125634232182024,
+          0.0038367147795969293
+        ],
+        [
+          -0.029377915065933326,
+          0.025405612717771472
+        ],
+        [
+          -0.0053075267817409705,
+          0.041328401516490074
+        ],
+        [
+          0.01367632271941854,
+          0.04933160853801657
+        ],
+        [
+          0.042344814294887484,
+          0.059489481542911136
+        ]
+      ],
+      "construction": "demand hull offset ring minus the object withdrawal shadow",
+      "actual_remaining_footprint_covers_demand": true,
+      "pads_xy_m": [
+        [
+          [
+            0.08636857341616974,
+            -0.024079690769767324
+          ],
+          [
+            0.09502652757107008,
+            -0.028101859985222785
+          ],
+          [
+            0.0779240534797914,
+            -0.040319605637158695
+          ]
+        ],
+        [
+          [
+            0.0779240534797914,
+            -0.040319605637158695
+          ],
+          [
+            0.0845965775367933,
+            -0.048160016269290284
+          ],
+          [
+            0.05883660847628338,
+            -0.05666543779983704
+          ]
+        ],
+        [
+          [
+            0.017781019931144483,
+            -0.06485203306228612
+          ],
+          [
+            0.01888436625219079,
+            -0.05512727739421556
+          ],
+          [
+            0.03292705801510479,
+            -0.06312485787039561
+          ]
+        ],
+        [
+          [
+            0.01888436625219079,
+            -0.05512727739421556
+          ],
+          [
+            0.017781019931144483,
+            -0.06485203306228612
+          ],
+          [
+            0.0005622851622790169,
+            -0.0587709508191315
+          ]
+        ],
+        [
+          [
+            0.0005622851622790169,
+            -0.0587709508191315
+          ],
+          [
+            -0.017411344728219032,
+            -0.046472441749292326
+          ],
+          [
+            -0.008205610585578718,
+            -0.04121541504406042
+          ]
+        ],
+        [
+          [
+            -0.029377915065933326,
+            0.025405612717771472
+          ],
+          [
+            -0.01032323254536614,
+            0.02657547571133308
+          ],
+          [
+            -0.03717992337932456,
+            0.011238693360587592
+          ]
+        ],
+        [
+          [
+            -0.01032323254536614,
+            0.02657547571133308
+          ],
+          [
+            -0.029377915065933326,
+            0.025405612717771472
+          ],
+          [
+            -0.0053075267817409705,
+            0.041328401516490074
+          ]
+        ],
+        [
+          [
+            0.04263023224488595,
+            0.0494725162965317
+          ],
+          [
+            0.01367632271941854,
+            0.04933160853801657
+          ],
+          [
+            0.042344814294887484,
+            0.059489481542911136
+          ]
+        ],
+        [
+          [
+            0.07824040109556221,
+            0.039095713356437536
+          ],
+          [
+            0.08394128000946945,
+            0.047368271740885634
+          ],
+          [
+            0.0944529492493804,
+            0.033470481401366686
+          ]
+        ],
+        [
+          [
+            0.031396613998001935,
+            -0.053700445916468324
+          ],
+          [
+            0.03292705801510479,
+            -0.06312485787039561
+          ],
+          [
+            0.01888436625219079,
+            -0.05512727739421556
+          ]
+        ],
+        [
+          [
+            0.0005622851622790169,
+            -0.0587709508191315
+          ],
+          [
+            -0.008205610585578718,
+            -0.04121541504406042
+          ],
+          [
+            0.0049166075322063275,
+            -0.05019433135207367
+          ]
+        ],
+        [
+          [
+            -0.01032323254536614,
+            0.02657547571133308
+          ],
+          [
+            -0.0053075267817409705,
+            0.041328401516490074
+          ],
+          [
+            -0.0007854082006159253,
+            0.03288483644318594
+          ]
+        ],
+        [
+          [
+            0.0005622851622790169,
+            -0.0587709508191315
+          ],
+          [
+            0.0049166075322063275,
+            -0.05019433135207367
+          ],
+          [
+            0.01888436625219079,
+            -0.05512727739421556
+          ]
+        ],
+        [
+          [
+            0.01367632271941854,
+            0.04933160853801657
+          ],
+          [
+            -0.0007854082006159253,
+            0.03288483644318594
+          ],
+          [
+            -0.0053075267817409705,
+            0.041328401516490074
+          ]
+        ],
+        [
+          [
+            0.03292705801510479,
+            -0.06312485787039561
+          ],
+          [
+            0.031396613998001935,
+            -0.053700445916468324
+          ],
+          [
+            0.03541690656826259,
+            -0.0625982559402834
+          ]
+        ],
+        [
+          [
+            -0.0007854082006159253,
+            0.03288483644318594
+          ],
+          [
+            0.01367632271941854,
+            0.04933160853801657
+          ],
+          [
+            0.017124299290406216,
+            0.04043520691661807
+          ]
+        ],
+        [
+          [
+            0.033258324884905315,
+            -0.05330669484068065
+          ],
+          [
+            0.03541690656826259,
+            -0.0625982559402834
+          ],
+          [
+            0.031396613998001935,
+            -0.053700445916468324
+          ]
+        ],
+        [
+          [
+            0.017124299290406216,
+            0.04043520691661807
+          ],
+          [
+            0.01367632271941854,
+            0.04933160853801657
+          ],
+          [
+            0.04263023224488595,
+            0.0494725162965317
+          ]
+        ],
+        [
+          [
+            0.056167159271411596,
+            -0.04750329269839302
+          ],
+          [
+            0.03541690656826259,
+            -0.0625982559402834
+          ],
+          [
+            0.033258324884905315,
+            -0.05330669484068065
+          ]
+        ],
+        [
+          [
+            0.07824040109556221,
+            0.039095713356437536
+          ],
+          [
+            0.04263023224488595,
+            0.0494725162965317
+          ],
+          [
+            0.042344814294887484,
+            0.059489481542911136
+          ]
+        ],
+        [
+          [
+            0.03541690656826259,
+            -0.0625982559402834
+          ],
+          [
+            0.056167159271411596,
+            -0.04750329269839302
+          ],
+          [
+            0.05883660847628338,
+            -0.05666543779983704
+          ]
+        ],
+        [
+          [
+            0.08394128000946945,
+            0.047368271740885634
+          ],
+          [
+            0.07824040109556221,
+            0.039095713356437536
+          ],
+          [
+            0.042344814294887484,
+            0.059489481542911136
+          ]
+        ],
+        [
+          [
+            0.05883660847628338,
+            -0.05666543779983704
+          ],
+          [
+            0.056167159271411596,
+            -0.04750329269839302
+          ],
+          [
+            0.0779240534797914,
+            -0.040319605637158695
+          ]
+        ],
+        [
+          [
+            0.0861375165666515,
+            0.02865470226683249
+          ],
+          [
+            0.07824040109556221,
+            0.039095713356437536
+          ],
+          [
+            0.0944529492493804,
+            0.033470481401366686
+          ]
+        ],
+        [
+          [
+            0.0845965775367933,
+            -0.048160016269290284
+          ],
+          [
+            0.0779240534797914,
+            -0.040319605637158695
+          ],
+          [
+            0.09502652757107008,
+            -0.028101859985222785
+          ]
+        ],
+        [
+          [
+            0.09676308168574746,
+            0.0036845600846296175
+          ],
+          [
+            0.0861375165666515,
+            0.02865470226683249
+          ],
+          [
+            0.0944529492493804,
+            0.033470481401366686
+          ]
+        ],
+        [
+          [
+            0.09648609514578074,
+            0.0005136108003963798
+          ],
+          [
+            0.09502652757107008,
+            -0.028101859985222785
+          ],
+          [
+            0.08636857341616974,
+            -0.024079690769767324
+          ]
+        ],
+        [
+          [
+            0.09676308168574746,
+            0.0036845600846296175
+          ],
+          [
+            0.0944529492493804,
+            0.033470481401366686
+          ],
+          [
+            0.106471285802357,
+            0.005227317940624122
+          ]
+        ],
+        [
+          [
+            0.09502652757107008,
+            -0.028101859985222785
+          ],
+          [
+            0.09648609514578074,
+            0.0005136108003963798
+          ],
+          [
+            0.10586027131788117,
+            -0.0017675921457560911
+          ]
+        ],
+        [
+          [
+            0.10586027131788117,
+            -0.0017675921457560911
+          ],
+          [
+            0.09676308168574746,
+            0.0036845600846296175
+          ],
+          [
+            0.106471285802357,
+            0.005227317940624122
+          ]
+        ],
+        [
+          [
+            0.09676308168574746,
+            0.0036845600846296175
+          ],
+          [
+            0.10586027131788117,
+            -0.0017675921457560911
+          ],
+          [
+            0.09648609514578074,
+            0.0005136108003963798
+          ]
+        ]
+      ]
+    },
+    "link": {
+      "length_m": 0.01494250729195377,
+      "waypoints_m": [
+        [
+          0.0990016851406853,
+          0.035694195515215174,
+          0.016040603089640795
+        ],
+        [
+          0.0908048208126771,
+          0.03312108245136767,
+          0.0038148504126488594
+        ]
+      ],
+      "beam_width_m": 0.009155640990357263,
+      "floor_joint_width_m": 0.0061037606602381755,
+      "method": "shortest clear direct link within the current frame/base menu",
+      "global_shortest_claimed": false
+    },
+    "solid": {
+      "component_count": 1,
+      "boundary_component_count": 17,
+      "positive_boundary_shells": 1,
+      "cavity_count": 16,
+      "zero_boundary_shells": 0,
+      "cavity_containment_verified": true,
+      "cavity_outside_volume_m3": 0.0,
+      "cavity_containment_tolerance_m3": 6.939729655899662e-17,
+      "connectivity_rule": "One positive outer shell; all negative cavity shells contained; no separate positive or zero-volume shell",
+      "watertight": true,
+      "consistently_wound": true,
+      "volume_m3": 6.702909821026013e-05,
+      "one_solid": true,
+      "zero_thickness_surface_duplicates_removed": []
+    },
+    "ground": {
+      "passed": true,
+      "supplied_hull_xy_m": [
+        [
+          -0.03717992337932456,
+          0.011238693360587592
+        ],
+        [
+          -0.017411344728219032,
+          -0.046472441749292326
+        ],
+        [
+          0.0005622851622790169,
+          -0.0587709508191315
+        ],
+        [
+          0.017781019931144483,
+          -0.06485203306228612
+        ],
+        [
+          0.03292705801510479,
+          -0.06312485787039561
+        ],
+        [
+          0.03541690656826259,
+          -0.0625982559402834
+        ],
+        [
+          0.05883660847628338,
+          -0.05666543779983704
+        ],
+        [
+          0.0845965775367933,
+          -0.048160016269290284
+        ],
+        [
+          0.09502652757107008,
+          -0.028101859985222785
+        ],
+        [
+          0.10586027131788117,
+          -0.0017675921457560911
+        ],
+        [
+          0.106471285802357,
+          0.005227317940624122
+        ],
+        [
+          0.0944529492493804,
+          0.033470481401366686
+        ],
+        [
+          0.08394128000946945,
+          0.047368271740885634
+        ],
+        [
+          0.042344814294887484,
+          0.059489481542911136
+        ],
+        [
+          0.01367632271941854,
+          0.04933160853801657
+        ],
+        [
+          -0.0053075267817409705,
+          0.041328401516490074
+        ],
+        [
+          -0.029377915065933326,
+          0.025405612717771472
+        ]
+      ],
+      "required_vertex_count": 18,
+      "maximum_outside_distance_m": 0.0,
+      "original_object_floor_point_included": true,
+      "floor_triangle_count": 31
+    },
+    "trajectory": {
+      "passed": true,
+      "status": "rigid_trajectory_verified",
+      "continuous_sweep_verified": true,
+      "origin_m": [
+        0.025843321474041406,
+        -0.003417036802443707,
+        0.08061297746616738
+      ],
+      "length_scale_m": 0.19074252063244296,
+      "motion": [
+        0.868380974048194,
+        0.4958976546739355,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "final_withdrawal_amount": 0.8166335003774099,
+      "segment_amounts": [
+        0.0,
+        0.8166335003774099
+      ],
+      "checked_intervals": 1,
+      "method": "exact convex translation sweep per primitive, replayed on the whole assembly",
+      "path_definition": "support moves +s*D*d on withdrawal; insertion reverses s; object fixed",
+      "rotation_allowed": false,
+      "geometric_tolerance_m": 1.9074252063244298e-11,
+      "volume_tolerance_m3": 6.939729655899661e-14,
+      "bearing_verified": true
+    },
+    "actual_frame_gap_m": 0.0038148504126488594
+  },
+  "bearing": {
+    "sampled_passed": true,
+    "continuous_passed": true,
+    "body_count": 1,
+    "reactions_shared": true,
+    "attempts": [
+      {
+        "friction": 64.0,
+        "sampled_passed": true,
+        "sampled_diagnostics": [],
+        "continuous_passed": true,
+        "continuous_diagnostics": []
+      }
+    ],
+    "original_object_floor_friction_included": true,
+    "finite_friction_menu_is_sufficient_not_complete": true,
+    "assumption": "floor friction is sufficiently large; coefficient is a numerical witness, not a material input",
+    "search_exhaustion_means": "unresolved under the sufficient-friction assumption, not a proof of infeasibility",
+    "sufficient_friction_coefficient": 64.0,
+    "certificate_source": "fixed Step5 head/base equilibrium; independently replayed in Step6 audit"
+  },
+  "geometry_constructed": true,
+  "trajectory_verified": true,
+  "step3_continuous_coverage_proved": true,
+  "process_access_enforced": false,
+  "belt_avoids_work_faces": true,
+  "direction_first": true,
+  "frame_clearance_fraction": 0.02,
+  "contact_interfaces_preserved": true,
+  "stl_units": {
+    "support.stl": "metres",
+    "support_mm.stl": "millimetres"
+  },
+  "physical_supports_verified": false,
+  "strength_verified": false,
+  "multi_pose_reuse_verified": false,
+  "scope": "Fixed Step3 contact interfaces and fixed Step5 base/direction. Construct a loose rear frame and thick links with explicit clearance. Full assembly sweep and shared bearing are independently checked. Failure is not a proof against all paths; printing strength and robot kinematics are not certified.",
+  "provenance": {
+    "inputs": {
+      "slides/baseline_algo/output/B/pose_2/step3_scheculer/schedule.json": "78f82aa9a6de3ef53e9b357b6c99c1dc80bf42f9a01361117d6a91a440a5bc3f",
+      "slides/baseline_algo/output/B/pose_2/step3_scheculer/status.json": "021eacd7676304cef1f68843d5be08c6779387551669713145b2718c2c2cf786",
+      "slides/baseline_algo/output/B/pose_2/step3_scheculer/final_contacts.npz": "8eb2d1f823e3921708c401ec938b80d260d076b17b671ac116f7172031013666",
+      "slides/baseline_algo/output/B/pose_2/step3_scheculer/insertion_directions.json": "92c22e26bedbb46a89e2e2761c94647bb10cbbf555efbc107c02e7d103feb4a6",
+      "slides/baseline_algo/output/B/pose_2/step_1_needs/needs.json": "7e94777bcdc6fe2f8237ed05d0c4b0d6e5abfd542057441c648cb3c4205da5a0",
+      "slides/baseline_algo/output/B/pose_2/step4_floor_contact/floor_contact.json": "132826d0c2215049f6f489468b0ce9355d803f15bb49d04c06572f02d32168aa",
+      "slides/baseline_algo/output/B/pose_2/step4_floor_contact/floor_contact.npz": "171b4f00e5885f88b639f3f157134bdde4ab7a364253f60df00f3ac2541a6e9a",
+      "slides/baseline_algo/output/B/pose_2/step4_floor_contact/audit.json": "8a92b1fb22b48ebb124e462996cbaf1fc2a5dc89f4106e618cceb87975b8fde5",
+      "slides/baseline_algo/output/B/pose_2/step5_base/base.json": "1f43ce7309367a3bed9c99ba08573803985048d8a3fe5d0aec245e1ad9e1153b",
+      "slides/baseline_algo/output/B/pose_2/step5_base/audit.json": "bf4bd4ad9a2deb07fb4c289a07c0c406c6cca1bfe440b39834154ecc12aa9df8",
+      "slides/baseline_algo/output/B/pose_2/step5_base/geometry.npz": "3e985ecaff00b5c1a738fbfbf2ee9a55abe12e3d0e27396c9e748f5f32ae355e",
+      "slides/baseline_algo/output/B/pose_2/step5_base/bearing.npz": "e69dc0472912ed563c1250f0d989c54bb65337d4574937f3dda0322da4489b3f"
+    },
+    "code": {
+      "slides/baseline_algo/step2_local_support/insertion.py": "5e1d565c3f535cdfe25d35ba782332434373f6307c06a92bfdfb3af932060b10",
+      "slides/obj_supp/insert_trajectory/angles.py": "dfaae414bd6cdd122398d5bd16dedb2a2ca62d2f69d86c70efd1974b72febf63",
+      "slides/baseline_algo/step2_local_support/geometry.py": "b6693a72556863bc642e805fca528e8f0b56644fc14dafa1cef38bee7ff02900",
+      "slides/baseline_algo/step2_local_support/surface.py": "98d1d821af445ecd442d96d0d6a3064538da84ab0a2335bb0c1f6fc09ac03b6a",
+      "slides/baseline_algo/step3_scheculer/contacts.py": "5366815d66b134ddee266ef6fa59fa82c171b2ecb1a90f281dd15e47778f1a49",
+      "slides/baseline_algo/step5_connect_support/whole_assembly.py": "ebe5ace176a17bb02d6d1ecb48209f06979ab3fad826bf24cd4cac46619a3579",
+      "slides/baseline_algo/step5_connect_support/belt_geometry.py": "8d749768bee3d69250dbdfe13e1ef46730c0bb427723faf476e9e7a48eba60d1",
+      "slides/baseline_algo/step5_connect_support/rigid_path.py": "c1d286039b84a094baeb809ee3e10ee97597a505dfcd44e60264bbb64eebf003",
+      "slides/baseline_algo/step5_connect_support/solids.py": "9861d1189fdf8e78abafc3025acbd4f1e4cbd1719ac20dab763734405324ecd3",
+      "slides/baseline_algo/step5_connect_support/visual_details.py": "678d05e1b59ab9663f0097aa28b25db08b25bf3640e1a2a8aa89f68e5d3616a7",
+      "slides/baseline_algo/step5_connect_support/surface_check.py": "4722e593b49678e82a73dfd56ac906febbc0aa49dc4cd1286ff6ed27724ca0ab",
+      "slides/baseline_algo/step4_floor_contact/whole_assembly.py": "82cf142232ef2a6a6689a31e4fb370ee4cc294ebf41a145985ef8e000b7e92bf",
+      "slides/baseline_algo/step4_floor_contact/equilibrium.py": "b0d045c299d9880b0a50194bdea1224150934401bfd017a4137ef8109c56b47f",
+      "slides/baseline_algo/step5_connect_support/floor_design.py": "4466041cd8a5d62b4cab0ca0070dc5e6dcfbc5484c48389ea4a521b7411345eb",
+      "slides/baseline_algo/step5_connect_support/piecewise_path.py": "ac87984d290627accf7c4e7cdf2f8d8f4c47a4813d8a645b49aa0539fd653e5f",
+      "slides/baseline_algo/step5_connect_support/video.py": "45cdc45a5356615db49568ed7ba2bcc21d8c20d00d7b2095cd79d7cf7b120830",
+      "slides/baseline_algo/step6_connect_support/direction_first.py": "7fb585b7cad5aefe7c80c376e898e358a8b748078f5df3ac853314a933de367a",
+      "slides/baseline_algo/step5_connect_support/failure_visuals.py": "70993269e4f15def0e37c3ac3b264330835629094dc531b114908123ee45056b",
+      "slides/baseline_algo/step5_connect_support/ground.py": "00168711f9a9244b13c6d5d753abebb27d449325b0cdb0720f56f0af67e0e436",
+      "slides/baseline_algo/step5_connect_support/ring.py": "82c0247d696bf452f9a4c7d4b30afcb68e8cce8662e4311572042b76530bc2f2",
+      "slides/baseline_algo/step5_connect_support/routing.py": "14515ecf7e69e0276e16cc8ccd0dccc56d9a28b7d679bae8eef42c42e2f07d0f",
+      "slides/baseline_algo/step5_base/base.py": "0ac99c60b0a7ec84dcd18bbe573dd6bec1ee1ca61d975961c19cb66ce7928420",
+      "slides/baseline_algo/step5_base/bearing.py": "01f773152bb382816c25864f0347e97a7fa8f230758179daf815072d496c5831",
+      "slides/baseline_algo/step6_connect_support/belt_assembly.py": "08ac8812b126fdffb20671814c69878358ab97d04d53fef8a412514517d87da6",
+      "slides/baseline_algo/step5_connect_support/failure_viewer.html": "39891ab4a956011d41c940c489940941b48dff6446463d211f66789d6e29a54a"
+    }
+  },
+  "artifacts": {
+    "geometry.npz": "c71ef51caca137ac90ddef99afe9901b59b7a294c3576a893fd30f5b558d0465",
+    "support.stl": "c2a1825f8851a84919cfd0218bf5ba2c29850ddb4b6e45b612f11d228980f58b",
+    "support_mm.stl": "4e21f125e0dd657db53b78aff359165ffa918c36eba34658658c229f545fc04f",
+    "heads.npz": "7adeddfd49157519f0a7c883724174535007073dae60a76ddca12940c87d7ef0",
+    "belt.npz": "15c63ba651dd39ec15af470b24bccbef5e078ee8078e84f6718e80a99a6b0061",
+    "direction_search.json": "dd79b936222566e107c862ee151812dddf56550eed42ba4ab7665d9596120c04",
+    "trajectory.json": "cb3a632c31d103e759a32bdab185db838437e67f92e917a302d61a58b11b500d",
+    "bearing.npz": "1750f8544eb0d2259eefcd0ad8ce414349c7dc1cf3c9943d1f82bd13c8ef5bee",
+    "failed_attempt.npz": "20a44730ca5303ea1675290aeddc08a2c043cd674bd3e684dae1d75781e3e7f1",
+    "failed_attempt.json": "1e75102f72f0e1225883a1df922d6a987f50e36f14bd5259267a47495041291e"
+  }
+}

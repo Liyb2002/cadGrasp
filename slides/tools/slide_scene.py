@@ -14,10 +14,10 @@ from PIL import Image, ImageDraw
 
 SLIDES = Path(__file__).resolve().parents[1]
 BASE = SLIDES / 'baseline_algo'
-CASE = BASE / 'output/B/pose_2'
 sys.path.insert(0, str(BASE))
 from step1.needs import ContinuousNeeds, demand
 from step2_local_support import render as R
+from step3_scheculer.pair_tasks import task_folder
 
 PAPER = (255, 255, 255)
 GREY = (184, 189, 191)
@@ -38,7 +38,16 @@ PRESENTATION_CASES = (('B', 'pose_2'), ('B', 'pose_3'),
 
 
 def case_path(domain):
-    return BASE/'output'/domain.data['object']/domain.data['pose_id']
+    folder = task_folder(domain.data['object'], domain.data['pose_id'])
+    return folder.parents[1] if folder.parent.name == 'step_1_needs' else folder.parent
+
+
+def stage_path(domain, stage):
+    folder = task_folder(domain.data['object'], domain.data['pose_id'])
+    if stage == 'step_1_needs':
+        return folder
+    case = case_path(domain)
+    return case/stage/domain.data['pose_id'] if folder.parent.name == 'step_1_needs' else case/stage
 
 
 def case_label(domain):
@@ -46,7 +55,7 @@ def case_label(domain):
 
 
 def load(name='B', pose='pose_2'):
-    domain = ContinuousNeeds.read(BASE/'output'/name/pose/'step_1_needs/needs.json')
+    domain = ContinuousNeeds.read(task_folder(name, pose)/'needs.json')
     assert domain.data['object'] == name and domain.data['pose_id'] == pose
     assert np.allclose(domain.gravity, [0., 0., -1.])
     return domain
@@ -54,9 +63,9 @@ def load(name='B', pose='pose_2'):
 
 def samples(domain=None):
     domain = load() if domain is None else domain
-    case = case_path(domain)
-    data = json.loads((case / 'step_1_needs/samples.json').read_text())
-    digest = hashlib.sha256((case/'step_1_needs/needs.json').read_bytes()).hexdigest()
+    folder = stage_path(domain, 'step_1_needs')
+    data = json.loads((folder/'samples.json').read_text())
+    digest = hashlib.sha256((folder/'needs.json').read_bytes()).hexdigest()
     assert data['provenance']['physical_domain_sha256'] == digest
     assert np.allclose(data['moment_origin_m'], domain.com, atol=1e-12, rtol=0)
     q = np.asarray(data['pt_m'])
@@ -158,7 +167,7 @@ def applied_force(image, cam, domain, label=True, point=None, direction=None, le
 
 def record(path, domain=None, **fields):
     domain = load() if domain is None else domain
-    source = case_path(domain) / 'step_1_needs/needs.json'
+    source = stage_path(domain, 'step_1_needs')/'needs.json'
     result = dict(object=domain.data['object'], pose=domain.data['pose_id'], coordinate_system='Z-up; floor z=0',
                   camera_vector=VIEW.tolist(), floor_margin_fraction=FLOOR_MARGIN,
                   camera_margin=CAMERA_MARGIN,

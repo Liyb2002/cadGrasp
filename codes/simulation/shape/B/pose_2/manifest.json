@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "object": "B",
+  "pose": "pose_2",
+  "coordinate_system": "world_z_up_xy_floor",
+  "length_unit": "m",
+  "geometry_already_in_target_pose": true,
+  "mass_kg": 0.7352354441525804,
+  "com_world_m": [
+    0.025843321474041406,
+    -0.003417036802443707,
+    0.08061297746616738
+  ],
+  "inertia_com_world_kg_m2": [
+    [
+      0.0014417499743547963,
+      9.95348917581141e-06,
+      -0.0002849031023362575
+    ],
+    [
+      9.95348917581142e-06,
+      0.0014054448542984768,
+      -7.961257958874294e-05
+    ],
+    [
+      -0.00028490310233625745,
+      -7.961257958874307e-05,
+      0.0008817153044646878
+    ]
+  ],
+  "selected_contact_ids": [
+    "C139",
+    "C024",
+    "C011"
+  ],
+  "load": {
+    "K": 0.5,
+    "magnitude_range_mg": [
+      0.0,
+      0.5
+    ],
+    "magnitude_endpoints_included": true,
+    "gravity_force_mg": [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    "gravity_application_point_m": [
+      0.025843321474041406,
+      -0.003417036802443707,
+      0.08061297746616738
+    ],
+    "cone_half_deg": 30.0
+  },
+  "baseline_passed": true,
+  "baseline_source_stage": "step6_connect_support",
+  "contact_assumptions": {
+    "object_support": "frictionless_unilateral",
+    "floor": "sufficient_friction_unilateral_no_anchoring"
+  },
+  "simulation_status": "inputs_prepared_not_run",
+  "files": {
+    "target_pose.json": {
+      "sha256": "8e4bf70ee3408d008f5e10aad2d98a29562e1e8a47e1e054fe248cda0f2c9897",
+      "source": "slides/setup/poses/B/pose_2/setup.json"
+    },
+    "target_pose.npz": {
+      "sha256": "94206a80fd94ada627113d4ae7119f9a94209865d02c8fe4a041447a94111d7e",
+      "source": "slides/setup/poses/B/pose_2/setup.npz"
+    },
+    "object_meta.json": {
+      "sha256": "7ad183573e0a76a2b329bde236640b119988c4f2523be82dcea1eb80bb9780e7",
+      "source": "objects/B/meta.json"
+    },
+    "object_source.stl": {
+      "sha256": "b711c7d77f79450c3218209c9f6714b2ae1fccb6f00e310190d2f5ceaefd414f",
+      "source": "objects/B/mesh.stl"
+    },
+    "load_domain.json": {
+      "sha256": "7e94777bcdc6fe2f8237ed05d0c4b0d6e5abfd542057441c648cb3c4205da5a0",
+      "source": "slides/baseline_algo/output/B/pose_2/step_1_needs/needs.json"
+    },
+    "support.stl": {
+      "sha256": "c2a1825f8851a84919cfd0218bf5ba2c29850ddb4b6e45b612f11d228980f58b",
+      "source": "slides/baseline_algo/output/B/pose_2/step6_connect_support/support.stl"
+    },
+    "support_geometry.npz": {
+      "sha256": "c71ef51caca137ac90ddef99afe9901b59b7a294c3576a893fd30f5b558d0465",
+      "source": "slides/baseline_algo/output/B/pose_2/step6_connect_support/geometry.npz"
+    },
+    "baseline_base.json": {
+      "sha256": "1f43ce7309367a3bed9c99ba08573803985048d8a3fe5d0aec245e1ad9e1153b",
+      "source": "slides/baseline_algo/output/B/pose_2/step5_base/base.json"
+    },
+    "baseline_base_geometry.npz": {
+      "sha256": "3e985ecaff00b5c1a738fbfbf2ee9a55abe12e3d0e27396c9e748f5f32ae355e",
+      "source": "slides/baseline_algo/output/B/pose_2/step5_base/geometry.npz"
+    },
+    "load_samples.json": {
+      "sha256": "3c78538dc5fe327f004fdfe39bf0c2565e421f75c71ec80caa3decfbeb341a10",
+      "source": "slides/baseline_algo/output/B/pose_2/step_1_needs/samples.json"
+    },
+    "contacts.npz": {
+      "sha256": "8eb2d1f823e3921708c401ec938b80d260d076b17b671ac116f7172031013666",
+      "source": "slides/baseline_algo/output/B/pose_2/step3_scheculer/final_contacts.npz"
+    },
+    "baseline_connection.json": {
+      "sha256": "9ba9bbc9d167b38d4cf3f9390ca11b6b5a1d826f56d14e61a898fbb5f5968d05",
+      "source": "slides/baseline_algo/output/B/pose_2/step6_connect_support/connection.json"
+    },
+    "baseline_audit.json": {
+      "sha256": "b85df816ba98ff13420ce18418fc6a183cef32cf67f2533a49a14f8a5c8fb97b",
+      "source": "slides/baseline_algo/output/B/pose_2/step6_connect_support/audit.json"
+    },
+    "baseline_trajectory.json": {
+      "sha256": "cb3a632c31d103e759a32bdab185db838437e67f92e917a302d61a58b11b500d",
+      "source": "slides/baseline_algo/output/B/pose_2/step6_connect_support/trajectory.json"
+    },
+    "object.stl": {
+      "sha256": "ff7e68d6b101f5595bd212a6c8426b5aaca02891282f032d3e1d2a732f5f097e"
+    },
+    "object_geometry.npz": {
+      "sha256": "ac0b39a30fbd6265a3aacd6898a8c4cab49f1e65c4367c88c16f9052184646a1"
+    },
+    "working_area.stl": {
+      "sha256": "f025be3ef568e8b64d5ebbc5c6557e733a4467d8645908431732033c81bd4753"
+    },
+    "working_area.npz": {
+      "sha256": "a1432ffdcf9d8a1941c8e331a9430893e4294df726d479ce5e14268762ab12a6"
+    },
+    "directions.json": {
+      "sha256": "11c6536c1cb1a76f0b3bd36cad98ba4fbd71048a7d8208414123156b8a46ea40"
+    }
+  }
+}

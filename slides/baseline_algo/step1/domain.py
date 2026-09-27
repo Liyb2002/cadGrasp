@@ -226,7 +226,7 @@ def main():
     args = parser.parse_args()
     names = args.objects or OBJECTS
     if any(name not in OBJECTS for name in names):
-        parser.error('objects must be A1-f, B or C5')
+        parser.error('objects must be active in objects/cases.json')
     for name in names:
         build(name)
 

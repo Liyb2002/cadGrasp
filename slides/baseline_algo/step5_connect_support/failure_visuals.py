@@ -11,13 +11,13 @@ import sys
 import numpy as np
 import trimesh
 from PIL import Image,ImageDraw
-import imageio.v2 as imageio
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from step1.needs import COORD
 from step1.needs import ContinuousNeeds,OUTPUTS,sha256
 from step1.cases import pose_name,selected_pose
 from step3_scheculer import contacts as I
 from step5_connect_support import belt_geometry as B, direction_first as X, solids as S, visual_details as V
+from step5_connect_support.video import mp4_writer
 
 RED=np.array([208.,49.,56.]);PURPLE='#8b4599'
 STAGES=['heads','loose_frame','base','thick_links','whole_path','bearing']
@@ -217,7 +217,7 @@ def render(name,domain,contacts,parts,labels,geometry,status,out,static_only=Fal
             ink.text((20,710),f"Withdrawn {event['distance_m']*1000*t:.3f} mm / {event['name']} / material: {stage}",font=V.R.font(22),fill=V.R.INK)
             frames.append(frame)
         frames=[frames[0]]*8+frames+[frames[-1]]*20
-        with imageio.get_writer(out/'failure.mp4',fps=12,codec='libx264',quality=None,ffmpeg_params=['-crf','0','-vf','scale=in_range=full:out_range=full','-color_range','pc'],macro_block_size=1) as writer:
+        with mp4_writer(out/'failure.mp4') as writer:
             for frame in frames:writer.append_data(np.asarray(frame))
         frames[0].save(out/'failure.gif',save_all=True,append_images=frames[1:],duration=83,loop=0)
     # Self-contained canvas viewer: no network, external library or local server.
@@ -287,7 +287,7 @@ def no_heads(name,domain,out,inputs=()):
 
 
 def saved_failure(name,static_only=False):
-    root=OUTPUTS/name/pose_name();out=root/'step5_connect_support'
+    root=OUTPUTS/name/pose_name();out=root/'step6_connect_support'
     domain=ContinuousNeeds.read(root/'step_1_needs/needs.json')
     state=json.loads((root/'step3_scheculer/status.json').read_text());partial=not state.get('complete')
     if partial:

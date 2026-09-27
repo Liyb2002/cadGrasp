@@ -86,7 +86,8 @@ def install(objects):
 if __name__=='__main__':
     stage=Path(sys.argv[1]).resolve()
     if HERE not in stage.parents:raise ValueError('Stage must be inside baseline_algo')
-    objects=[s for s in sys.argv[2:] if s in ('A1-f','B','C5')]
+    from step1.registry import active_objects
+    objects=[s for s in sys.argv[2:] if s in active_objects()]
     if len(objects)!=1:raise ValueError('One object/pose per recovery process')
     install(objects);sys.argv=[str(stage)]+sys.argv[2:]
     if stage==HERE/'step3_scheculer/verification.py':

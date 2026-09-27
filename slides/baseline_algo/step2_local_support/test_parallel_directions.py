@@ -99,6 +99,7 @@ class ParallelDirectionsTests(unittest.TestCase):
             mocks.enter_context(patch.object(I.I, 'hashes', return_value={}))
             mocks.enter_context(patch.object(I, 'code_hashes', return_value={}))
             mocks.enter_context(patch.object(I.D, 'make_catalogue', return_value={}))
+            mocks.enter_context(patch.object(I.INIT, 'scene', return_value={}))
             def interrupted(*args):
                 for index in range(7):
                     yield P.rejected(index, f'C{index+1:03d}')

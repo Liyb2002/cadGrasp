@@ -82,6 +82,8 @@ class DirectionTests(unittest.TestCase):
                 return dict(initial_row, geometry_signature=D.signature(contact, .1),
                             radius_m=contact['radius_m'], certified_directions=directions)
             tracker.analyzer = SimpleNamespace(analyze=analyze)
+            tracker.connection_checker = SimpleNamespace(check=lambda actual, allowed:
+                dict(passed=W.nonempty(allowed), directions=allowed))
             with patch.object(I, 'read_contacts', return_value=[actual]), \
                  patch.object(I, 'hashes', return_value={}), \
                  patch.object(I, 'save'), \

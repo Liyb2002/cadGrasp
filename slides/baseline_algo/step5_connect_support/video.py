@@ -7,6 +7,21 @@ from PIL import Image
 from step5_connect_support import rigid_path as P,piecewise_path as PP,solids as S,belt_geometry as B,visual_details as V
 
 
+def mp4_writer(path, fps=12):
+    """8-bit H.264 Main for native players, with the MP4 index at the front.
+
+    x264 CRF 0 selects High 4:4:4 Predictive even with 4:2:0 pixels;
+    That lossless profile is outside common browser/hardware playback profiles.
+    """
+    return imageio.get_writer(path, fps=fps, codec='libx264', quality=None,
+        pixelformat='yuv420p', macro_block_size=1,
+        ffmpeg_params=['-crf', '18', '-profile:v', 'main', '-level:v', '4.0',
+                       '-vf', 'scale=in_range=full:out_range=tv:out_color_matrix=bt709',
+                       '-color_range', 'tv', '-colorspace', 'bt709',
+                       '-color_primaries', 'bt709', '-color_trc', 'bt709',
+                       '-tag:v', 'avc1', '-movflags', '+faststart'])
+
+
 def render(domain,data,path,out):
     if not path.get('passed') or not path.get('continuous_sweep_verified'):
         raise ValueError('A successful continuous trajectory is required before rendering insertion video')
@@ -42,7 +57,7 @@ def render(domain,data,path,out):
         frame,_=V.render(V.arrays(domain,[],modules,ground=fixed_floor),view,640)
         frames.append(frame)
     frames=[frames[0]]*12+frames+[frames[-1]]*24
-    with imageio.get_writer(out/'insertion.mp4',fps=12,codec='libx264',quality=None,ffmpeg_params=['-crf','0','-vf','scale=in_range=full:out_range=full','-color_range','pc'],macro_block_size=16) as writer:
+    with mp4_writer(out/'insertion.mp4') as writer:
         for frame in frames:writer.append_data(np.asarray(frame))
     frames[0].save(out/'insertion.gif',save_all=True,append_images=frames[1:],duration=83,loop=0)
     if (out/'video_review.png').exists():

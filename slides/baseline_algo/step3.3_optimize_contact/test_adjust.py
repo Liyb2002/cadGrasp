@@ -71,22 +71,25 @@ class SizeAdjustmentTests(unittest.TestCase):
         self.assertLess(report['upper_bound_count_per_m2'],67.)
         self.assertAlmostEqual(A.efficiency(evaluate(.5)),100/1.5)
 
-    def test_real_unmodified_radius_preserves_step3_sample_mask(self):
-        if not (A.I.folder('B',A.M.OUTPUT_NAME,1)/'selection.json').exists():
-            self.skipTest('Requires a current B Step3 selection; Step2-only reruns archive that fixture')
-        import json
-        saved=A.I.folder('B',A.OUTPUT_NAME,1)/'state.json'
-        if not saved.exists() or not json.loads(saved.read_text()).get('rest_equilibrium_radius_constraint'):
-            self.skipTest('Saved B selection predates the shared no-uplift force model')
-        problem = A.SizeProblem('B')
+    def test_real_unmodified_radius_matches_original_candidate_supply(self):
+        # Use current Step2 geometry, not a Step3 report tied to older code hashes.
+        if not (A.C.OUTPUTS/'B'/'pose_1'/'step2_local_support'/'circles.json').exists():
+            self.skipTest('Requires current B Step2 geometry')
+        base = A.C.Problem('B')
+        base.targets = base.targets[::1024].copy()
+        minimum = A.area_limit.MIN_AREA_FRACTION*base.domain.mesh.area
+        for index in np.flatnonzero(base.data.valid):
+            contact = base.candidate(int(index))
+            if (A.I.area([contact]) > minimum and
+                    A.C.gravity_check(base.supply([contact]),base.domain,base.scale)['passed']):
+                break
+        else:
+            self.skipTest('No gravity-feasible candidate in the current B geometry')
+        problem = A.SizeProblem('B',problem=base,contacts=[contact],coordinate_index=0)
         entry = problem.score(problem.initial_radius)
-        assert_array_equal(entry['mask'], problem.initial_mask)
         full = A.C.columns(problem.domain, problem.data, problem.index, problem.floor, problem.scale)
-        # Different polygon triangulations must generate the same feasible set.
-        targets = problem.targets[::1024]
-        actual, _, _ = A.C.classify(entry['full'], targets)
-        expected, _, _ = A.C.classify(full, targets)
-        assert_array_equal(actual, expected)
+        expected, _, _ = A.C.classify(full, base.targets)
+        assert_array_equal(entry['mask'], expected)
         self.assertAlmostEqual(entry['row']['efficiency'],
                                entry['row']['covered_percent']/entry['row']['object_area_percent'])
 

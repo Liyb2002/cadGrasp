@@ -161,7 +161,8 @@ def run(name):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('objects', nargs='*', default=['A1-f', 'B', 'C5'])
+    from step1.registry import active_objects
+    parser.add_argument('objects', nargs='*', default=active_objects())
     parser.add_argument('--pose', default=None)
     args = parser.parse_args()
     with selected_pose(args.pose):

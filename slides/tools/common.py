@@ -30,6 +30,10 @@ def obj_path(name: str) -> Path:
     return OBJ_DIR / name
 
 
+def simulation_assets_path(name: str) -> Path:
+    return OBJ_DIR / '_simulation_assets' / name
+
+
 def read_json(p: Path) -> dict:
     with open(p) as f:
         return json.load(f)

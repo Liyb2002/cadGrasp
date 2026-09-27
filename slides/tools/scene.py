@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from common import obj_path, read_json
+from common import obj_path, simulation_assets_path, read_json, mat_to_quat_wxyz
 from pathlib import Path
+import os
+import xml.etree.ElementTree as ET
 
 # sliding / torsional / rolling.  A perfectly flat plane with MuJoCo's default
 # rolling coefficient lets rounded objects roll forever, so it is raised here to
@@ -57,12 +59,16 @@ def build_xml(name: str, drop_z: float = 0.3, keyframes: np.ndarray | None = Non
     """
     d = obj_path(name)
     meta = read_json(d / "meta.json")
-    parts = sorted((d / "collision").glob("part_*.obj"))
+    parts = sorted((simulation_assets_path(name) / "collision").glob("part_*.obj"))
+    if not parts:
+        parts = sorted((d / 'collision').glob('part_*.obj'))
+    if not parts:
+        raise FileNotFoundError(f'{name}: collision meshes missing; run decompose.py')
 
-    assets = ['    <mesh name="visual" file="mesh.stl"/>']
+    assets = [f'    <mesh name="visual" file="{d / "mesh.stl"}"/>']
     geoms = []
     for i, p in enumerate(parts):
-        assets.append(f'    <mesh name="p{i:02d}" file="collision/{p.name}"/>')
+        assets.append(f'    <mesh name="p{i:02d}" file="{p}"/>')
         geoms.append(
             f'      <geom name="col{i:02d}" type="mesh" mesh="p{i:02d}" group="3"'
             f' friction="{friction}" condim="{condim}" rgba="0.25 0.55 0.85 0.35"/>'
@@ -96,7 +102,7 @@ def build_xml(name: str, drop_z: float = 0.3, keyframes: np.ndarray | None = Non
 
 
 def write_scene(name: str) -> Path:
-    """(Re)write objects/<name>/scene.xml, with the sampled placements as keyframes.
+    """Write objects/_simulation_assets/<name>/scene.xml with pose keyframes.
 
     Called by both the sampler and the renderer so the file on disk always
     matches the current template.
@@ -105,8 +111,16 @@ def write_scene(name: str) -> Path:
     keyframes = None
     poses_file = d / "poses.json"
     if poses_file.exists():
-        poses = read_json(poses_file)["poses"]
-        keyframes = np.array([list(p["pos"]) + list(p["quat_wxyz"]) for p in poses])
-    out = d / "scene.xml"
-    out.write_text(build_xml(name, keyframes=keyframes))
+        record = read_json(poses_file)
+        if record.get('schema') == 'cadgrasp_sequence_v1':
+            transforms = [np.array(p['T_world_mesh']) for p in [record['rest']] + record['poses']]
+            keyframes = np.array([np.r_[T[:3,3], mat_to_quat_wxyz(T[:3,:3])] for T in transforms])
+        else:
+            keyframes = np.array([list(p["pos"]) + list(p["quat_wxyz"]) for p in record['poses']])
+    out = simulation_assets_path(name) / "scene.xml"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    root = ET.fromstring(build_xml(name, keyframes=keyframes))
+    for mesh in root.findall('asset/mesh'):
+        mesh.set('file', os.path.relpath(mesh.get('file'), out.parent))
+    out.write_text(ET.tostring(root, encoding='unicode')+'\n')
     return out

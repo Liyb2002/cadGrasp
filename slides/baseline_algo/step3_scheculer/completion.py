@@ -14,6 +14,9 @@ class IncompleteSchedule(RuntimeError):
 
 def require_passed(schedule):
     count = schedule.get('sample_count', 0)
+    connected = set(schedule.get('common_connected_directions', {}).get('ids', []))
+    head_directions = set(schedule.get('common_withdrawal_directions', {}).get('ids', []))
+    connection = schedule.get('connection', {})
     if not (schedule.get('complete') is True
             and schedule.get('status') == 'continuous_contact_model_verified'
             and count > 0 and schedule.get('covered_count') == count
@@ -28,6 +31,10 @@ def require_passed(schedule):
             and schedule.get('insertion_mode') == 'common_rigid_withdrawal_3d'
             and schedule.get('common_head_withdrawal_verified') is True
             and bool(schedule.get('common_withdrawal_directions', {}).get('ids'))
+            and schedule.get('head_connection_witness_verified') is True
+            and connection.get('passed') is True
+            and bool(connected) and connected <= head_directions
+            and connected == set(connection.get('directions', {}).get('ids', []))
             and schedule.get('all_contact_areas_above_minimum') is True
             and (schedule.get('process_access_enforced') is False
                  or schedule.get('all_contact_heads_clear_of_work_volume') is True)
@@ -54,7 +61,7 @@ def read_passed(name):
 def archive_downstream(name):
     """Invalidate downstream status in place; never create history directories."""
     root = I.OUTPUTS/name/pose_name()
-    for stage in ('step4_floor_contact', 'step5_connect_support'):
+    for stage in ('step4_floor_contact', 'step5_connect_support', 'step5_base', 'step6_connect_support'):
         folder = root/stage
         if folder.exists():
             I.save(folder/'status.json', dict(

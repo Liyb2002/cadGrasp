@@ -1,7 +1,7 @@
 r"""One slide: workpiece equilibrium, reference floor torque, and insertion.
 
-The floor row reproduces slides/ref.png using scalar pressure and force
-magnitudes. Bold F distinguishes vector forces in the workpiece equations.
+The floor row uses the scalar normal pressure from slides/ref.png.
+Bold F denotes a vector force in every row, including the process force.
 This is the reference's vertical-pressure floor model, not the full frictional
 equilibrium certificate used by the baseline. Supports are massless.
 """
@@ -51,10 +51,10 @@ def main():
     text(.775, .535, 'sys_floor', 19, MUTED)
     text(.105, .457,
          r'$\int_{\rm sys\_floor}\; F_{\rm supp}\,r_{\rm supp}\times\hat z\,dA'
-         r'=-\left(F_{\rm push}\,r_{\rm push}\times d_{\rm push}\right)$', 31)
+         r'=-r_{\rm push}\times\mathbf{F}_{\rm push}$', 31)
     text(.105, .391,
          r'$F_{\rm supp}\geq0$: floor normal pressure; '
-         r'$\mathbf{F}_{\rm push}=F_{\rm push}d_{\rm push}$; '
+         r'$\mathbf{F}_{\rm push}$: process force vector; '
          'all moment arms are measured from c.', 20, MUTED)
 
     text(.045, .305, '04', 30, fontweight='bold')
@@ -69,7 +69,7 @@ def main():
 
     text(.045, .081,
          r'$\hat z$: up; floor: $z=0$; $r_{\rm supp}=p_{\rm contact}-c$; '
-         r'$r_{\rm push}=q-c$; $0\leq F_{\rm push}\leq0.5\,mg$.', 18, MUTED)
+         r'$r_{\rm push}=q-c$; $0\leq\|\mathbf{F}_{\rm push}\|\leq0.5\,mg$.', 18, MUTED)
     text(.045, .040,
          'Massless supports. The reference floor row uses vertical pressure; full frictional equilibrium is checked separately.',
          18, MUTED)

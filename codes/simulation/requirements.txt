@@ -1,0 +1,13 @@
+# Versions exercised for the first B/pose_2 run (Python 3.12).
+mujoco==3.9.0
+numpy==2.4.6
+scipy
+trimesh
+tetgen==0.8.4
+pyvista==0.49.0
+rtree
+imageio
+imageio-ffmpeg
+Pillow
+pycollada==0.9.3
+PyYAML

@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from step3_scheculer import contacts as I
+from step3_scheculer import connection as B
 from step2_local_support import withdrawal as D
 from step2_local_support import insertion_directions as catalogue
 from step3_scheculer.stage_imports import load_stage
@@ -12,10 +13,11 @@ area_limit = load_stage('optimize', 'area_limit')
 
 
 def code_hashes():
-    return dict(D.code_hashes(), **I.hashes([Path(__file__), Path(catalogue.__file__), Path(area_limit.__file__)]))
+    return dict(B.code_hashes(), **I.hashes([Path(__file__), Path(catalogue.__file__), Path(area_limit.__file__)]))
 
 
-def candidate_filter(rows, selected, geometry_valid, areas=None, minimum_area=None, common_allowed=None):
+def candidate_filter(rows, selected, geometry_valid, areas=None, minimum_area=None, common_allowed=None,
+                     *, connection_checker=None, selected_contacts=(), candidate=None):
     if (areas is None) != (minimum_area is None):
         raise ValueError('Area filtering requires both candidate areas and the minimum')
     selected = set(selected)
@@ -38,11 +40,19 @@ def candidate_filter(rows, selected, geometry_valid, areas=None, minimum_area=No
         else:
             reason = 'eligible'
             eligible[index] = True
+        connection = None
+        if eligible[index] and connection_checker is not None:
+            connection = connection_checker.check([*selected_contacts, candidate(index)], remaining)
+            if not connection['passed']:
+                reason = 'no_common_connection_witness'
+                eligible[index] = False
         records.append(dict(candidate_index=index, candidate_id=row['candidate_id'],
                             eligible=bool(eligible[index]), reason=reason,
                             certified_directions=allowed, remaining_if_selected=remaining))
         if areas is not None:
             records[-1].update(initial_area_m2=float(areas[index]), minimum_area_m2=float(minimum_area))
+        if connection is not None:
+            records[-1]['connection'] = connection
     return eligible, records
 
 
@@ -82,11 +92,15 @@ class Tracker:
         self.analyzer = None
         self.areas = candidate_areas(problem)
         self.minimum_area = area_limit.MIN_AREA_FRACTION*float(problem.domain.mesh.area)
+        self.connection_checker = B.for_problem(problem, self.catalogue)
+        self.actual = []
 
     def prepare(self, number):
         selected = [p['candidate_index'] for p in self.current['contacts']]
         eligible, rows = candidate_filter(self.catalogue['candidates'], selected, self.problem.data.valid,
-                                         self.areas, self.minimum_area, self.current['common_directions'])
+                                         self.areas, self.minimum_area, self.current['common_directions'],
+                                         connection_checker=self.connection_checker,
+                                         selected_contacts=self.actual, candidate=self.problem.candidate)
         inputs = [self.catalogue_path] + ([self.current_path] if self.current_path else [])
         path = self.out/f'round_{number:03d}'/'candidate_filter.json'
         result = dict(object=self.problem.name, complete=True, round=number,
@@ -98,7 +112,7 @@ class Tracker:
                       minimum_contact_area_fraction=area_limit.MIN_AREA_FRACTION,
                       minimum_contact_area_m2=self.minimum_area,
                       previous_direction_record=str(self.current_path.relative_to(I.ROOT)) if self.current_path else None,
-                      rule='Keep only candidates above the area minimum whose complete-head directions intersect the surviving common directions',
+                      rule='Keep only candidates above the area minimum with a shared head direction AND a finite-thickness connection witness for that same direction',
                       size_mismatch_policy='Optimize while preserving a common direction, then recompute the actual exported geometry.',
                       provenance=dict(inputs=I.hashes(inputs), code=code_hashes()))
         I.save(path, result)
@@ -114,6 +128,7 @@ class Tracker:
             inputs.append(self.current_path)
         provenance = dict(inputs=I.hashes(inputs), code=code_hashes())
         actual = I.read_contacts(contacts_path)
+        self.actual = actual
         depth = self.catalogue['normal_depth_m']
         signatures = [D.signature(p, depth) for p in actual]
         try:
@@ -152,6 +167,7 @@ class Tracker:
                           actual_contacts_file=str(contacts_path.relative_to(I.ROOT)),
                           size_mismatch_policy='Actual geometry must retain a direction shared with every fixed head and the work/floor policy',
                           provenance=provenance)
+            cached['connection'] = self.connection_checker.check(actual, common)
             I.save(path, cached)
         assert cached['mode'] == D.MODE
         self.current, self.current_path = cached, path
@@ -163,6 +179,7 @@ class Tracker:
         records = self.current['contacts']
         common = D.common(records, self.direction_catalogue['global_allowed_directions'])
         valid = D.nonempty(common)
+        actual = I.read_contacts(contacts_path)
         result = dict(self.current, object=self.problem.name, complete=True, motion=D.MOTION,
                       mode=D.MODE, contacts=records,
                       selected_ids=[p['candidate_id'] for p in records],
@@ -173,6 +190,7 @@ class Tracker:
                       common_representative=D.representative(common,self.direction_catalogue),
                       provenance=dict(inputs=I.hashes([self.catalogue_path, contacts_path]
                           + ([self.current_path] if self.current_path else [])), code=code_hashes()))
+        result['connection'] = self.connection_checker.check(actual, common)
         path = contacts_path.parent/'insertion_directions.json'
         I.save(path, result)
         return result, path

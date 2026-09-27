@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "status": "rigid_trajectory_verified",
+  "continuous_sweep_verified": true,
+  "origin_m": [
+    0.025843321474041406,
+    -0.003417036802443707,
+    0.08061297746616738
+  ],
+  "length_scale_m": 0.19074252063244296,
+  "motion": [
+    0.868380974048194,
+    0.4958976546739355,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "final_withdrawal_amount": 0.8166335003774099,
+  "segment_amounts": [
+    0.0,
+    0.8166335003774099
+  ],
+  "checked_intervals": 1,
+  "method": "exact convex translation sweep per primitive, replayed on the whole assembly",
+  "path_definition": "support moves +s*D*d on withdrawal; insertion reverses s; object fixed",
+  "rotation_allowed": false,
+  "geometric_tolerance_m": 1.9074252063244298e-11,
+  "volume_tolerance_m3": 6.939729655899661e-14,
+  "bearing_verified": true
+}

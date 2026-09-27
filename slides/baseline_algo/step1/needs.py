@@ -24,11 +24,12 @@ ROOT = HERE.parents[2]
 OUTPUTS = BASELINE / 'output'
 sys.path.insert(0, str(BASELINE))
 from step1.cases import pose_name
+from step1.registry import active_objects, task_snapshot
 sys.path.insert(0, str(ROOT / 'slides/tools'))
 import coordinates as COORD
 from cone_model import CONE_HALF_DEG, frame
 
-OBJECTS = ('A1-f', 'B', 'C5')
+OBJECTS = active_objects()
 K = 0.5
 GRAVITY = np.array([0., 0., -1.])
 RAY_OFFSET_M = 1e-5
@@ -64,9 +65,7 @@ def demand(q_m, force_push_mg, com_m, gravity_mg=GRAVITY):
 def setup_geometry(name):
     """Replay only uniform subdivision; never rerun setup selection/rendering."""
     pose = pose_name()
-    source = ROOT / 'slides/setup/poses' / name / pose / 'setup.npz'
-    if not source.is_file():
-        raise FileNotFoundError(f'{name}/{pose}: create the setup pose first ({source})')
+    source = task_snapshot(name, pose)
     with np.load(source) as z:
         meta = {k: z[k].copy() for k in (
             'T_world_mesh', 'com_m', 'work_faces', 'mesh_sha256',
@@ -248,7 +247,6 @@ def example_cases(domain):
     rng = np.random.default_rng(20260907)
     areas = np.asarray(domain.data['geometry']['work_face_areas_m2'])
     cases = []
-    used_faces = set()
     for attempt in range(300):
         i = int(rng.choice(len(areas), p=areas/areas.sum()))
         u, v = rng.random(2)
@@ -258,9 +256,8 @@ def example_cases(domain):
         phi = float(rng.uniform(0, 2*np.pi))
         magnitude = [domain.k/4, domain.k/2, domain.k][len(cases)]
         result = domain.evaluate(i, u, v, theta, phi, magnitude_mg=magnitude)
-        if not result['tool_reachable'] or i in used_faces:
+        if not result['tool_reachable']:
             continue
-        used_faces.add(i)
         record = {'id': len(cases)+1, 'work_face_index': i,
                   'mesh_face_id': int(domain.work_ids[i]),
                   'parameters': {'u': float(u), 'v': float(v), 'theta_rad': theta,
@@ -288,7 +285,7 @@ def example_cases(domain):
                     'purpose': 'Three individual illustrative loads; never applied simultaneously',
                     'selection': 'Area-weighted random faces and uniform solid angle; reject occluded rays; illustrative magnitudes K/4, K/2, K',
                     'continuous_set_file': 'needs.json', 'cases': cases}
-    raise RuntimeError('Could not find three distinct reachable work faces')
+    raise RuntimeError('Could not find three reachable illustrative loads')
 
 
 def sample_needs(domain, count=DEFAULT_SAMPLE_COUNT, seed=DEFAULT_SAMPLE_SEED):
@@ -369,13 +366,17 @@ def sample_needs(domain, count=DEFAULT_SAMPLE_COUNT, seed=DEFAULT_SAMPLE_SEED):
     }
 
 
-def build(name, count=DEFAULT_SAMPLE_COUNT, seed=DEFAULT_SAMPLE_SEED):
-    folder = OUTPUTS/name/pose_name()/'step_1_needs'
+def build(name, count=DEFAULT_SAMPLE_COUNT, seed=DEFAULT_SAMPLE_SEED, output_folder=None):
+    snapshot = task_snapshot(name, pose_name())
+    folder = Path(output_folder) if output_folder is not None else OUTPUTS/name/pose_name()/'step_1_needs'
     path = folder/'needs.json'
     stored = json.loads(path.read_text()) if path.exists() else None
     if stored is not None and stored.get('pose_id', 'pose_1') != pose_name():
         raise ValueError(f'{name}: saved needs belong to a different pose')
-    if (stored is None or 'coordinate_migration' in stored or 'pose_id' not in stored or
+    if (stored is None or
+            stored.get('provenance', {}).get('setup_snapshot') != str(snapshot.relative_to(ROOT)) or
+            stored.get('provenance', {}).get('setup_snapshot_sha256') != sha256(snapshot) or
+            'coordinate_migration' in stored or 'pose_id' not in stored or
             float(stored['load']['cone_half_deg']) != CONE_HALF_DEG):
         save_json(path, setup_geometry(name))
     domain = ContinuousNeeds.read(path)
@@ -411,7 +412,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=DEFAULT_SAMPLE_SEED)
     args = parser.parse_args()
     if args.count < 1 or args.seed < 0 or any(name not in OBJECTS for name in args.objects):
-        parser.error('objects must be A1-f, B or C5; count > 0 and seed >= 0')
+        parser.error('objects must be active in objects/cases.json; count > 0 and seed >= 0')
     from domain import build as build_domain
     from draw_proof import draw as draw_examples
     for name in args.objects or OBJECTS:

@@ -18,7 +18,8 @@ def efficiency(row):
 
 
 def maximize_efficiency(evaluate, radii, initial_radius, radius_tolerance,
-                        relative_tolerance=EFFICIENCY_REL_TOL, max_evaluations=512):
+                        relative_tolerance=EFFICIENCY_REL_TOL, max_evaluations=512,
+                        admissible=None):
     """Bound a non-unimodal ratio using monotone numerator and denominator.
 
     For a <= r <= b, count(r)/area(r) <= count(b)/area(a).
@@ -40,12 +41,14 @@ def maximize_efficiency(evaluate, radii, initial_radius, radius_tolerance,
         return efficiency(rows[radius])
 
     best = value(best_radius)
+    if admissible is not None and not admissible(best_radius):
+        raise ValueError('Initial size has no admissible connection/insertion witness')
     original_value = best
 
     def visit(radius):
         nonlocal best, best_radius
         candidate = value(radius)
-        if candidate > best*(1+1e-12):
+        if candidate > best*(1+1e-12) and (admissible is None or admissible(radius)):
             best, best_radius = candidate, radius
 
     for radius in radii:

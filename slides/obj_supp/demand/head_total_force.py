@@ -1,9 +1,9 @@
-"""Schematic workpiece reactions on a connected support, without a floor base.
+"""Schematic support forces on the workpiece, without a floor base.
 
 Actual B pose_2 contact C139 and the saved side frame are reused. Candidate
-C023 sits on the crown with an overhead arm; C151 sits below the chin. The
+C023 sits on the crown with an overhead arm. The
 ground plane is visible, without the ground-base ring.
-Orange/blue arrows point outward: force FROM the workpiece ON the support.
+Blue arrows point inward: force FROM the support ON the workpiece.
 A red arrow presses downward on the green work region. Magnitudes are
 illustrative; no load-case, bearing, or trajectory claim is made.
 """
@@ -28,8 +28,7 @@ from step5_connect_support import solids as S
 C=load_stage('score','contribution')
 PAPER=SC.PAPER
 INK='#151515'
-HIGH=SC.ORANGE
-LOW=SC.BLUE
+HEAD=SC.BLUE
 FRAME=SC.FRAME
 APPLIED=SC.RED
 
@@ -73,8 +72,7 @@ def run():
             keep=any(k in head_labels[int(label.split('_')[-1])] for k in ['C139'])
         else:keep=not label.startswith(('ground_strip_','connector_'))
         if keep:selected.append(i)
-    # Add an actual upward-bearing contact below the chin, visibly between the
-    # existing high and low heads. Its broad neck is a conceptual connection.
+    # Add the actual crown contact with an illustrative overhead connection.
     circles_path=case/'step2_local_support/circles.json'
     data_path=case/'step2_local_support/circles.npz'
     directions_path=case/'step2_local_support/insertion_directions.json'
@@ -108,24 +106,8 @@ def run():
         if label.startswith('contact_head_C139_'):continue
         if label.startswith('neck_') and 'C139' in head_labels[int(label.split('_')[-1])]:continue
         upper_only.append(i)
-    row=next(r for r in directions['candidates'] if r['candidate_id']=='C151')
-    added=ID.candidate(data,circles,row['candidate_index'])
-    contacts['C151']=added
-    assert not np.intersect1d(added['source_faces'],domain.work_ids).size
-    depth=directions['normal_depth_m']
-    added_heads,_=S.joined_heads(domain.mesh,[added],depth)
-    n=domain.mesh.face_normals[added['center_face']]
-    a=added['center_m']+.5*depth*n
-    b=np.array([.109,-.011,.121])
-    c=np.array([.106,.039,.121])
-    extra=added_heads+[
-        trimesh.creation.cylinder(radius=.005,segment=[a,b],sections=20),
-        trimesh.creation.cylinder(radius=.005,segment=[b,c],sections=20),
-        trimesh.creation.icosphere(subdivisions=2,radius=.005).apply_translation(b)]
-    for j,part in enumerate(extra):
-        selected.append(len(parts));parts.append(part);labels.append(f'illustrative_C151_{j:03d}')
     blue_lips=[]
-    for key,radius in [('C139',.0180),('C151',.0140)]:
+    for key,radius in [('C139',.0180)]:
         contact=contacts[key]
         normal=domain.mesh.face_normals[contact['center_face']]
         lip=flared_contact(contact['center_m'],normal,radius)
@@ -158,45 +140,43 @@ def run():
         for i in ids:
             tri.append(parts[i].triangles)
             label=labels[i]
-            color=HIGH if 'C023' in label else LOW if any(k in label for k in ['C139','C151']) else FRAME
+            color=HEAD if any(k in label for k in ['C023','C139']) else FRAME
             if label.startswith('neck_'):
-                owner=head_labels[int(label.split('_')[-1])]
-                color=HIGH if 'C023' in owner else LOW
+                color=HEAD
             palette.append(np.tile(color,(len(parts[i].faces),1)))
         picture,_=R.raster(np.concatenate(tri),np.concatenate(palette),focus,basis,width,size,unlit=[0,1])
         image.paste(picture,(x,y))
-        centered(draw,(x+550,204),'(a) One upper contact' if panel==0 else '(b) One upper and two lower contacts',31)
+        centered(draw,(x+550,204),'(a) One upper contact' if panel==0 else '(b) One upper and one lower contact',31)
         # The arrowhead lands on the actual green work face; the applied force
-        # acts ON the workpiece, unlike the contact reaction arrows below.
+        # acts ON the workpiece, as do the support-force arrows below.
         load_end=R.project(load_point,focus,basis,width,size)[:2]+[x,y]
         load_start=R.project(load_point-load_arrow_length*load_direction,focus,basis,width,size)[:2]+[x,y]
         arrow(draw,load_start,load_end,APPLIED,10)
         draw.text((load_start[0]-22,load_start[1]+24),'Applied force',
                   font=R.font(25),fill=APPLIED,anchor='rm')
-        for key,color,force_length in [('C023',HIGH,.036)]+([('C139',LOW,.026),('C151',LOW,.034)] if panel else []):
+        for key,force_length in [('C023',.036)]+([('C139',.026)] if panel else []):
             h=contacts[key];p=h['center_m'];n=domain.mesh.face_normals[h['center_face']]
             assert n[2]>0 if key=='C023' else n[2]<0
-            # Workpiece force ON the support is along the outward surface normal.
+            # Support force ON the workpiece is along the inward surface normal.
             start=R.project(p,focus,basis,width,size)[:2]+[x,y]
-            end=R.project(p+force_length*n,focus,basis,width,size)[:2]+[x,y]
-            arrow(draw,start,end,color,10)
+            end=R.project(p-force_length*n,focus,basis,width,size)[:2]+[x,y]
+            arrow(draw,start,end,HEAD,10)
             draw.ellipse((start[0]-6,start[1]-6,start[0]+6,start[1]+6),fill=INK)
-            metadata[key]={'center_m':p.tolist(),'outward_normal':n.tolist(),'force_on_support_direction':n.tolist(),'illustrative_arrow_length_m':force_length}
+            metadata[key]={'center_m':p.tolist(),'outward_normal':n.tolist(),'force_on_workpiece_direction':(-n).tolist(),'illustrative_arrow_length_m':force_length}
         centered(draw,(x+550,1230),
-            'The workpiece lifts the upper contact.' if panel==0
-            else 'The workpiece also pushes the lower contacts down.',26)
-    arrow(draw,[350,1310],[430,1310],HIGH,7)
-    arrow(draw,[445,1310],[525,1310],LOW,7)
-    draw.text((555,1310),'Workpiece force on support',font=R.font(27),fill=INK,anchor='lm')
+            'The upper contact pushes the workpiece down.' if panel==0
+            else 'The lower contact pushes the workpiece up.',26)
+    arrow(draw,[445,1310],[525,1310],HEAD,7)
+    draw.text((555,1310),'Support force on workpiece',font=R.font(27),fill=INK,anchor='lm')
     draw.rectangle((1570,1297,1611,1323),fill=FRAME)
     draw.text((1641,1310),'Rigid connection',font=R.font(27),fill=INK,anchor='lm')
     centered(draw,(1200,1366),'Illustrative forces and arrow lengths.',24)
     image.save(HERE/'head_total_force.png')
     report={
-        'case':'B/pose_2','depicted_heads':['C023','C139','C151'],
+        'case':'B/pose_2','depicted_heads':['C023','C139'],
         'arrow_magnitudes':'illustrative, not calculated reactions',
-        'arrow_convention':'Red: downward applied force ON the workpiece. Orange/blue: workpiece forces ON the support, along actual outward contact normals.',
-        'arrow_counts_by_panel':[2,4],'contact_reaction_arrow_counts_by_panel':[1,3],'forces':metadata,
+        'arrow_convention':'Red: downward applied force ON the workpiece. Blue: support forces ON the workpiece, along actual inward contact normals.',
+        'arrow_counts_by_panel':[2,3],'contact_reaction_arrow_counts_by_panel':[1,2],'forces':metadata,
         'applied_force':{'source_face':load_face,'point_m':load_point.tolist(),
             'direction':load_direction.tolist(),'on_body':'workpiece','region':'green work region',
             'illustrative_arrow_length_m':load_arrow_length,'shown_in_both_panels':True},
@@ -209,12 +189,8 @@ def run():
             'connector_centerline_m':[top_a.tolist(),top_b.tolist(),top_c.tolist(),top_d.tolist()],
             'connector_scope':'Illustrative overhead arm'},
         'blue_contact_lips':blue_lips,
-        'added_blue_contact':{'candidate_id':'C151','location':'Below chin, above existing lower contact',
-            'source':'Actual Step2 non-work-region contact patch',
-            'connector_centerline_m':[a.tolist(),b.tolist(),c.tolist()],
-            'connector_radius_m':.005,'connector_scope':'Illustrative neck, not a Step5 result'},
         'inputs':I.hashes([case/'step3_scheculer/final_contacts.npz',case/'step5_connect_support/geometry.npz',circles_path,data_path,directions_path]),
-        'scope':'Conceptual connected-support force illustration without a floor base. Ground plane shown without a base ring. Actual C139 head and saved side frame reused; C023 crown contact and overhead arm replace C024; actual C151 candidate added with an illustrative blue neck. No solved load, balance, bearing, or insertion claim.'}
+        'scope':'Conceptual connected-support force illustration without a floor base. Ground plane shown without a base ring. Actual C139 head and saved side frame reused; C023 crown contact and overhead arm replace C024. Panel (a) shows C023; panel (b) shows C023 and C139. All heads are blue. No solved load, balance, bearing, or insertion claim.'}
     (HERE/'head_total_force.json').write_text(json.dumps(report,indent=2)+'\n')
     print(HERE/'head_total_force.png')
 

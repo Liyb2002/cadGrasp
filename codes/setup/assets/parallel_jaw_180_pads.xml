@@ -1,0 +1,40 @@
+<!-- Generic flat compliant pad assumption, unchanged straight finger geometry.
+     condim 4 includes torsional friction with effective length 3 mm.
+     This is a simulation model, not measured hardware certification. -->
+<mujoco model="generic parallel jaw with flat soft pads">
+  <compiler angle="radian" autolimits="true" />
+  <option />
+  <default>
+    <joint damping="1" armature=".01" />
+  </default>
+  <asset />
+  <worldbody>
+    <body name="hand">
+      <geom type="box" size=".025 .105 .02" pos="0 0 .02" mass=".65" rgba=".25 .28 .30 1" />
+      <body name="left_finger" pos="0 0 .04">
+        <joint name="finger_joint1" type="slide" axis="0 1 0" range="0 .09" />
+        <geom type="box" size=".02 .006 .04" pos="0 .006 .04" mass=".10" rgba=".18 .20 .22 1" priority="1" solref=".002 1" solimp=".99 .999 .001" condim="4" friction=".8 .003 0" />
+      </body>
+      <body name="right_finger" pos="0 0 .04" quat="0 0 0 1">
+        <joint name="finger_joint2" type="slide" axis="0 1 0" range="0 .09" />
+        <geom type="box" size=".02 .006 .04" pos="0 .006 .04" mass=".10" rgba=".18 .20 .22 1" priority="1" solref=".002 1" solimp=".99 .999 .001" condim="4" friction=".8 .003 0" />
+      </body>
+    </body>
+  </worldbody>
+  <contact>
+    <exclude body1="hand" body2="left_finger" />
+    <exclude body1="hand" body2="right_finger" />
+  </contact>
+  <tendon>
+    <fixed name="split">
+      <joint joint="finger_joint1" coef=".5" />
+      <joint joint="finger_joint2" coef=".5" />
+    </fixed>
+  </tendon>
+  <equality>
+    <joint joint1="finger_joint1" joint2="finger_joint2" solref=".005 1" />
+  </equality>
+  <actuator>
+    <general name="close" tendon="split" biastype="affine" />
+  </actuator>
+</mujoco>

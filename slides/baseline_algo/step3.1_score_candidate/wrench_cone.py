@@ -189,8 +189,12 @@ def solve(full, target):
     transformed = target@transform
     scale = max(float(np.max(np.abs(transformed))), 1.)
     options = {'primal_feasibility_tolerance':1e-9,'dual_feasibility_tolerance':1e-9}
+    # These supply LPs have very few equations and many reaction columns.
+    # HiGHS dependency-removal presolve can dominate the actual solve; the
+    # original-equation residual and reaction checks below remain unchanged.
     result = linprog(np.zeros(len(full)), A_eq=(full@transform).T,
-                     b_eq=transformed/scale, bounds=(0,None), method='highs', options=options)
+                     b_eq=transformed/scale, bounds=(0,None), method='highs',
+                     options=dict(options, presolve=False))
     if result.status not in (0,2):
         result = linprog(np.zeros(len(full)), A_eq=(full@transform).T,
                          b_eq=transformed/scale, bounds=(0,None), method='highs-ipm',

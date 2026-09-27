@@ -32,3 +32,6 @@ slides/**/*.log
 # Small fixed regression inputs are part of the test code
 !slides/**/fixtures/*.json
 !slides/**/fixtures/*.npz
+
+# Fixed parameters for the reproducible local-body specimen
+!slides/baseline_algo/step5_connect_support/local_body_case.json

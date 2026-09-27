@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from step3_scheculer.stage_imports import load_stage
 C = load_stage('score', 'contribution')
 from step3_scheculer import contacts as I
+from step3_scheculer import paths as PTH
 
 OUTPUT_NAME = 'step3.2_select_contact'
 
@@ -18,18 +19,46 @@ def rank_candidates(rows):
                   key=lambda index: (-rows[index]['covered_count'], rows[index]['id']))
 
 
-def run(name, round_number=1, state_path=None, problem=None):
+def top_k_distribution(rows, base_count, top_k=5, excluded_indices=()):
+    """Only eligible candidates; weight new coverage, with uniform zero-gain fallback."""
+    if top_k < 1:
+        raise ValueError('top_k must be positive')
+    indices = [i for i in rank_candidates(rows) if i not in excluded_indices][:top_k]
+    gains = np.array([rows[i]['covered_count']-base_count for i in indices], dtype=float)
+    if np.any(gains < 0):
+        raise ValueError('Adding a contact cannot lose previously covered loads')
+    probabilities = (gains/gains.sum() if gains.sum() else
+                     np.full(len(indices), 1/len(indices)) if indices else np.empty(0))
+    return indices, probabilities
+
+
+def run(name, round_number=1, state_path=None, problem=None, rng=None, top_k=5, excluded_indices=(), proposal_seed=None):
     problem = problem or C.Problem(name)
     score = C.read(name, round_number)
     fixed, base, paths = problem.load_state(state_path)
     assert score['selected_indices'] == sorted(p['candidate_index'] for p in fixed)
     assert round_number == len(fixed)+1
-    source = I.folder(name, C.OUTPUT_NAME, round_number)
-    out = I.folder(name, OUTPUT_NAME, round_number)
+    source = PTH.folder(name, C.OUTPUT_NAME, round_number)
+    out = PTH.folder(name, OUTPUT_NAME, round_number)
     out.mkdir(parents=True, exist_ok=True)
     rows = score['contributions']
     order = rank_candidates(rows)
-    winner = dict(rows[order[0]]) if order else None
+    sampling = None
+    chosen = order[0] if order else None
+    if rng is not None:
+        indices, probabilities = top_k_distribution(rows, int(base.sum()), top_k, excluded_indices)
+        # Record the actual uniform draw so audits do not depend on RNG implementations.
+        draw = float(rng.random()) if indices else None
+        if indices:
+            chosen = indices[min(int(np.searchsorted(np.cumsum(probabilities), draw, side='right')), len(indices)-1)]
+        sampling = dict(top_k=top_k, indices=indices, probabilities=probabilities.tolist(),
+                        uniform_draw=draw, base_covered_count=int(base.sum()),
+                        gains=[rows[i]['covered_count']-int(base.sum()) for i in indices])
+        if proposal_seed is not None:
+            sampling.update(excluded_indices=list(excluded_indices), proposal_seed=proposal_seed)
+        if not indices:
+            chosen = None
+    winner = dict(rows[chosen]) if chosen is not None else None
     artifacts = {}
     if winner is not None:
         selected = problem.candidate(winner['index'])
@@ -41,10 +70,10 @@ def run(name, round_number=1, state_path=None, problem=None):
         artifacts = {f: C.sha256(out/f) for f in
                      ['selected_contact.npz', 'contacts_before_optimization.npz', 'sample_coverage.npz']}
     result = dict(object=name, round=round_number, complete=True,
-        objective='maximize_joint_covered_sample_count', winner=winner,
+        objective='sample_top_k_by_marginal_coverage' if rng is not None else 'maximize_joint_covered_sample_count', winner=winner,
         ranking=order, sample_count=score['sample_count'], fixed_indices=score['selected_indices'],
-        tied_best_ids=[rows[i]['id'] for i in order if rows[i]['covered_count'] == winner['covered_count']],
-        tie_break='candidate_id_ascending', current_contact_resized=False,
+        tied_best_ids=[rows[i]['id'] for i in order if winner is not None and rows[i]['covered_count'] == winner['covered_count']],
+        tie_break='candidate_id_ascending', sampling=sampling, current_contact_resized=False,
         provenance=dict(inputs=I.hashes(problem.inputs+paths+[source/'contributions.json', source/'sample_coverage.npz']),
                         code=dict(C.code_hashes(), **I.hashes([Path(__file__)]))), artifacts=artifacts)
     I.save(out/'selection.json', result)
@@ -54,7 +83,7 @@ def run(name, round_number=1, state_path=None, problem=None):
 
 
 def read(name, round_number=1):
-    return I.check_report(I.folder(name, OUTPUT_NAME, round_number)/'selection.json')
+    return I.check_report(PTH.folder(name, OUTPUT_NAME, round_number)/'selection.json')
 
 
 if __name__ == '__main__':

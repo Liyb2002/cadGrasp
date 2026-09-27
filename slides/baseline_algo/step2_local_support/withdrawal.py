@@ -8,6 +8,7 @@ from pathlib import Path
 import manifold3d as manifold
 import numpy as np
 from step2_local_support import insertion as H
+from step2_local_support import installation as INIT
 from step3_scheculer import contacts as I
 
 MODE = 'common_rigid_withdrawal_3d'
@@ -15,13 +16,15 @@ NORMAL_TOL = 1e-10
 VOLUME_TOL = 1e-11
 MOTION = dict(direction='support withdrawal +d; insertion reverses the same line',
               frame='Step1 world coordinates', rotation_allowed=False,
+              installation_floor='catalogue.installation.floor_plane when declared; task-world floor for legacy catalogues',
+              moving_body='contact module only; base docking is a separate motion',
               floor_checked=True, connectors_checked=False,
               representation='finite shared 3-D direction IDs; no continuous-sphere completeness claim')
 signature = H.signature
 
 
 def code_hashes():
-    return {**H.code_hashes(), **I.hashes([Path(__file__)])}
+    return {**H.code_hashes(), **I.hashes([Path(__file__), Path(INIT.__file__)])}
 
 
 def normalize(ids=()):
@@ -48,7 +51,7 @@ def preferred(mesh, work_ids):
     return v/np.linalg.norm(v) if np.linalg.norm(v) > mesh.area*1e-12 else None
 
 
-def make_catalogue(mesh, work_ids, contacts):
+def make_catalogue(mesh, work_ids, contacts, installation=None):
     vectors = []
     def add(v):
         v = np.asarray(v, float).copy(); length = np.linalg.norm(v)
@@ -67,17 +70,26 @@ def make_catalogue(mesh, work_ids, contacts):
     for c in contacts:
         n = np.average(mesh.face_normals[c['source_faces']], axis=0, weights=c['triangle_areas_m2'])
         add(n); add(COORD.lift_floor(COORD.floor(n))); add(np.cross(n,[0,0,1])); add(np.cross([0,0,1],n))
+    up = np.array(installation['floor_plane'][:3]) if installation else np.array([0.,0.,1.])
+    if installation:
+        add(up)
+        for c in contacts:
+            n = np.average(mesh.face_normals[c['source_faces']], axis=0, weights=c['triangle_areas_m2'])
+            add(n-(n@up)*up); add(np.cross(n,up)); add(np.cross(up,n))
     array = np.asarray(vectors)
-    floor = array[:,2] < -NORMAL_TOL
-    work = array@back < -NORMAL_TOL if back is not None else np.zeros(len(array),bool)
+    floor = array@up < -NORMAL_TOL
+    work = (array@back < -NORMAL_TOL) if back is not None and installation is None else np.zeros(len(array),bool)
     allowed = np.flatnonzero(~floor & ~work)
-    return dict(vectors=array.tolist(), global_allowed_directions=normalize(allowed),
+    result = dict(vectors=array.tolist(), global_allowed_directions=normalize(allowed),
         floor_locked_ids=np.flatnonzero(floor).tolist(), work_face_locked_ids=np.flatnonzero(work).tolist(),
         preferred_withdrawal_direction=back.tolist() if back is not None else None,
         work_face_rule='Exclude outward hemisphere of area-weighted work-face normal; tangent allowed',
         work_face_normal_degenerate=back is None,
         resolution='15 degree azimuth, 20 degree elevation, poles and contact-normal/tangent seeds',
         finite_direction_set=True, entire_sphere_infeasibility_claimed=False)
+    if installation:
+        result.update(installation=installation, work_face_rule='Working surfaces excluded from contacts; no task-force hemisphere restriction on initial installation')
+    return result
 
 
 def representative(value, catalogue):
@@ -102,13 +114,15 @@ class Analyzer(H.Analyzer):
         self.scale = float(mesh.extents.max()); self.origin = mesh.bounds.mean(axis=0)
         self.obstacle = solid(mesh,self.origin,self.scale)
         self.clearance = H.G.Clearance(mesh, self.scale*1e-12)
+        self.floor = np.asarray(catalogue.get('installation', {}).get('floor_plane', [0.,0.,1.,0.]))
 
     def test(self, heads, direction):
         """Convex head cells swept continuously until an AABB separates forever."""
         d = np.asarray(direction)
-        if d[2] < -NORMAL_TOL: return dict(clear=False,reason='floor_direction')
+        if d@self.floor[:3] < -NORMAL_TOL: return dict(clear=False,reason='initial_floor_direction')
         points = np.vstack([h.vertices for h in heads])
-        if points[:,2].min() < -self.scale*1e-10: return dict(clear=False,reason='installed_floor_collision')
+        if np.min(points@self.floor[:3]+self.floor[3]) < -self.scale*1e-10:
+            return dict(clear=False,reason='initial_installed_floor_collision')
         distances=[]
         for axis,v in enumerate(d):
             if v>1e-10: distances.append((self.mesh.bounds[1,axis]+.035*self.scale-points[:,axis].min())/v)
@@ -137,8 +151,12 @@ class Analyzer(H.Analyzer):
         ids=(allowed or self.catalogue['global_allowed_directions'])['ids']
         normals=np.unique(self.mesh.face_normals[contact['source_faces']],axis=0)
         heads=None; checks=[]; clear=[]; locked=[]; unresolved=[]
+        clearance=self.catalogue.get('installation', {}).get('contact_floor_clearance_m', 0.)
+        grounded=np.min(np.asarray(contact['triangles_m'])@self.floor[:3]+self.floor[3]) < clearance-self.scale*1e-10
         for i in ids:
-            if np.min(normals@self.vectors[i]) < -NORMAL_TOL:
+            if grounded:
+                row=dict(clear=False,reason='contact_on_initial_ground_region')
+            elif np.min(normals@self.vectors[i]) < -NORMAL_TOL:
                 row=dict(clear=False,reason='contact_normal_blocks_withdrawal')
             else:
                 if heads is None: heads=self.heads(contact)

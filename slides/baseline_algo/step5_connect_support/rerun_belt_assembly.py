@@ -6,4 +6,4 @@ import sys
 from step3_scheculer.batch_cases import main
 
 if __name__ == '__main__':
-    sys.exit(main(first=5, last=5, budget=24))
+    sys.exit(main(first=5, last=6, budget=24))

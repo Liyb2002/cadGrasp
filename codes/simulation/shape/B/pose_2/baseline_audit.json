@@ -1,0 +1,69 @@
+{
+  "object": "B",
+  "pose": "pose_2",
+  "complete": true,
+  "passed": true,
+  "design_passed": true,
+  "design_status": "fixed_base_support_verified",
+  "checks": {
+    "selected_heads_retained": true,
+    "direction_constraints_recomputed": true,
+    "exact_original_head_cells_retained": true,
+    "actual_head_collision_witnesses_replayed": 0,
+    "belt_connected": true,
+    "loose_frame_clearance_and_sweep_verified": true,
+    "noncontact_clearance_verified": true,
+    "full_translation_ray_checked": true,
+    "millimetre_stl_checked": true,
+    "continuous_rigid_trajectory": true,
+    "sampled_bearing": {
+      "load_count": 32769,
+      "maximum_body_equilibrium_residual_conditioned": 4.947153797729698e-13,
+      "minimum_reaction_coefficient_mg": 1.577304966256731e-08,
+      "every_workpiece_and_support_checked": true
+    },
+    "continuous_bearing": {
+      "load_count": 37441,
+      "maximum_body_equilibrium_residual_conditioned": 3.090860900556436e-13,
+      "minimum_reaction_coefficient_mg": 2.175556571006699e-07,
+      "every_workpiece_and_support_checked": true
+    },
+    "one_solid": true,
+    "actual_open_ring_hull_verified": true,
+    "contact_interfaces_preserved": true,
+    "exported_stl_checked": true
+  },
+  "evidence_audit_is_not_design_success": true,
+  "provenance": {
+    "inputs": {
+      "slides/baseline_algo/output/B/pose_2/step6_connect_support/connection.json": "9ba9bbc9d167b38d4cf3f9390ca11b6b5a1d826f56d14e61a898fbb5f5968d05"
+    },
+    "code": {
+      "slides/baseline_algo/step2_local_support/insertion.py": "5e1d565c3f535cdfe25d35ba782332434373f6307c06a92bfdfb3af932060b10",
+      "slides/obj_supp/insert_trajectory/angles.py": "dfaae414bd6cdd122398d5bd16dedb2a2ca62d2f69d86c70efd1974b72febf63",
+      "slides/baseline_algo/step2_local_support/geometry.py": "b6693a72556863bc642e805fca528e8f0b56644fc14dafa1cef38bee7ff02900",
+      "slides/baseline_algo/step2_local_support/surface.py": "98d1d821af445ecd442d96d0d6a3064538da84ab0a2335bb0c1f6fc09ac03b6a",
+      "slides/baseline_algo/step3_scheculer/contacts.py": "5366815d66b134ddee266ef6fa59fa82c171b2ecb1a90f281dd15e47778f1a49",
+      "slides/baseline_algo/step5_connect_support/whole_assembly.py": "ebe5ace176a17bb02d6d1ecb48209f06979ab3fad826bf24cd4cac46619a3579",
+      "slides/baseline_algo/step5_connect_support/belt_geometry.py": "8d749768bee3d69250dbdfe13e1ef46730c0bb427723faf476e9e7a48eba60d1",
+      "slides/baseline_algo/step5_connect_support/rigid_path.py": "c1d286039b84a094baeb809ee3e10ee97597a505dfcd44e60264bbb64eebf003",
+      "slides/baseline_algo/step5_connect_support/solids.py": "9861d1189fdf8e78abafc3025acbd4f1e4cbd1719ac20dab763734405324ecd3",
+      "slides/baseline_algo/step5_connect_support/visual_details.py": "678d05e1b59ab9663f0097aa28b25db08b25bf3640e1a2a8aa89f68e5d3616a7",
+      "slides/baseline_algo/step5_connect_support/surface_check.py": "4722e593b49678e82a73dfd56ac906febbc0aa49dc4cd1286ff6ed27724ca0ab",
+      "slides/baseline_algo/step4_floor_contact/whole_assembly.py": "82cf142232ef2a6a6689a31e4fb370ee4cc294ebf41a145985ef8e000b7e92bf",
+      "slides/baseline_algo/step4_floor_contact/equilibrium.py": "b0d045c299d9880b0a50194bdea1224150934401bfd017a4137ef8109c56b47f",
+      "slides/baseline_algo/step5_connect_support/floor_design.py": "4466041cd8a5d62b4cab0ca0070dc5e6dcfbc5484c48389ea4a521b7411345eb",
+      "slides/baseline_algo/step5_connect_support/piecewise_path.py": "ac87984d290627accf7c4e7cdf2f8d8f4c47a4813d8a645b49aa0539fd653e5f",
+      "slides/baseline_algo/step5_connect_support/video.py": "45cdc45a5356615db49568ed7ba2bcc21d8c20d00d7b2095cd79d7cf7b120830",
+      "slides/baseline_algo/step6_connect_support/direction_first.py": "7fb585b7cad5aefe7c80c376e898e358a8b748078f5df3ac853314a933de367a",
+      "slides/baseline_algo/step5_connect_support/failure_visuals.py": "70993269e4f15def0e37c3ac3b264330835629094dc531b114908123ee45056b",
+      "slides/baseline_algo/step5_connect_support/ground.py": "00168711f9a9244b13c6d5d753abebb27d449325b0cdb0720f56f0af67e0e436",
+      "slides/baseline_algo/step5_connect_support/ring.py": "82c0247d696bf452f9a4c7d4b30afcb68e8cce8662e4311572042b76530bc2f2",
+      "slides/baseline_algo/step5_connect_support/routing.py": "14515ecf7e69e0276e16cc8ccd0dccc56d9a28b7d679bae8eef42c42e2f07d0f",
+      "slides/baseline_algo/step5_base/base.py": "0ac99c60b0a7ec84dcd18bbe573dd6bec1ee1ca61d975961c19cb66ce7928420",
+      "slides/baseline_algo/step5_base/bearing.py": "01f773152bb382816c25864f0347e97a7fa8f230758179daf815072d496c5831",
+      "slides/baseline_algo/step6_connect_support/belt_assembly.py": "08ac8812b126fdffb20671814c69878358ab97d04d53fef8a412514517d87da6",
+      "slides/baseline_algo/step5_connect_support/failure_viewer.html": "39891ab4a956011d41c940c489940941b48dff6446463d211f66789d6e29a54a"
+    }
+  }
+}

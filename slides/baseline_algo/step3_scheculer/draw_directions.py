@@ -9,22 +9,27 @@ import matplotlib.pyplot as plt
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from step1.cases import selected_pose,pose_name
 from step3_scheculer import contacts as I
+from step3_scheculer import paths as PTH
 from step2_local_support import withdrawal as W
 
 
 def run(name):
     out=I.OUTPUTS/name/pose_name()/'step3_scheculer'
+    schedule=I.check_report(out/'schedule.json') if (out/'schedule.json').exists() else None
+    with PTH.trajectory(schedule.get('selected_trajectory') if schedule else None), PTH.round_owners(schedule.get('round_trajectories',{}) if schedule else {}):
+        stage=PTH.stage_folder(name,'step3.3_optimize_contact')
+        records=([PTH.folder(name,'step3.3_optimize_contact',r['round'])/'insertion_directions.json' for r in schedule['rounds']]
+                 if schedule else sorted(stage.glob('round_*/insertion_directions.json')))
     source=out/'insertion_directions.json'
     partial=not source.exists()
     if partial:
-        records=sorted(out.parent.glob('step3.3_optimize_contact/round_*/insertion_directions.json'))
         if not records: raise RuntimeError('No optimized direction record is available')
         source=records[-1]
     result=I.check_report(source);cat=result['direction_catalogue']
     vectors=np.asarray(cat['vectors']);azimuth=np.rad2deg(np.arctan2(vectors[:,2],vectors[:,0]));elevation=np.rad2deg(np.arcsin(np.clip(vectors[:,1],-1,1)))
     states=[('Work-face + floor locks',cat['global_allowed_directions'])]
     sources=[source]
-    for path in sorted(out.parent.glob('step3.3_optimize_contact/round_*/insertion_directions.json')):
+    for path in records:
         r=I.check_report(path);sources.append(path)
         states.append((f"Round {r['round']}: + {r['selected_ids'][-1]}",r['common_directions']))
     all_states=states
@@ -53,6 +58,7 @@ def run(name):
         artifacts={'withdrawal_directions.png':I.sha256(out/'withdrawal_directions.png')}))
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('objects', nargs='*', default=['A1-f', 'B', 'C5']);parser.add_argument('--pose',default=None);args=parser.parse_args()
+    from step1.registry import active_objects
+    parser=argparse.ArgumentParser();parser.add_argument('objects', nargs='*', default=active_objects());parser.add_argument('--pose',default=None);args=parser.parse_args()
     with selected_pose(args.pose):
         for name in args.objects: run(name)
