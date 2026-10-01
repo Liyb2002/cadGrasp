@@ -52,4 +52,4 @@ python slides/baseline_algo/step3_scheculer/rerun_common_directions.py \
 python slides/baseline_algo/step3_scheculer/run_all.py B --pose pose_2 --from-step 6
 ```
 
-原 `step5_connect_support/` 保留共享几何、力学、绘图工具和兼容入口；其中旧案例输出是历史结果，当前完整结果应读 Step6。`simultation/shape/` 的既有数据包也是之前导出的快照，不会被 baseline 重跑隐式覆盖。
+原 `step4_connect_support/` 保留共享几何、力学、绘图工具和兼容入口；其中旧案例输出是历史结果，当前完整结果应读 Step6。`simultation/shape/` 的既有数据包也是之前导出的快照，不会被 baseline 重跑隐式覆盖。

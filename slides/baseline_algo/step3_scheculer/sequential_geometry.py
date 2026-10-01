@@ -32,11 +32,13 @@ def local_group(geometry, entries):
 
 
 class SequentialGeometry:
-    def __init__(self, problems, count=200):
+    def __init__(self, problems, count=200, *, global_head_exclusions=False):
         self.problems, self.count = problems, count
+        self.global_head_exclusions = global_head_exclusions
         # PairGeometry's constructor/make support a single task. Its pair-only
         # group_check is deliberately replaced by local_group above.
-        self.local = [PairGeometry([p], count=count) for p in problems]
+        self.local = [PairGeometry([p], count=count,
+            head_exclusion_problems=problems if global_head_exclusions else None) for p in problems]
         frames = [np.asarray(p.domain.data['frame']['T_world_mesh']) for p in problems]
         self.transforms = [[b@np.linalg.inv(a) for b in frames] for a in frames]
         self.cache = {}
@@ -144,6 +146,39 @@ class SequentialGeometry:
                 return True
         return False
 
+    def all_pose_head_check(self, entries):
+        """Recheck ALL selected solids in ALL poses, including inactive heads.
+
+        This checks original contact patches and actual owner solids. It does
+        not require an inactive head to supply force or have its own insertion
+        witness in every task. Foot feasibility and whole-body paths are separate.
+        """
+        rows = []
+        for entry in entries:
+            owner = entry['owner_task']
+            contact = entry['contact']
+            geometry = self.local[owner]
+            polygons = {int(f): contact['triangles_m'][contact['source_faces'] == f, 1]
+                        for f in np.unique(contact['source_faces'])}
+            points = np.concatenate([G.head_cell(geometry.mesh, polygon, f, geometry.clearance.offsets)
+                                     for f, polygon in polygons.items()])
+            for task, problem in enumerate(self.problems):
+                transform = self.transforms[owner][task]
+                surface = contact['triangles_m']@transform[:3, :3].T+transform[:3, 3]
+                solid = points@transform[:3, :3].T+transform[:3, 3]
+                overlap = np.intersect1d(contact['source_faces'], problem.domain.work_ids)
+                minimum_surface = float(surface[:, :, 2].min())
+                minimum_solid = float(solid[:, 2].min())
+                tol = self.local[task].scale*1e-10
+                passed = not len(overlap) and minimum_surface >= S.FLOOR_CLEARANCE_M-tol and minimum_solid >= -tol
+                rows.append(dict(candidate_id=contact['candidate_id'], pose=problem.pose,
+                    active=task in entry['active_tasks'], passed=bool(passed),
+                    overlapping_work_faces=overlap.tolist(), minimum_contact_height_m=minimum_surface,
+                    minimum_head_height_m=minimum_solid))
+        return dict(passed=all(row['passed'] for row in rows), per_head_pose=rows,
+            contact_floor_clearance_m=S.FLOOR_CLEARANCE_M, inactive_heads_included=True,
+            scope='All selected contact surfaces and owner solids in every supplied pose; feet and connectors absent')
+
     def save(self, folder, save):
         folder = Path(folder)
         folder.mkdir(parents=True, exist_ok=True)
@@ -152,6 +187,8 @@ class SequentialGeometry:
             I.save_contacts(arrays, [e['contact'] for e in pool if len(e['contact']['triangles_m'])])
             save(folder/f'candidates_{problem.pose}.json', dict(pose=problem.pose, count=self.count,
                 coordinate_frame='this task world frame', area_fraction=P.AREA_FRACTION,
+                global_head_exclusions=self.global_head_exclusions,
+                excluded_work_and_floor_poses=geometry.head_exclusion_poses,
                 area_relative_tolerance=P.AREA_REL_TOL, direction_catalogue=geometry.catalogues[0],
                 path_roadmap=geometry.paths.record,
                 candidates=[dict(id=e['contact']['candidate_id'], valid=e['valid'], reason=e['reason'],

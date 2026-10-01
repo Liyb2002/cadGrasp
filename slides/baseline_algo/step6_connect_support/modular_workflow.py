@@ -12,7 +12,7 @@ from PIL import ImageDraw
 from step1.needs import OUTPUTS,sha256
 from step1.cases import pose_name
 from step3_scheculer import contacts as I
-from step5_connect_support import whole_assembly as A,solids as S,visual_details as V,video
+from step4_connect_support import whole_assembly as A,solids as S,visual_details as V,video
 from step5_base import modular as BASE,rectangular_dock as J
 
 SCHEMA='staged_contact_module_stationary_dock_v1'

@@ -18,7 +18,7 @@ OUTPUTS = HERE / 'output'
 from step1.registry import active_cases
 CASES = active_cases()
 STAGES = {1: 'step_1_needs', 2: 'step2_local_support', 3: 'step3_scheculer',
-          4: 'step4_floor_contact', 5: 'step5_base', 6: 'step6_connect_support'}
+          4: 'step0_pose_selection', 5: 'step5_base', 6: 'step6_connect_support'}
 REPORTS = {1: 'needs.json', 2: 'circles.json', 3: 'schedule.json',
            4: 'floor_contact.json', 5: 'base.json', 6: 'connection.json'}
 
@@ -143,7 +143,7 @@ def run_case(case, first, last, resume=False, connection_edge_budget=2000,
     log = folder / 'batch_run.log'
     if first >= 5 and not read(stage_folder(case, 3) / 'status.json').get('complete'):
         record.update(skipped=True, reason='Step3 incomplete')
-        command=[sys.executable,str(HERE/'step5_connect_support/failure_visuals.py'),case[0],'--pose',case[1],'--static-only']
+        command=[sys.executable,str(HERE/'step4_connect_support/failure_visuals.py'),case[0],'--pose',case[1],'--static-only']
         with log.open('w') as stream:
             stream.write('Step3 incomplete; render the saved partial geometry only.\n');stream.flush()
             diagnostic=subprocess.run(command,stdout=stream,stderr=subprocess.STDOUT)
@@ -199,7 +199,7 @@ def run_case(case, first, last, resume=False, connection_edge_budget=2000,
         if last==6 and first<=3 and result.returncode not in (0,2) and schedule_state and not schedule_state.get('complete'):
             floor_command=[sys.executable,str(HERE/'step3_scheculer/run_all.py'),case[0],'--pose',case[1],
                            '--from-step','4','--through-step','4']
-            diagnostic_command=[sys.executable,str(HERE/'step5_connect_support/failure_visuals.py'),
+            diagnostic_command=[sys.executable,str(HERE/'step4_connect_support/failure_visuals.py'),
                                 case[0],'--pose',case[1],'--static-only']
             with log.open('a') as stream:
                 stream.write('\nStep3 incomplete: save independent floor demand and inspectable partial heads.\n');stream.flush()

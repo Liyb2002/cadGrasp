@@ -33,5 +33,5 @@ slides/**/*.log
 !slides/**/fixtures/*.json
 !slides/**/fixtures/*.npz
 
-# Fixed parameters for the reproducible local-body specimen
-!slides/baseline_algo/step5_connect_support/local_body_case.json
+# Provenance for the explicitly requested Step5 method archive
+!slides/baseline_algo/step5_connect_support/archive/*/manifest.json

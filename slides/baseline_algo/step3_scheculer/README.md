@@ -1,10 +1,168 @@
-# Step3：固定 1% 选头，终止时尝试小幅补全
+2026-09-29 当前修改：**各 pose 仍独立选头、独立受力和退出，但增加整组地面余量筛选。** 头的构造输入按零厚度接触面表示；其全部有限三角面顶点变换到组内每个 pose 后，最低地面高度必须至少为 **2 mm**（数值容差 `1e-10 m`，恰好 2 mm 通过）。平面高度是仿射函数，因此检查全部三角形顶点等价于检查完整面，不使用中心点替代。只筛选原来的 200 个候选，不重定位、裁小或扩大头，不添加跨 pose 的受力、退出或工作面限制。
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 \
+  /Users/yuanboli/miniforge3/envs/cadgrasp/bin/python \
+  slides/baseline_algo/step3_scheculer/run_independent.py B \
+  --poses pose_3 pose_6 --floor-poses pose_3 pose_6 --floor-clearance-mm 2 \
+  --output-root slides/baseline_algo/output/B/pose3+6/step3_scheculer/independent_poses_floor2mm \
+  --jobs 1
+```
+
+每组独立结果根目录必须显式指定，避免同一个 pose 在不同组错误复用未筛选的旧结果。新 schema 为 `independent_single_pose_floor_margin_v1`；主报告及候选表都保存整组 pose、原始输入哈希、2 mm 条件和每个头的逐 pose 最低高度。最终验收重新计算选中面。保留全部 32,768 原始载荷、1% 接触面积、200 候选、3–4 个头及最多十条链。
+
+本地退出和细路径暂时继续用原有限厚度头作**保守探测**；零厚度直接送入旧实体凸包会退化。`normal_depth_m` / `local_geometry_probe_depth_m` 记录这个探测体厚度，**不再要求 Step4 保留这个旧实体体积**；`head_model=zero_thickness_contact_surface` / `construction_thickness_m=0` 明确新构造输入。Step4 从这些完整接触面造实际有体积的连接支架，并重新检查全部真实材料。2 mm 面筛选只修复头部地面余量，不能保证任意连接体、退出或受力通过。组模式不重建用户已删除的单 pose `heads.png`。
+
+以下为被当前修改替代的独立求解与固定配准记录。
+
+2026-09-29 历史独立入口：`run_independent.py B --jobs 2` 默认覆盖 B 的全部 20 个 pose；没有 `--floor-poses` 的旧模式不施加整组地面筛选，结果位于 `output/B/independent_poses/pose_<i>/`。
+
+独立结果只认证本 pose 的头和受力，不认证 Step4 连接实体。Step4 需要确定物体与共享支撑在不同 pose 下的相对摆放，然后检查闲置材料的真实位置。不能把闲置头通过物体坐标变换重新贴到物体上，也不能拿下面旧固定配准结果判断新方案。旧 Step0 的跨 pose 地面检查不是本次独立求解的前置条件。
+
+全部 20 个 B pose 已跑完：18 个达到 32,768/32,768；pose2 为 31,533/32,768，pose20 为 32,551/32,768，两者用完十条链，保留四头的最好结果。[完整表](../output/B/independent_poses/report.md)。这不是 Step4 完整实体的通过结果；独立头的后续连接入口见 [Step4](../step4_connect_support/README.md)。
+
+以下为已被替代的固定配准实验记录。
+
+2026-09-29 历史入口：先运行 `../run_sequential_batch.py B --n 3` 的 Step0，随机试不同组合直到地面需求全部合法。Step0 通过后才发布 Step1 并准备 Step2 候选；该入口仍保留用于复现旧实验。
+
+2026-09-29 退出检查修正：每增加一个物理头，检查它在**所有 pose** 下的完整直线退出，并与此前保留下来的方向集合求交；包含闲置头和还未开始求解的 pose。任意 pose 的方向集合为空就拒绝候选，不进入覆盖评分。切换 pose、选择共享头时也继承方向集合，只有新搜索链才重新初始化。结束时独立重放全部已选头的整组退出，把实际保留的方向交给 Step4；连接体、地脚仍在 Step4 构造并检查。方向目录依旧是现有有限水平方向，不能把搜索失败称为任意运动下无解。
+
+同一批从 Step3 重跑：`../run_sequential_batch.py B --from-step 3 --seed 20260929 --jobs 2`。复用保存的 Step0–2 输入和精确候选曲面；旧 Step2 未保存的方向／路径证书在内存中重算，不生成新候选、不修改候选文件。只替换现有八组的 Step3/4 输出，不创建历史归档。当前共享 Step0 缓存已删除，因此输入引用经哈希核对后指向各组原有 Step1；本轮汇总放最后一组的 `step4/data/batch_report.md`。
+
+本轮八组已完成：**pose3+6 用 6 个头全覆盖，并在 Step4 构造连接实体（258.579 cm³；后续 Step4 完整退出通过，但联合载荷验收失败）**；其余七组在十条链内未全覆盖。全部选中头组在所有 pose 的退出均通过独立重放；265 次加头的方向继承记录已复核，36 项相关测试通过。[八组结果和图片](../output/B/pose2+9+13+15+17/step4/data/batch_report.md)。
+
+# Step3：逐 pose 求解，选一个最佳已有头，再补当前 pose
+
+最新用户决定（2026-09-28）：baseline 使用 [run_sequential_k.py](run_sequential_k.py)。先求第一个 pose；后续 pose 从此前**所有已选物理头**中，选择对当前 pose 单头覆盖增量最大的合法头，再添加当前 pose 自己的头。每个 pose 优先用 3 个头，未全覆盖则补第 4 个；共享头计入后续 pose 的 3–4 个总数。每个 pose 满足全部 32,768 个原始样本后才进入下一个，先前头组和几何保持不变。每头固定面积 1%，不改尺寸或末尾扩展。每组最多十条独立 top5 搜索链，第一条全任务通过即停止。
+
+最新几何修正：**每个头都必须避开所有输入 pose 的工作面和地面，不论它在哪些 pose 参与受力。** 候选生成先扣除工作面并集，并将接触曲面裁到所有地面以上 1.5 mm；固定 1% 面积拟合后，再用原始来源头实体检查所有地面。不能在某个 pose 把头设为 inactive 来豁免这些条件。最终 `geometry.all_pose_head_check` 重查每个选中头与每个 pose，记录工作面交集、接触面最低高度和实体最低高度。各有效组的插入／基本路径、覆盖评分不变；不要求每个头都贡献每个 pose，完整支架装卸与落脚可行性仍由 Step5 处理。
+
+新结果使用 `sequential_k_global/from_<顺序>/`，原 `sequential_k/` 保存为历史。当前重跑命令如下，只处理仍保留的四组新结果，不恢复已删除的组合，也不覆盖旧 pose1+3 做图结果：
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MPLCONFIGDIR=/tmp/cadgrasp-mpl-head-previews \
+  /Users/yuanboli/miniforge3/envs/cadgrasp/bin/python \
+  slides/baseline_algo/run_sequential_batch.py B --existing-groups --workers 2
+```
+
+当前评分只看正在求解的 pose 的原始载荷覆盖增量。每轮按增量取 top5，并按增量归一化抽样；零增量均匀抽样。共享头选择比较单头与原工件地面支点的增量，并按 ID 打破并列；不只比较紧邻前一 pose 的头。一个已有头可以被多个后续 pose 依次选中，但每个新 pose 只继承一个旧头。
+
+此前批量入口随机选六个组合，组合种子 `20260928` 得到：`8+10`、`6+7`、`6+9+10`、`1+9+10`、`4+5+6+8`、`5+7+8+9`。每组按数字升序求解，每任务 200 个候选；不根据结果更换抽中的组合。原始输出在各阶段的 `sequential_k/from_<顺序>/`。下述六组数据尚未使用所有 pose 的头部排除规则；新版本不复用这些候选和成功状态。
+
+```sh
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
+  /Users/yuanboli/miniforge3/envs/cadgrasp/bin/python \
+  slides/baseline_algo/run_sequential_batch.py B --seed 20260928
+```
+
+Step5 已支持 N 组接触的唯一物理头配准、所有有序地面对检查、最近合法地面身体和多 pose 展示。前置条件失败会保留诊断和明确失败状态，不输出虚构实体；默认仍关闭最终完整受力／退出审计。顺序搜索、多 pose 共享实体与原回归共 49 项测试通过。用户保存的 `slides/co_design_algo/` 副本只读，未修改。
+
+### 全 pose 头部排除后的四组重跑（2026-09-28）
+
+四组均已处理到 Step5 入口，批量运行约 451 秒。所有已选头都通过全部 pose 的工作面／地面检查；3/4 组完成 Step3 全覆盖，0/4 组生成完整支架。
+
+| pose 组合 | 不同头数 | 各 pose 有效头数 | 搜索链数 | Step3 | Step5 |
+| --- | ---: | --- | ---: | --- | --- |
+| 1+9+10 | 8 | 3、4、3 | 1 | 全覆盖 | 固定配准落脚条件失败 |
+| 4+5+6+8 | 10 | 3、3、4、3 | 2 | 全覆盖 | 固定配准落脚条件失败 |
+| 5+7+8+9 | 11 | 3、3、4、4 | 10 | pose9 为 32379/32768，其余全覆盖 | 接触输入未完成 |
+| 6+9+10 | 9 | 4、4、3 | 4 | 全覆盖 | 固定配准落脚条件失败 |
+
+三组完整接触方案的地面冲突数量与旧运行完全一致：固定摆放下，脚位限制和整件地面需求并不随头的选择改变。新增检查修复了头本身占用其他工作面／穿地的问题，但不代表脚和连接结构也能实现。第四组只是在十链、每 pose 至多四头的搜索预算内未成功，不能据此证明不存在其他头组合。
+
+86 项相关回归通过。独立复查了 135 个头／pose 组合、458752 个保存覆盖标记和 24 个原始地面对条件，旧头图保留，co-design 副本的 9764 个文件未改变。当前[批量结果](../output/B/pose6+9+10/step4/data/batch_summary.json)、[总图](../output/B/pose6+9+10/step4/data/batch.png)、[独立复查](../output/B/pose6+9+10/step4/data/global_head_review.json)在最后一组的 Step5 data 内。每组外层的 `heads.png` 和 `head_details.png` 已更新为新选头。
+
+### 历史六组结果：仅检查有效任务的头（2026-09-28）
+
+六组均已处理到 Step5 入口。**5/6 组完成全部 pose 的 Step3 覆盖；0/6 组生成完整实体。** 通过的每个 pose 都是原始 `32768/32768`；Step5 的五次拒绝均来自固定共享头配准下的地面需求冲突。本批没有进入身体增长，也未运行最终完整实体审计，不能把这些接触解称为完整支撑。
+
+| 依次求解的 pose | 不同头数 | 各 pose 有效头数 | 搜索链数 | Step3 | Step5 |
+| --- | ---: | --- | ---: | --- | --- |
+| 8 → 10 | 6 | 3、4 | 10 | 未全覆盖：32768、23446 | 接触输入未完成 |
+| 6 → 7 | 6 | 4、3 | 5 | 全覆盖 | 固定配准地面冲突 |
+| 6 → 9 → 10 | 9 | 4、4、3 | 1 | 全覆盖 | 固定配准地面冲突 |
+| 1 → 9 → 10 | 8 | 3、4、3 | 1 | 全覆盖 | 固定配准地面冲突 |
+| 4 → 5 → 6 → 8 | 9 | 3、3、3、3 | 2 | 全覆盖 | 固定配准地面冲突 |
+| 5 → 7 → 8 → 9 | 12 | 4、3、4、4 | 1 | 全覆盖 | 固定配准地面冲突 |
+
+[六组图](../output/B/pose5+7+8+9/step4/data/batch.png)仅显示选中的接触与失败状态，没有身体或脚。[批量记录](../output/B/pose5+7+8+9/step4/data/batch_summary.json)和同目录 `review_check.json` 区分每一阶段并绑定实际来源哈希。Step3 导出时已从零重算原始覆盖 mask，作独立 LP 抽查；另外重放所有链的共享头选择、top5 随机数、固定接触几何和 Step5 有序地面对证据。
+
+## 历史：所有 pose 同时选头
+
+2026-09-28 最新范围：用户已停止十任务搜索并要求删除其整个输出目录；十任务记录和下文提到的该组验证文件已一并删除，不再自动重跑。当前指定组为 **pose1+3+4+6**，其旧六头预算试跑尚未通过：覆盖数为 **4,782 / 3,154 / 32,768 / 32,768**。该组 Step5 已运行构造前置检查，固定共享接触配准后的地面条件也未通过，未生成实体；见该组 `step4/data/report.json`。旧配对 Step5 图保持不动。
+
+2026-09-28 当前入口为 [run_joint.py](run_joint.py)。取消先为第一个 pose 选三头、再强制共享一个并补两个的顺序；从第一轮同时计算所有输入 pose。每个 pose 的头数、总头数和共享数量由搜索产生。旧入口和结果保留为历史对照，下面的 3+2、逐轮尺寸优化、末尾扩展规则不适用于当前入口。
+
+不指定 pose 时，默认读取 `objects/<object>/tasks.json` 的全部任务共同搜索；`--all-poses` 显式表达同一行为。`--poses` 可指定一个任务子集，只有显式使用 `--pairs` 才运行抽样双任务实验。B 当前注册了 pose_1～pose_10，因此全任务运行是一次十任务搜索，不是五次双任务搜索。
+
+当前已选状态记为 S，任务 k 的原始载荷覆盖率为 c_k；加入候选 h 后的新增覆盖比例为 delta_k，分母仍是该任务的全部 32,768 个原始样本。评分为：
+
+```text
+value(h | S) = mean_k((1 - c_k) * delta_k)
+```
+
+例如覆盖 80% 的任务新增 10 个百分点，贡献为 `0.2 * 0.1 = 0.02`；覆盖 20% 的任务增加相同覆盖，贡献为 `0.8 * 0.1 = 0.08`。未覆盖比例作乘法权重，不作分母。它是即时启发式，柔性照顾落后任务；不保证优先推进每一个瓶颈、最少头数或未来成功。
+
+- 每任务生成 200 个固定为工件总面积 1% 的候选，合并为公共池。每个候选保留来源任务的真实接触曲面与头实体；跨 pose 只作刚性变换，不重新挤出另一实体。
+- 每轮分别检查候选加入各任务现有头组后的局部几何、共同水平退出方向和基本路径。将该头加入所有兼容任务；不兼容的任务保持原头组。允许候选只贡献一个任务，不要求它在所有任务均为合法有效接触。已经选中的头和任务分配保持不变；这个“全部兼容任务启用”的规则尚不枚举其他任务子集。
+- 每任务对加入后的整组接触重新求反力，沿用原地面接触与共享不上抬约束。delta_k 是整组覆盖的增量，不能相加各头独立覆盖。所有任务每个原始样本通过才成功，不增加纯重力门槛或连续验证。
+- 默认十条独立链，每轮按新的 value 取 top5，并以同一 value 归一化抽样；全部为零时均匀抽样。并列按候选 ID 排序。每轮权重更新，已全覆盖任务权重为零。
+- 默认四个独立进程分担候选评分，主进程统一排序和抽样，`--workers 1` 可串行运行。只增加接触时，旧反力见证可令新头反力为零而保留，因此使用原分类器的 `known_covered` 接口复用已覆盖样本；已经全覆盖的任务不重复求候选 LP。导出时仍用全部原始载荷从零重算覆盖 mask 并作独立 LP 抽查。
+- 完成空集合的全候选评估后，缓存实际候选及各 pose 的单头方向／路径分量集合，后续组合法性仍重新求交；缓存绑定输入、几何代码和候选文件哈希。首轮力学评分另外绑定评分代码哈希，各链可复用同一空状态评分，但使用自己的随机数。任何依赖变化会使对应缓存失效。
+- 只增加头：不删除、不替换、不改尺寸，末尾也不扩展。没有每 pose 或总头数的固定目标。不能重复选择已有中心，因此有限候选耗尽会终止；`--max-heads` 可设置总计算预算，预算停止不代表无解。
+- Step3 只输出有效接触集合。闲置实体冲突、共享支撑摆放、身体、地脚和完整装卸保留到 Step5。Step4 沿用原载荷的地面需求计算。现有 Step5 仍读取历史 3+2 数据，不能把新结果直接当作完整实体或已适配的新 Step5 输入。
+
+```sh
+# 全部已注册 pose 一起搜索；B 为十任务，无头数上限
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
+  /Users/yuanboli/miniforge3/envs/cadgrasp/bin/python \
+  slides/baseline_algo/step3_scheculer/run_joint.py B --all-poses
+
+# 两个 pose 同时搜索；默认十条链，每任务 200 个候选，无固定头数
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
+  /Users/yuanboli/miniforge3/envs/cadgrasp/bin/python \
+  slides/baseline_algo/step3_scheculer/run_joint.py B --poses pose_1 pose_3
+
+# 相同入口支持四个 pose 子集，同样不限制头数
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
+  /Users/yuanboli/miniforge3/envs/cadgrasp/bin/python \
+  slides/baseline_algo/step3_scheculer/run_joint.py B --poses pose_1 pose_3 pose_4 pose_6
+```
+
+结果位于 `output/B/pose1+3/step3_scheculer/joint_weighted/` 等目录；四任务为 `pose1+3+4+6/`，数字排序，输入顺序不指定搜索先后。各链记录逐轮所有候选的各 pose 增量、未覆盖权重、value、top5 概率、随机数、激活任务和几何筛选原因，以及最终接触 NPZ 与原始样本 mask。导出接触后重算全部 mask 并作独立 LP 抽查。顶层 `schedule.json` 记录实际参数、各任务头 ID、候选来源与头深度；`complete` 仅表示运行完成，设计是否成功看 `result.passed`。Step4 生成 `joint_result.json` 和 `joint_overview.png`，不修改旧实验或 Step5。
+
+### 2026-09-28 实现验证
+
+加入原始样本的精确剩余候选池失败证明和 `--resume` 后，相关测试合计 **63 项通过**。断点恢复绑定输入、候选、参数和代码，重放随机数并复核已保存前缀；失败证明只针对冻结的当前前缀，不表示其他选择也无解。
+
+加入覆盖证明复用与准备缓存后共 **58 项相关测试通过**，包括已完成任务免重算、缓存曲面的刚性变换与方向／路径求交、输入／候选／几何代码变化时拒绝缓存、力学代码变化时禁用旧评分。另对正式十任务运行保留的前两轮，重放全部 4,000 个候选的十任务几何判断，结果一致；八个第二轮候选的四进程评分与原串行十任务覆盖数和 value 一致。保留的原运行记录及代码哈希位于十任务 Step3 的 `joint_weighted/history/before_coverage_reuse/`。
+
+正式加速运行还逐项复现了前两轮全部 4,000 条候选记录的各 pose 覆盖数、value、top5 概率与抽样结果。对应文件哈希与核对结论保存在十任务 Step4 的 `joint_weighted/coverage_reuse_equivalence.json`；测试日志为同目录 `implementation_tests.log`。
+
+全任务入口更新后共 **54 项相关测试通过**。新增测试确认默认入口一次传入全部十个任务、没有头数上限，只有显式 `--pairs` 才抽样配对；另以必须选十个不同头才能覆盖的十任务案例确认选头不会在三头或五头处停止。`progress.json` 逐轮保存当前链、头数与所有任务覆盖数；多任务结果图自动换行。
+
+同日代码复核后共 **50 项测试通过**，补充五任务真实 LP／共享不上抬、三任务完整运行与导出、重跑失败状态回归。修复了同目录重跑在初始化时失败仍可能留下旧 `complete=true` 报告的问题：CLI 在加载输入前将本次 Step3/4 报告标为未完成、旧检查标为未复核；只有本次完成后才发布完成报告，旧数据文件不作为新运行的通过证据。候选文件改在运行开始后导出，单独创建求解器不再替换既有候选文件。
+
+对下表保存结果另行重放全部 22 轮的评分、top5 概率与随机选择，重新计算 262,144 条最终载荷分类并作独立 LP 抽查；逐接触核对来源曲面的刚性变换、原半径和只增前缀，全部一致。记录为各组 Step4 的 `joint_weighted/review_check.json`，绑定原 `schedule.json` 哈希。本次没有重新搜索；保存结果继续保留状态管理修复前的原代码哈希，不能改写成新搜索结果。共享头实体的跨任务扫掠逻辑未在这次复核中改变，完整支撑仍不属于 Step3 验证范围。
+
+47 项针对性测试通过，包含五任务动态头数／共享分配、剩余比例乘法权重、top5 排名与概率、权重更新、零增益互补、有限池终止、固定尺寸与新增前缀、原输入复用，以及旧 sequential/pair/terminal-expansion 回归。
+
+用原始 32,768 载荷完成两次小规模端到端试跑，种子均为 `20260926`；这是接口与规则验证，不是默认 200 候选／十链的成功率实验：
+
+| 输入 pose | 每任务候选数 | 链数 | 总头数预算 | 最佳链覆盖数 | 结果 |
+|---|---:|---:|---:|---|---|
+| 1、6 | 24 | 2 | 8 | 9,434 / 32,768；32,768 / 32,768 | 两链均预算耗尽 |
+| 1、3、4、6 | 12 | 1 | 6 | 4,782；3,154；32,768；32,768（各自总数 32,768） | 预算耗尽 |
+
+两次均已重算导出接触的完整样本 mask、独立 LP 抽查和 Step4 方程；另重放全部 22 个选头轮次的 value／概率、检查只增前缀、输入原字节与来源／输出哈希。记录在各组 `step0_pose_selection/joint_weighted/joint_check.json`，图为同目录 `joint_overview.png`。检查通过不等于设计通过，本次真实数据试跑尚无所有 pose 全覆盖的组合。
+
+## 历史：顺序式及双任务共同头组实验
 
 2026-09-26 目录整理：配对现在直接位于 `output/B/pose1+3/`、`pose1+4/`、`pose1+6/`、`pose2+8/`、`pose6+9/`，下一层为阶段目录。Step1 输入分别位于每对的 `step_1_needs/pose_<i>/`；顺序式结果为 `step3_scheculer/sequential_3plus2/from_<first_pose>/terminal_expansion/`。配对目录按数字排序，`from_*` 保留先求哪个 pose 的区别。全部既有实验已迁移并更新引用，没有重跑搜索或改变载荷。
 
 <a id="sequential-3plus2"></a>
 
-## 最新实验：先 pose1 三头，再共享一个、为 pose2 补两个
+## 历史实验：先 pose1 三头，再共享一个、为 pose2 补两个
 
 2026-09-26 用户指定直接 hardcode 顺序算法，入口为 [run_sequential.py](run_sequential.py)。先运行十条独立 pose1 particle，各用 top5 增量加权采样选三个头；在每条可继续的三头链内，选出对 pose2 单独覆盖增量最大的几何合法头，再为 pose2 用同样的 top5 规则增加两个新头。零增量 top5 均匀抽样，共享头并列按 ID 决定。每个完整组合恰好五个不同中心，两套接触三元组只共享一个头。
 
@@ -29,11 +187,11 @@ PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
 
 | 顺序 | 第一任务三头直接全覆盖 | 转入第二任务的链 | 最终通过／不同组合数 | 其中补全成功 | 图 |
 |---|---:|---:|---:|---:|---|
-| 1 → 6 | 5/10 | 5 | 2/10 | 1 | [图](../output/B/pose1+6/step4_floor_contact/sequential_3plus2/from_pose_1/terminal_expansion/sequential_overview.png) |
-| 1 → 4 | 5/10 | 5 | 3/10 | 0 | [图](../output/B/pose1+4/step4_floor_contact/sequential_3plus2/from_pose_1/terminal_expansion/sequential_overview.png) |
-| 1 → 3 | 5/10 | 5 | 3/10 | 0 | [图](../output/B/pose1+3/step4_floor_contact/sequential_3plus2/from_pose_1/terminal_expansion/sequential_overview.png) |
-| 6 → 9 | 3/10 | 8 | 2/10 | 0 | [图](../output/B/pose6+9/step4_floor_contact/sequential_3plus2/from_pose_6/terminal_expansion/sequential_overview.png) |
-| 2 → 8 | 1/10 | 9 | 1/10 | 0 | [图](../output/B/pose2+8/step4_floor_contact/sequential_3plus2/from_pose_2/terminal_expansion/sequential_overview.png) |
+| 1 → 6 | 5/10 | 5 | 2/10 | 1 | [图](../output/B/pose1+6/step0_pose_selection/sequential_3plus2/from_pose_1/terminal_expansion/sequential_overview.png) |
+| 1 → 4 | 5/10 | 5 | 3/10 | 0 | [图](../output/B/pose1+4/step0_pose_selection/sequential_3plus2/from_pose_1/terminal_expansion/sequential_overview.png) |
+| 1 → 3 | 5/10 | 5 | 3/10 | 0 | [图](../output/B/pose1+3/step0_pose_selection/sequential_3plus2/from_pose_1/terminal_expansion/sequential_overview.png) |
+| 6 → 9 | 3/10 | 8 | 2/10 | 0 | [图](../output/B/pose6+9/step0_pose_selection/sequential_3plus2/from_pose_6/terminal_expansion/sequential_overview.png) |
+| 2 → 8 | 1/10 | 9 | 1/10 | 0 | [图](../output/B/pose2+8/step0_pose_selection/sequential_3plus2/from_pose_2/terminal_expansion/sequential_overview.png) |
 
 第一任务未全覆盖但严格超过 98% 的链也可继续，最终仍须补齐两边全部载荷；因此“转入第二任务”可能多于第一任务直接成功数。此次 11 个最终成功组合的第一任务在选三头后均已全覆盖。唯一补全成功的是 `1 → 6` 的 particle 009：第二任务由 32,753/32,768 补至全覆盖。其余失败结果保持失败。
 
@@ -86,11 +244,11 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
 
 | Pose 对 | 尝试补全链数 | 最佳链补全后覆盖率 | 未覆盖数：补全前 → 后 | 通过链数 | 图 |
 |---|---:|---|---|---:|---|
-| 1 + 6 | 0 | 100% / 100% | 0 / 0 → 0 / 0 | 1/10 | [图](../output/B/pose1+6/step4_floor_contact/fixed_area_1pct/terminal_expansion/heads_5/pair_overview.png) |
-| 1 + 4 | 1 | 100% / 99.9969% | 0 / 1 → 0 / 1 | 0/10 | [图](../output/B/pose1+4/step4_floor_contact/fixed_area_1pct/terminal_expansion/heads_5/pair_overview.png) |
-| 1 + 3 | 0 | 14.8987% / 100% | 27,886 / 0 → 27,886 / 0 | 0/10 | [图](../output/B/pose1+3/step4_floor_contact/fixed_area_1pct/terminal_expansion/heads_5/pair_overview.png) |
-| 6 + 9 | 3 | 100% / 99.6155% | 0 / 131 → 0 / 126 | 0/10 | [图](../output/B/pose6+9/step4_floor_contact/fixed_area_1pct/terminal_expansion/heads_5/pair_overview.png) |
-| 2 + 8 | 0 | 88.0768% / 100% | 3,907 / 0 → 3,907 / 0 | 0/10 | [图](../output/B/pose2+8/step4_floor_contact/fixed_area_1pct/terminal_expansion/heads_5/pair_overview.png) |
+| 1 + 6 | 0 | 100% / 100% | 0 / 0 → 0 / 0 | 1/10 | [图](../output/B/pose1+6/step0_pose_selection/fixed_area_1pct/terminal_expansion/heads_5/pair_overview.png) |
+| 1 + 4 | 1 | 100% / 99.9969% | 0 / 1 → 0 / 1 | 0/10 | [图](../output/B/pose1+4/step0_pose_selection/fixed_area_1pct/terminal_expansion/heads_5/pair_overview.png) |
+| 1 + 3 | 0 | 14.8987% / 100% | 27,886 / 0 → 27,886 / 0 | 0/10 | [图](../output/B/pose1+3/step0_pose_selection/fixed_area_1pct/terminal_expansion/heads_5/pair_overview.png) |
+| 6 + 9 | 3 | 100% / 99.6155% | 0 / 131 → 0 / 126 | 0/10 | [图](../output/B/pose6+9/step0_pose_selection/fixed_area_1pct/terminal_expansion/heads_5/pair_overview.png) |
+| 2 + 8 | 0 | 88.0768% / 100% | 3,907 / 0 → 3,907 / 0 | 0/10 | [图](../output/B/pose2+8/step0_pose_selection/fixed_area_1pct/terminal_expansion/heads_5/pair_overview.png) |
 
 总结果仍为 **1/5 对、1/50 条链通过**，本次小幅补全没有增加成功链。(1,4) 接受了 15 次逐级更新，部分提案被共同方向／路径条件或法向包角拒绝，最后仍差 1 个载荷。(6,9) 最佳链五个头都扩大到约 1.10%，补上 5 个载荷；其余两条尝试链分别补上 2 个和 12 个，均未完成。接近 100% 的样本比例不保证小幅扩大可以覆盖剩余载荷；这些结果只说明本次有限扩展未找到全覆盖解。
 
@@ -110,11 +268,11 @@ PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
 
 | Pose 对 | 最佳链覆盖率 | 未覆盖样本数 | 通过链数 | 图 |
 |---|---|---|---:|---|
-| 1 + 6 | 100% / 100% | 0 / 0 | 1/10 | [图](../output/B/pose1+6/step4_floor_contact/fixed_area_1pct/heads_5/pair_overview.png) |
-| 1 + 4 | 100% / 99.9969% | 0 / 1 | 0/10 | [图](../output/B/pose1+4/step4_floor_contact/fixed_area_1pct/heads_5/pair_overview.png) |
-| 1 + 3 | 14.8987% / 100% | 27,886 / 0 | 0/10 | [图](../output/B/pose1+3/step4_floor_contact/fixed_area_1pct/heads_5/pair_overview.png) |
-| 6 + 9 | 100% / 99.6002% | 0 / 131 | 0/10 | [图](../output/B/pose6+9/step4_floor_contact/fixed_area_1pct/heads_5/pair_overview.png) |
-| 2 + 8 | 88.0768% / 100% | 3,907 / 0 | 0/10 | [图](../output/B/pose2+8/step4_floor_contact/fixed_area_1pct/heads_5/pair_overview.png) |
+| 1 + 6 | 100% / 100% | 0 / 0 | 1/10 | [图](../output/B/pose1+6/step0_pose_selection/fixed_area_1pct/heads_5/pair_overview.png) |
+| 1 + 4 | 100% / 99.9969% | 0 / 1 | 0/10 | [图](../output/B/pose1+4/step0_pose_selection/fixed_area_1pct/heads_5/pair_overview.png) |
+| 1 + 3 | 14.8987% / 100% | 27,886 / 0 | 0/10 | [图](../output/B/pose1+3/step0_pose_selection/fixed_area_1pct/heads_5/pair_overview.png) |
+| 6 + 9 | 100% / 99.6002% | 0 / 131 | 0/10 | [图](../output/B/pose6+9/step0_pose_selection/fixed_area_1pct/heads_5/pair_overview.png) |
+| 2 + 8 | 88.0768% / 100% | 3,907 / 0 | 0/10 | [图](../output/B/pose2+8/step0_pose_selection/fixed_area_1pct/heads_5/pair_overview.png) |
 
 固定面积版 **1/5 对、1/50 条链通过**；旧尺寸优化五头版为 2/5 对、3/50 条链。五对最终导出的最佳链均为五头；(1,4) 仍有一个固定样本失败，不能按四舍五入后的 100% 判通过。候选合格数依次为 101、94、104、106、108；失败结果不表示其他接触组合无解。
 
@@ -126,11 +284,11 @@ PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
 
 | Pose 对 | 三头上限覆盖率 | 五头上限覆盖率 | 五头上限通过链数 | 当前结论 | 图 |
 |---|---|---|---:|---|---|
-| 1 + 6 | 35.14% / 100% | 100% / 100% | 1/10 | 通过 | [图](../output/B/pose1+6/step4_floor_contact/heads_5/pair_overview.png) |
-| 1 + 4 | 61.16% / 98.66% | 100% / 98.41% | 0/10 | 尚未全覆盖 | [图](../output/B/pose1+4/step4_floor_contact/heads_5/pair_overview.png) |
-| 1 + 3 | 11.42% / 83.81% | 13.53% / 99.99% | 0/10 | 尚未全覆盖 | [图](../output/B/pose1+3/step4_floor_contact/heads_5/pair_overview.png) |
-| 6 + 9 | 100% / 97.96% | 100% / 100% | 2/10 | 通过 | [图](../output/B/pose6+9/step4_floor_contact/heads_5/pair_overview.png) |
-| 2 + 8 | 99.91% / 87.28% | 89.68% / 100% | 0/10 | 尚未全覆盖 | [图](../output/B/pose2+8/step4_floor_contact/heads_5/pair_overview.png) |
+| 1 + 6 | 35.14% / 100% | 100% / 100% | 1/10 | 通过 | [图](../output/B/pose1+6/step0_pose_selection/heads_5/pair_overview.png) |
+| 1 + 4 | 61.16% / 98.66% | 100% / 98.41% | 0/10 | 尚未全覆盖 | [图](../output/B/pose1+4/step0_pose_selection/heads_5/pair_overview.png) |
+| 1 + 3 | 11.42% / 83.81% | 13.53% / 99.99% | 0/10 | 尚未全覆盖 | [图](../output/B/pose1+3/step0_pose_selection/heads_5/pair_overview.png) |
+| 6 + 9 | 100% / 97.96% | 100% / 100% | 2/10 | 通过 | [图](../output/B/pose6+9/step0_pose_selection/heads_5/pair_overview.png) |
+| 2 + 8 | 99.91% / 87.28% | 89.68% / 100% | 0/10 | 尚未全覆盖 | [图](../output/B/pose2+8/step0_pose_selection/heads_5/pair_overview.png) |
 
 三头预算仍为 0/5 对通过；五头预算为 **2/5 对通过，共 3/50 条链**。(1,6) 的五头组合按当前规则通过，过去的连续域反例不参与当前判定。(6,9) 的两条通过链分别使用 4 个和 5 个头；当前按面积选择五头方案，不以头数最少为目标。表中的未通过只表示本次保存头组未覆盖全部固定样本。
 

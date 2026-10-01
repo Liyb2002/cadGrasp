@@ -264,7 +264,7 @@ class SequentialSearch:
 
 
 def run_case(args, poses):
-    step4 = output_folder(args.object, poses, 'step4_floor_contact', not args.no_expansion)
+    step4 = output_folder(args.object, poses, 'step0_pose_selection', not args.no_expansion)
     R.save(step4/'status.json', dict(complete=False, status='running'))
     started = time.monotonic()
     try:

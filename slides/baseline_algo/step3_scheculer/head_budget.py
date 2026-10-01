@@ -31,7 +31,7 @@ def main():
         pairs, seed = sample_pairs(args.object, args.pairs, args.seed)
         print('Head budget:', args.max_heads, 'seed:', seed, 'pairs:', pairs, flush=True)
         def launch(poses):
-            out = folder(args.object, poses, 'step4_floor_contact')
+            out = folder(args.object, poses, 'step0_pose_selection')
             out.mkdir(parents=True, exist_ok=True)
             R.save(out/'batch_plan.json', dict(object=args.object, pair=poses, pairs=pairs,
                 seed=seed, particles=args.particles, candidates=args.candidates, max_heads=args.max_heads))

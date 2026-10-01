@@ -34,7 +34,7 @@ def pair_name(poses):
 
 def pair_folder(name, poses, stage):
     if stage not in ('step_1_needs', 'step2_local_support', 'step3_scheculer',
-                     'step4_floor_contact', 'step5_connect_support'):
+                     'step0_pose_selection', 'step4_connect_support'):
         raise ValueError('Unknown two-pose stage')
     return OUTPUTS/name/pair_name(poses)/stage
 
@@ -85,9 +85,9 @@ def completion_folder(name, poses, stage):
     return fixed_area_folder(name, poses, stage)/'terminal_expansion'
 
 
-def read_task(name, pose, poses=None):
+def read_task(name, pose, poses=None, *, folder=None):
     snapshot = task_snapshot(name, pose)
-    folder = task_folder(name, pose, poses)
+    folder = task_folder(name, pose, poses) if folder is None else Path(folder)
     domain_path, samples_path = folder/'needs.json', folder/'samples.json'
     domain = ContinuousNeeds.read(domain_path)
     samples = json.loads(samples_path.read_text())

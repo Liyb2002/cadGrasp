@@ -15,8 +15,8 @@ from step1.needs import OUTPUTS, OBJECTS, COORD, sha256
 from step1.cases import pose_name
 from step3_scheculer import contacts as I
 from step2_local_support import geometry as H, insertion as D
-from step5_connect_support import whole_assembly as A, floor_design as FD
-from step5_connect_support import belt_geometry as B, solids as S
+from step4_connect_support import whole_assembly as A, floor_design as FD
+from step4_connect_support import belt_geometry as B, solids as S
 from step6_connect_support import direction_first as X
 from step5_base import bearing as M
 
@@ -322,7 +322,7 @@ def audit(name):
         assert ground['passed']
         joined, solid = B.union_parts(parts, scene.scale)
         assert solid['one_solid']
-        from step5_connect_support import rigid_path as P
+        from step4_connect_support import rigid_path as P
         assert P.replay(B.Scene(domain.mesh), parts, report['trajectory'])
         rebuilt = [Polygon(p) for p in report['base']['pads_xy_m']]
         np.testing.assert_allclose(unary_union(rebuilt).area, report['base']['material_area_m2'], rtol=1e-9)
@@ -340,7 +340,7 @@ def audit(name):
                           ('ground_points_m',ground['points_m']),('ground_forces',ground['forces']),
                           ('ground_owners',ground['owners'])]:
             np.testing.assert_array_equal(arrays[key],value)
-        from step4_floor_contact.audit import replay
+        from step0_pose_selection.audit import replay
         for prefix,loads in [('sample',points['load_wrenches']),('continuous',points['continuous_outer_load_wrenches'])]:
             checks[prefix+'_bearing']=replay(arrays,prefix,loads,1,mu)
         targets=M.Q.padded_targets(points['continuous_outer_load_wrenches'],arrays['scale'],12)

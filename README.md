@@ -1,6 +1,10 @@
 # cadGrasp
 
-可见 Step5 结果：[B / pose1+3 窄地框合并模型](slides/baseline_algo/output/B/pose1+3/step5/overview.png)、[单独结构对比](slides/baseline_algo/output/B/pose1+3/step5/separate.png)、[旋转查看](slides/baseline_algo/output/B/pose1+3/step5/index.html)。每个 pose 分别连接自己的三头和空心地框，再合并；约 60.8 cm³，比此前厚体少约 89.4%。原载荷与完整退出通过，尚未校核强度。详见 [Step5](slides/baseline_algo/step5_connect_support/README.md)。
+2026-09-29：当前流程改为 **Step0 随机选择并筛选 n 个 pose → Step1 载荷 → Step2 候选头 → Step3 顺序选头 → Step4 实体构造**。入口 `run_sequential_batch.py B --n 3`；旧 Step4 检查前移到 Step0，旧 Step5 改名 Step4。组合穿地就换一组，全部尝试后仍失败则停止。[当前说明](slides/baseline_algo/step0_pose_selection/README.md)；B 的 n=2 验证在第 7 次选中 [pose3+4](slides/baseline_algo/output/B/pose3+4/step0_pose_selection/floor_point_conflicts.png)，尚未选头或造实体。已有图与模型保留，下面的运行记录及阶段编号为历史。
+
+2026-09-28 当前 baseline 使用[逐 pose 顺序求解](slides/baseline_algo/step3_scheculer/README.md)：每 pose 3–4 个头，后续 pose 从所有已选头中继承一个最佳共享头。每个实体头现在必须避开所有输入 pose 的工作面和地面，包括闲置时。`run_sequential_batch.py B --existing-groups` 已重跑保留的四组：3/4 组全覆盖，但 Step5 仍因固定摆放的落脚条件失败；另一组 pose9 为 32379/32768。0/4 个完整支架。[当前结果](slides/baseline_algo/output/B/pose6+9+10/step4/data/batch_summary.json)与头部 PNG 已更新，旧 pose1+3 做图结果保留。`slides/co_design_algo/` 副本未修改；下方其他构造记录为历史。
+
+可见 Step5 结果：[B / pose1+3 窄地框合并模型](slides/baseline_algo/output/B/pose1+3/step4/overview.png)、[单独结构对比](slides/baseline_algo/output/B/pose1+3/step4/separate.png)、[旋转查看](slides/baseline_algo/output/B/pose1+3/step4/index.html)。每个 pose 分别连接自己的三头和空心地框，再合并；约 60.8 cm³，比此前厚体少约 89.4%。原载荷与完整退出通过，尚未校核强度。详见 [Step5](slides/baseline_algo/step4_connect_support/README.md)。
 
 当前 B 的配对输出位于 [baseline_algo/output/B](slides/baseline_algo/output/B)：`pose1+3/`、`pose1+4/`、`pose1+6/`、`pose2+8/`、`pose6+9/`，每对下面按 Step1–5 组织。全部旧结果及依赖已迁移，载荷和搜索结果保持原样。
 
@@ -53,8 +57,8 @@ Git 保存代码、Markdown、模板和固定测试样例；物体数据及生�
 # 重绘当前 slides；不执行 baseline 搜索
 python slides/tools/render.py
 
-# 当前固定 1% 双 pose baseline，五头预算，止于 Step4
-python slides/baseline_algo/step3_scheculer/head_budget.py B --poses pose_1 pose_6 --seed 20260926 --max-heads 5
+# 当前固定 1% 多 pose 联合选头，止于 Step4
+python slides/baseline_algo/run_sequential_batch.py B --seed 20260928
 ```
 
 使用已安装项目依赖的 `cadgrasp` Python 环境。运行完成、审计通过、设计通过是不同状态，具体以算法说明和当前案例报告为准。

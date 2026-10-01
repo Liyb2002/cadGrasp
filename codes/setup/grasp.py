@@ -355,7 +355,7 @@ def seated_targets(model, mesh, candidate, checks, angles):
 
 def render(model, history, output):
     sys.path.insert(0, str(ROOT / 'slides/baseline_algo'))
-    from step5_connect_support.video import mp4_writer
+    from step4_connect_support.video import mp4_writer
     data = mujoco.MjData(model)
     camera = mujoco.MjvCamera()
     camera.lookat[:] = [0., 0., .12]

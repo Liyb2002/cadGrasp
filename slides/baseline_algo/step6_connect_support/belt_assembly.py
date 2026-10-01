@@ -9,12 +9,12 @@ from step1.needs import OUTPUTS, sha256
 from step1.cases import pose_name
 from step3_scheculer import contacts as I
 from step2_local_support import insertion as D
-from step4_floor_contact import whole_assembly as F, equilibrium as Q
-from step5_connect_support import whole_assembly as A, belt_geometry as B, rigid_path as P
-from step5_connect_support import solids as S, visual_details as V, surface_check as U, floor_design as FD, piecewise_path as PP, video
+from step0_pose_selection import whole_assembly as F, equilibrium as Q
+from step4_connect_support import whole_assembly as A, belt_geometry as B, rigid_path as P
+from step4_connect_support import solids as S, visual_details as V, surface_check as U, floor_design as FD, piecewise_path as PP, video
 
 from step6_connect_support import direction_first as X
-from step5_connect_support import failure_visuals as FV
+from step4_connect_support import failure_visuals as FV
 from step5_base import base as BASE, bearing as M
 
 STAGE = 'step6_connect_support'
@@ -234,7 +234,7 @@ def audit(name):
         if trajectory['passed']:
             checks['continuous_rigid_trajectory'] = (PP.replay if trajectory.get('path_kind') == 'piecewise_rigid' else P.replay)(scene, parts, trajectory)
         if report['bearing']['sampled_passed']:
-            from step4_floor_contact.audit import replay
+            from step0_pose_selection.audit import replay
             arrays = I.load_npz(out/'bearing.npz'); mu = report['bearing']['sufficient_friction_coefficient']
             p,n,owners=bearing_rays(domain,contacts,floor['original_pivot_m'],mu)
             matrix, g = M.grounded_matrix(p, n, owners, domain.com, arrays['scale'], [base], mu)
@@ -266,7 +266,7 @@ def draw(name, static_only=False):
     preview(name, domain, contacts, out, report['status'])
     if report['trajectory_verified'] and not static_only:
         data = I.load_npz(out/'geometry.npz'); path = report['geometry']['trajectory']
-        from step5_connect_support import video
+        from step4_connect_support import video
         video.render(domain, data, path, out)
     if not report['passed']:
         FV.saved_failure(name,static_only)

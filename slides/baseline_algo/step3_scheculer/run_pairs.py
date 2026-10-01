@@ -23,7 +23,7 @@ from step3_scheculer.pair_geometry import PairGeometry
 from step2_local_support.circles import AREA_FRACTION, AREA_REL_TOL
 from step3_scheculer.pair_scoring import score_tasks, top5_distribution, C
 from step3_scheculer.random_search import chain_seed
-from step4_floor_contact.whole_assembly import pressure_centers
+from step0_pose_selection.floor_points import pressure_centers
 
 
 def save(path, data):
@@ -216,7 +216,7 @@ class PairSearch:
         return result
 
     def floor(self, result, folder=None):
-        folder = Path(folder) if folder is not None else pair_folder(self.name, self.poses, 'step4_floor_contact')
+        folder = Path(folder) if folder is not None else pair_folder(self.name, self.poses, 'step0_pose_selection')
         reports = []
         for k, problem in enumerate(self.problems):
             base = self.original_targets[k]/problem.scale
@@ -266,7 +266,7 @@ def main():
         from concurrent.futures import ThreadPoolExecutor, as_completed
         print('Batch seed:', seed, 'pairs:', pairs, flush=True)
         def launch(pair):
-            folder = pair_folder(args.object, pair, 'step4_floor_contact')
+            folder = pair_folder(args.object, pair, 'step0_pose_selection')
             folder.mkdir(parents=True, exist_ok=True)
             save(folder/'batch_plan.json', dict(object=args.object, seed=seed, pair=pair,
                  pairs=pairs, particles=args.particles, max_heads=args.max_heads, candidates=args.candidates))
@@ -289,7 +289,7 @@ def main():
     print('Pair sampling seed:', seed, 'pairs:', pairs, flush=True)
     for pair in pairs:
         started = time.monotonic()
-        folder = pair_folder(args.object, pair, 'step4_floor_contact')
+        folder = pair_folder(args.object, pair, 'step0_pose_selection')
         save(folder/'status.json', dict(complete=False, status='running', poses=pair))
         try:
             search = PairSearch(args.object, pair, seed, args.particles, args.max_heads, args.candidates)

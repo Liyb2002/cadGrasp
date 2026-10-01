@@ -75,7 +75,7 @@ def publish_segments(folder, invalidate_video=False):
         # nominal boundary. No interpolation, time reset or synthetic pose.
         ends=np.searchsorted(times,z['target_times_s'],side='right')-1
         ends=np.clip(ends,0,len(times)-1)
-        assert len(ends)==10 and np.all(np.diff(ends)>0)
+        assert len(ends)==len(record['poses']) and np.all(np.diff(ends)>0)
         assert ends[-1]==len(times)-1
         first=0
         for i,last in enumerate(ends):
@@ -179,7 +179,8 @@ def main():
                 raise ValueError(f'{name}: video provenance is missing or stale; rerender it')
         relocate_simulation_assets(folder)
         publish_segments(folder)
-        print(f'{name}: video.mp4 + 10 trajectory segments',flush=True)
+        record=json.loads((folder/'poses.json').read_text())
+        print(f'{name}: video.mp4 + {len(record["poses"])} trajectory segments',flush=True)
 
 
 if __name__=='__main__':main()

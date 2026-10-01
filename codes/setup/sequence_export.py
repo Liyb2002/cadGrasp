@@ -80,7 +80,9 @@ def export(name,mesh,initial,candidate,trial,poses,rule,checks,arm,
     folder=ROOT/'objects'/name
     regions=getattr(trial,'regions',None) or WorkRegions(mesh)
     patches=[regions.choose(T,f'{name}/pose_{i}') for i,T in enumerate(poses,1)]
-    names=[f'pose_{i}' for i in range(1,11)]
+    names=[f'pose_{i}' for i in range(1,len(poses)+1)]
+    if not names or len(checks) != len(poses):
+        raise ValueError('One motion check per target pose is required')
     record=dict(schema='cadgrasp_sequence_v1',object=name,coordinate_system='z_up_xy_floor',
         rest=dict(pose_id='rest',T_world_mesh=initial.tolist()),
         poses=[dict(index=i,pose_id=pose,T_world_mesh=T.tolist(),grounded=True,
@@ -133,7 +135,7 @@ def export(name,mesh,initial,candidate,trial,poses,rule,checks,arm,
             write(out/'setup.json',report)
         write(stage/'tasks.json',dict(schema='cadgrasp_tasks_v1',object=name,poses=names,
             rest='poses.json:rest',sequence='poses.json',trajectory='trajectory.npz',
-            definition='Ten ordered grounded robot-held poses; consecutive transitions share one continuous simulation'))
+            definition=f'{len(names)} ordered grounded robot-held poses; consecutive transitions share one continuous simulation'))
         qpos,pos,quat=zip(*trial.history)
         extensions={}
         if getattr(trial,'lock_id',-1)>=0:
@@ -152,4 +154,4 @@ def export(name,mesh,initial,candidate,trial,poses,rule,checks,arm,
             shutil.copy2(stage/file,folder/file)
     from organize import publish_segments
     publish_segments(folder,invalidate_video=True)
-    print(f'{name}: exported rest + 10 grounded targets and continuous trajectory',flush=True)
+    print(f'{name}: exported rest + {len(names)} grounded targets and continuous trajectory',flush=True)

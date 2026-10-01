@@ -16,7 +16,7 @@ def verify_segments(folder,data):
     index=json.loads((folder/data['trajectory_segments']).read_text())
     digest=hashlib.sha256((folder/'trajectory.npz').read_bytes()).hexdigest()
     assert index['full_trajectory_sha256']==digest
-    assert len(index['segments'])==10
+    assert len(index['segments'])==len(data['poses'])
     frames=[];robot_frames=[];robot_values=[]
     with np.load(folder/'trajectory.npz') as full:
         for i,row in enumerate(index['segments']):
@@ -44,8 +44,16 @@ def verify_segments(folder,data):
 def verify(folder):
     manifest=folder/'poses.json'
     data=json.loads(manifest.read_text())
+    if data.get('schema') == 'cadgrasp_pose_set_v1':
+        from compatible_pose_export import verify as verify_pose_set
+        result = verify_pose_set(folder)
+        stored = json.loads((folder/'floor_compatibility.json').read_text())
+        for key in ('pose_count', 'compatible_group_counts', 'directed_violating_counts', 'witnesses'):
+            assert result[key] == stored[key], f'{folder.name}: stale floor compatibility {key}'
+        return result['pose_count']
     assert data.get('schema')=='cadgrasp_sequence_v1',f'{folder.name}: sequence missing'
-    expected=[f'pose_{i}' for i in range(1,11)]
+    count=len(data['poses'])
+    expected=[f'pose_{i}' for i in range(1,count+1)]
     assert data['order']==['rest']+expected
     assert [p['pose_id'] for p in data['poses']]==expected
     assert json.loads((folder/'tasks.json').read_text())['poses']==expected
@@ -61,9 +69,9 @@ def verify(folder):
     if data.get('trajectory_revision')=='diverse_regrasp_v1':
         from regrasp_sequence import angle,differences
         rule=data['pose_selection'];grasps=data['grasps']
-        assert len(grasps)==10
+        assert len(grasps)==count
         gravity=targets[:,2,:3]
-        for i in range(10):
+        for i in range(count):
             assert data['transitions'][i]['grasp_id']==grasps[i]['grasp_id']
             for j in range(i):
                 assert angle(gravity[i],gravity[j])>=rule['minimum_pairwise_gravity_direction_deg']-1e-8
@@ -81,7 +89,7 @@ def verify(folder):
                     assert max(approach,closing)>=rule.get('minimum_measured_adjacent_grasp_direction_deg',rule['minimum_adjacent_grasp_direction_deg'])-1e-8
         releases=[e for e in data['regrasp_events'] if e['event']=='released_on_stable_rest']
         pickups=[e for e in data['regrasp_events'] if e['event']=='new_grasp']
-        assert len(releases)==9 and len(pickups)==10
+        assert len(releases)==count-1 and len(pickups)==count
         for i,release in enumerate(releases):
             assert release['finger_contacts']==0 and release['object_floor_normal_force_N']>.001
             if release.get('stability_metric')=='gravity_direction':
@@ -136,7 +144,7 @@ def verify(folder):
         graph=coo_matrix((np.ones(len(edges)),(edges[:,0],edges[:,1])),shape=(len(ids),len(ids)))
         assert connected_components(graph,directed=False,return_labels=False)==1
     with np.load(folder/'trajectory.npz') as z:
-        assert len(z['target_transforms'])==10
+        assert len(z['target_transforms'])==count
         np.testing.assert_allclose(z['time_s'],.033*(np.arange(len(z['time_s']))+1),atol=1e-9)
         np.testing.assert_allclose(z['target_transforms'],[p['T_world_mesh'] for p in data['poses']],atol=1e-12)
         np.testing.assert_allclose(z['T_world_object'][:,:3,3],z['qpos'][:,9:12],atol=1e-10)
@@ -186,18 +194,21 @@ def verify(folder):
         assert np.degrees(measured_angles).min()>.5,f'{folder.name}: actual holds not distinct'
     assert data['kuka_checks']['scene_checks']['maximum_penetration_m']<=.0002
     if 'trajectory_segments' in data:verify_segments(folder,data)
-    return 10
+    return count
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--partial',action='store_true')
+    parser.add_argument('objects', nargs='*')
     args=parser.parse_args()
-    count=0;skipped=[]
+    count=0;verified=0;skipped=[]
     for folder in sorted((ROOT/'objects').iterdir()):
         if not folder.is_dir() or not (folder/'mesh.stl').exists():continue
+        if args.objects and folder.name not in args.objects:continue
         data=json.loads((folder/'poses.json').read_text())
-        if args.partial and data.get('schema')!='cadgrasp_sequence_v1':
+        if args.partial and data.get('schema') not in ('cadgrasp_sequence_v1', 'cadgrasp_pose_set_v1'):
             skipped.append(folder.name);continue
         count+=verify(folder)
-    print(json.dumps(dict(verified_objects=count//10,verified_targets=count,pending=skipped)))
+        verified+=1
+    print(json.dumps(dict(verified_objects=verified,verified_targets=count,pending=skipped)))

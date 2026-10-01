@@ -64,7 +64,7 @@ class Workflow:
                            * self.path['final_withdrawal_amount'])
         # Replay the original whole-solid sweep, not a sampled animation check.
         sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'slides/baseline_algo'))
-        from step5_connect_support import solids, belt_geometry, rigid_path
+        from step4_connect_support import solids, belt_geometry, rigid_path
         with np.load(SHAPE / 'support_geometry.npz') as geometry:
             data = {key: geometry[key].copy() for key in geometry.files}
         assert rigid_path.replay(belt_geometry.Scene(self.object), solids.unpack_parts(data), self.path)
@@ -248,7 +248,7 @@ class Presentation:
 
 def render(workflow, path, fps=30):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'slides/baseline_algo'))
-    from step5_connect_support.video import mp4_writer
+    from step4_connect_support.video import mp4_writer
     workflow.prepare_arms(fps)
     display = Presentation(workflow)
     frames = round(workflow.duration * fps)

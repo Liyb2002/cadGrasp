@@ -7,7 +7,7 @@ from collections import Counter
 import numpy as np
 from PIL import Image, ImageDraw
 from step2_local_support import render as R
-from step4_floor_contact import draw_work_volume as V
+from step0_pose_selection import draw_work_volume as V
 
 COLORS = {'valid': '#267fcb', 'work_volume_collision': '#c43d48',
           'work_volume_unresolved': '#bd8400', 'other': '#48414e'}

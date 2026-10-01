@@ -29,7 +29,9 @@ def render(name):
     folder = ROOT / 'objects' / name
     record = json.loads((folder / 'poses.json').read_text())
     poses = record['poses']
-    assert [p['pose_id'] for p in poses] == [f'pose_{i}' for i in range(1, 11)]
+    count = len(poses)
+    assert [p['pose_id'] for p in poses] == [f'pose_{i}' for i in range(1, count+1)]
+    rows = (count+4)//5
     raw = trimesh.load(folder / 'mesh.stl', force='mesh')
     transforms = np.asarray([p['T_world_mesh'] for p in poses])
     all_vertices = np.concatenate([
@@ -44,11 +46,11 @@ def render(name):
     light = np.array([-.4, -.5, 1.])
     light /= np.linalg.norm(light)
 
-    fig = plt.figure(figsize=(20, 9.2), facecolor='white')
+    fig = plt.figure(figsize=(20, 4.3*rows+.6), facecolor='white')
     fig.subplots_adjust(left=.015, right=.985, bottom=.015, top=.90,
                         wspace=.015, hspace=.09)
     fig.text(.025, .95, name, fontsize=23, weight='bold', color='#243444')
-    fig.text(.025, .919, '10 target poses', fontsize=11, color='#687785')
+    fig.text(.025, .919, f'{count} target poses', fontsize=11, color='#687785')
     fig.legend(handles=[Patch(facecolor=WORK, label='Working area')],
                loc='upper right', bbox_to_anchor=(.98, .967),
                frameon=False, fontsize=11)
@@ -73,7 +75,7 @@ def render(name):
             colors[mask] = WORK
             colors *= shade[:, None]
 
-            ax = fig.add_subplot(2, 5, index + 1, projection='3d',
+            ax = fig.add_subplot(rows, 5, index + 1, projection='3d',
                                  computed_zorder=False)
             ax.set_proj_type('ortho')
             ax.view_init(elev=28, azim=125)
@@ -96,8 +98,8 @@ def render(name):
         destination = folder / 'overview.png'
         fig.savefig(destination, dpi=160, facecolor='white',
                     metadata={'Description':
-                        'Ten nominal robot-held target poses, fixed view and scale; '
-                        'orange faces are saved working areas. Robot omitted.'})
+                        f'{count} grounded target poses, fixed view and scale; '
+                        'orange faces are saved working areas. See poses.json for motion verification.'})
     finally:
         plt.close(fig)
     gc.collect()

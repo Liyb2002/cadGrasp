@@ -185,7 +185,7 @@ def render(source, history, output, name, tool, robot_track=None,hand_xml=None):
     import mujoco
     import grasp as G
     sys.path.insert(0,str(G.ROOT/'slides/baseline_algo'))
-    from step5_connect_support.video import mp4_writer
+    from step4_connect_support.video import mp4_writer
     model = G.build(name,hand_xml=hand_xml or (G.HERE/'assets/parallel_jaw.xml' if tool=='parallel' else None),
                     render_arm=True,robot_collisions=True,floor_hull=True)
     np.testing.assert_array_equal(source.jnt_qposadr,model.jnt_qposadr[:source.njnt])

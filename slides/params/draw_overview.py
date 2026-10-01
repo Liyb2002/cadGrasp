@@ -19,7 +19,7 @@ OUT=Path(__file__).resolve().parent
 ROOT=OUT.parents[1]
 sys.path.insert(0,str(OUT.parent/'tools'))
 import slide_scene as S
-from step4_floor_contact.whole_assembly import pressure_centers
+from step0_pose_selection.whole_assembly import pressure_centers
 
 INK,MUTED='#20303e','#667580'
 TEAL,BLUE=(41,145,133),(37,112,188)
@@ -82,7 +82,7 @@ def reuse_ground_data():
         name=pose['source'].split(' / ')[1]
         folder=OUT.parent/'baseline_algo/output/B'/name
         needs_path=folder/'step_1_needs/needs.json'
-        floor_path=folder/'step4_floor_contact/floor_contact.npz'
+        floor_path=folder/'step0_pose_selection/floor_contact.npz'
         setup_path=ROOT/'objects/B/tasks'/name/'setup.npz'
         contact_path=folder/'step3_scheculer/final_contacts.npz'
         source_paths.update((needs_path,floor_path,setup_path,contact_path))
@@ -191,23 +191,30 @@ def fixture_meshes():
 
 
 def current_reuse_cases():
-    """Read the current task placements without depending on retired Step3 files."""
+    """Read the new fixture placements against the pair's frozen task inputs."""
     source=OUT.parent/'reuse/data.js'
     data=json.loads(source.read_text().removeprefix('window.REUSE_DATA=').strip().removesuffix(';'))
+    assert data['schema']=='saved_pose1_3_fixture_v1'
+    assert [p['source'] for p in data['poses']]==['B / pose_1','B / pose_3']
     hashes={str(source.relative_to(ROOT)):sha(source)}
+    shape_path=ROOT/data['sourceShape']
+    assert sha(shape_path)==data['sourceShapeSha256']
+    hashes[str(shape_path.relative_to(ROOT))]=sha(shape_path)
     cases=[]
     for pose in data['poses'][:2]:
         name=pose['source'].split(' / ')[1]
-        setup_path=ROOT/'objects/B/tasks'/name/'setup.npz'
-        with np.load(setup_path) as setup:
-            np.testing.assert_allclose(pose['objectR'],setup['T_world_mesh'][:3,:3],atol=1e-12)
-            np.testing.assert_array_equal(pose['work'],np.flatnonzero(setup['work_faces']))
-        hashes[str(setup_path.relative_to(ROOT))]=sha(setup_path)
+        needs_path=OUT.parent/'baseline_algo/output/B/pose1+3/step_1_needs'/name/'needs.json'
+        saved=json.loads(needs_path.read_text())
+        np.testing.assert_allclose(pose['objectR'],np.asarray(saved['frame']['T_world_mesh'])[:3,:3],atol=1e-12)
+        np.testing.assert_array_equal(pose['work'],saved['geometry']['work_face_ids'])
+        np.testing.assert_array_equal(np.asarray(pose['object']['f']).reshape(-1,3),saved['geometry']['faces'])
+        np.testing.assert_allclose(np.asarray(pose['object']['v']).reshape(-1,3),saved['geometry']['vertices_m'],atol=5.1e-11,rtol=0)
+        hashes[str(needs_path.relative_to(ROOT))]=sha(needs_path)
         cases.append(dict(pose=name,
             object=trimesh.Trimesh(vertices=np.asarray(pose['object']['v']).reshape(-1,3),
                 faces=np.asarray(pose['object']['f']).reshape(-1,3),process=False),
             work_ids=np.asarray(pose['work'],int),fixture_R=np.asarray(pose['fixtureR']),
-            fixture_t=np.asarray(pose['fixtureT'])))
+            fixture_t=np.asarray(pose['fixtureT']),insertion_direction=-np.asarray(pose['withdrawalDirection'])))
     return cases,hashes
 
 
@@ -221,6 +228,8 @@ def approved_panels(cases,hashes):
     if not APPROVED_PANELS.exists():
         if FIGURE.exists() and RECORD.exists():
             metadata=json.loads(RECORD.read_text())
+            metadata['task_poses']=metadata.get('approved_columns_1_2_task_poses',metadata['task_poses'])
+            metadata['source_sha256']=metadata.get('approved_panels_historical_source_sha256',metadata['source_sha256'])
             with Image.open(FIGURE) as saved:
                 if saved.size!=(4400,1660):
                     raise ValueError('Approved slide must have its original 4400 x 1660 layout')
@@ -243,10 +252,11 @@ def approved_panels(cases,hashes):
     with np.load(APPROVED_PANELS,allow_pickle=False) as saved:
         panels=[Image.fromarray(saved[key]) for key in ('contacts','ground')]
         metadata=json.loads(str(saved['metadata']))
-    assert metadata['task_poses']==[c['pose'] for c in cases]
-    for source,digest in hashes.items():
+    # Columns 1/2 deliberately retain their approved historical pose_2/pose_3
+    # pixels; columns 3/4 now illustrate the current pose_1/pose_3 fixture.
+    for source,digest in metadata['source_sha256'].items():
         if source.startswith('objects/'):
-            assert metadata['source_sha256'][source]==digest, 'Approved task geometry changed'
+            assert sha(ROOT/source)==digest, 'Approved task geometry changed'
     hashes[str(APPROVED_PANELS.relative_to(ROOT))]=sha(APPROVED_PANELS)
     return *panels,metadata
 
@@ -259,7 +269,7 @@ def structure_panel():
     """
     meshes=fixture_meshes()
     vertices=np.vstack([m.vertices for m in meshes])
-    basis=S.R.axes(np.array([-.85,.52,.55]))
+    basis=S.R.axes(np.array([-1.,-1.,.82]))
     projected=vertices@basis.T
     bounds=np.array([projected.min(0),projected.max(0)])
     cam=S.Camera(bounds.mean(0)@basis,basis,1.3*float(np.max(bounds[1,:2]-bounds[0,:2])),SIZE)
@@ -282,16 +292,21 @@ def direction_panel(cases):
         rotation,translation=c['fixture_R'],c['fixture_t']
         transform=np.eye(4);transform[:3,:3]=rotation;transform[:3,3]=translation
         parts=[m.copy().apply_transform(transform) for m in shared]
-        direction=rotation[:,0]
+        direction=c['insertion_direction']
         np.testing.assert_allclose(direction[2],0,atol=1e-12)
-        pre=c['object'].copy().apply_translation(-STROKE*direction)
+        np.testing.assert_allclose(np.linalg.norm(direction),1,atol=1e-12)
+        # Begin with complete object/fixture separation along the saved axis.
+        stroke=max(STROKE,float((c['object'].vertices@direction).max()
+                   -min((m.vertices@direction).min() for m in parts)+.012))
+        pre=c['object'].copy().apply_translation(-stroke*direction)
+        assert (pre.vertices@direction).max() < min((m.vertices@direction).min() for m in parts)
         end=c['object'].bounds.mean(0)
         end[2]=max(c['object'].bounds[1,2],*(m.bounds[1,2] for m in parts))+.02
-        arrow_world=np.array([end-STROKE*direction,end])
+        arrow_world=np.array([end-stroke*direction,end])
         cloud=np.vstack([c['object'].vertices,pre.vertices,arrow_world]+[m.vertices for m in parts])
         # Look into the opening, following reuse's consistent fixture-relative
         # azimuth; the old fixed world camera hides the new seated object.
-        yaw=np.arctan2(rotation[1,0],rotation[0,0])
+        yaw=np.arctan2(direction[1],direction[0])
         view=np.array([np.cos(yaw+2.1),np.sin(yaw+2.1),.5])
         cam=camera(c,cloud,view=view)
         cell=Image.new('RGB',(SIZE,SIZE),'white')
@@ -310,11 +325,11 @@ def direction_panel(cases):
         paste_row(pic,cell,i,rf'd_{i+1}')
         records.append(dict(task=i+1,pose=c['pose'],fixture_rotation_world=rotation.tolist(),
             fixture_translation_world_m=translation.tolist(),direction_world=direction.tolist(),
-            direction_fixture=(rotation.T@direction).tolist(),preinsertion_translation_world_m=(-STROKE*direction).tolist(),
-            stroke_m=STROKE,fixed_body='complete V',moving_body='object only',
-            direction_source='reuse robot workflow: fixtureR[:,0]',horizontal_world=True,
+            direction_fixture=(rotation.T@direction).tolist(),preinsertion_translation_world_m=(-stroke*direction).tolist(),
+            stroke_m=stroke,fixed_body='complete V',moving_body='object only',
+            direction_source='negative saved reuse withdrawalDirection (original Step3/Step5 direction)',horizontal_world=True,
             camera_view_world=view.tolist(),
-            sweep_collision_free_verified=False,fully_separated_start_verified=False))
+            sweep_collision_free_verified=False,fully_separated_start_verified=True))
     return pic,records
 
 
@@ -356,6 +371,8 @@ def main():
     source=OUT.parent/'reuse/data.js'
     result=dict(schema='shared_fixture_two_pose_design_groups',object='B',task_count=2,
         task_poses=[c['pose'] for c in cases],design_unknowns=['A_obj^k','A_floor^k','V','d_k'],
+        approved_columns_1_2_task_poses=approved['task_poses'],
+        updated_columns_3_4_task_poses=[c['pose'] for c in cases],
         source_sha256=hashes,source_inputs_unchanged=True,
         parameters_are_solution_objects_not_algorithm_tuning=True,
         equilibrium_equation_source='slides/tools/combined_equations.py',

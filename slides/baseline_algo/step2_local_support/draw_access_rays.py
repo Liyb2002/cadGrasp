@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from step1.cases import selected_pose, pose_name
 from step1.needs import frame
 from step2_local_support import circles as P, render as R
-from step4_floor_contact.draw_work_volume import layer
+from step0_pose_selection.draw_work_volume import layer
 
 
 def sample(domain):

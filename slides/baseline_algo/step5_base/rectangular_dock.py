@@ -9,7 +9,7 @@ import numpy as np
 import trimesh
 from scipy.optimize import linprog
 from step2_local_support import insertion as H, withdrawal as W
-from step4_floor_contact import equilibrium as Q
+from step0_pose_selection import equilibrium as Q
 from step5_base import bearing as M
 
 WIDTH, HEIGHT, LENGTH = .018, .008, .026

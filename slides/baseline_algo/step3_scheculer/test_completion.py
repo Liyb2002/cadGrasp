@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from step3_scheculer import completion as Q
-from step4_floor_contact import floor_contact as F
-from step5_connect_support import whole_assembly as C
+from step0_pose_selection import floor_contact as F
+from step4_connect_support import whole_assembly as C
 from step3_scheculer import run_all
 class CompletionTests(unittest.TestCase):
     def test_hull_timeout_requires_a_fresh_run(self):
@@ -109,7 +109,7 @@ class CompletionTests(unittest.TestCase):
             self.assertEqual(run_all.run(['failed'],from_step=3),2)
             stages=[call.args[0][1] for call in invoke.call_args_list]
             self.assertTrue(any(path.endswith('/verification.py') for path in stages))
-            self.assertTrue(any('/step4_floor_contact/' in path for path in stages))
+            self.assertTrue(any('/step0_pose_selection/' in path for path in stages))
             self.assertTrue(any('/step6_connect_support/' in path for path in stages))
 
     def test_default_run_includes_fixed_foot_connector_and_audit(self):
@@ -223,7 +223,7 @@ class CompletionTests(unittest.TestCase):
             scheduler=root/'step3_scheculer';scheduler.mkdir(parents=True)
             (scheduler/'schedule.json').write_text(json.dumps(dict(self.complete(),
                 status='round_limit_reached',continuous_coverage_proved=False)))
-            old=root/'step5_connect_support';old.mkdir()
+            old=root/'step4_connect_support';old.mkdir()
             (old/'support.stl').write_text('historical geometry')
             (old/'load_check.json').write_text('historical counterexample')
             self.assertIsNone(Q.archive_downstream('test'))

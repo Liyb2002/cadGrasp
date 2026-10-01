@@ -1,8 +1,36 @@
 # 当前 baseline 算法
 
-2026-09-26 Step5 当前实体：[B / pose1+3 窄地框与头部连接合并模型](step5_connect_support/README.md)，约 60.8 cm³。每个 pose 分别构造自己的地框和三头连接，再合并；框内留空，原载荷和完整退出通过。相对上一版 575.2 cm³ 厚体减材约 89.4%，尚非同等强度比较或全局最小值。文件仍直接位于 `output/B/pose1+3/step5/`，橙色仍有两个不同接触面。
+新增 [Step5 占地评价](step5_evaluate/README.md)：将整组静态 pose 的物体放进一个总 XY bounding box，再将整组物体加支撑放进另一个总 bounding box，比较面积与额外占地比例。沿用实际工位坐标，不累加各 pose 面积，不新增尺寸门槛。单组入口 `step5_evaluate/evaluate.py`；全部组合入口 `step5_evaluate/run_all.py`；[全部 BBX 对比](output/B/pose1+3/step5_evaluate/all_groups.png)。
 
-此前的 Step5 设计检查：顺序式 3+2 的五对、11 组接触成功，在保持当时的共享曲面配准时均违反两 pose 地脚兼容的必要条件。见 [Step5 检查与结构提案](step5_connect_support/shared_design.md) 的历史诊断；后来的双接触面实体已实现，开放后框也已被分支身体替代。以下“止于 Step4”描述保留为前一实验阶段。
+最新分工：**Step3 决定力和力矩是否通过；Step4 只验收实体几何，不重复求解承载。** 当前八组中 Step4 有 **8/8 通过**。所有 28 个安装姿态的工作面、地面、实际接地凸包覆盖、接触/根部保留、连通和退出均通过；用户未要求尺寸限制，已取消原代码的跨度上限；尺寸仅作记录。各组的 Step3 原始状态单独保留，没有把上游失败改成通过。原头、载荷、模型和图片未改；没有重新求解力或生成新实体。入口 `step4_connect_support/run_access_batch.py`；[逐组结果](output/B/pose5+7/step4/data/access_rerun.md) 与 [规则及实现](step4_connect_support/README.md)。
+
+工作面规则与 Step3 一致：只禁止占用工作面，相邻非工作面共边/共顶点允许，不额外禁止加工射线圆锥。八组 104 个原头和全部实体都已通过这项检查。此前“原头非法、必须重选”和加工射线阻挡导致失败的推断已撤销。两组双 pose 保留参考风格外侧脚垫：[pose5+7 总览](output/B/pose5+7/step4/overview.png)、[pose3+6 总览](output/B/pose3+6/step4/overview.png)。[八组撒点图](output/B/pose5+7/step4/data/floor_demands_all_groups.png) 每组只有一个固定半透明物体，各 pose 需求统一到物体坐标。B 根目录无 JSON，不生成 HTML。以下是历史记录，旧验收规则和输出链接不代表当前结果。
+
+以下为上一轮共同物体配准模型及更早记录。该模型的用户决定是：**Step3 每个 pose 独立选头、不共享，但完整接触面在组内每个 pose 下都须至少离地 2 mm；头作为零厚度接触面输入 Step4。** 实体阶段把所有接触面放回同一个物体参照，再运行复制的 co-design Step5 构造算法。实体阶段仍保留已改名的 `step4/` 路径。
+
+本轮入口为 `run_surface_batch.py B --jobs 2`，重跑现存八组；组内结果在 `step3_scheculer/independent_poses_floor2mm/`。接触面的地面筛选按全部三角形顶点执行，并在 Step3 结束、Step4 入口独立复核。Step3 自己 pose 的旧有限厚度几何仅作为保守退出／通路探针；Step4 不强制保留该厚度，从面生成小接触根部并继续构造实体。最终材料仍需通过地面、碰撞、接触保留、退出和全部原载荷检查。
+
+本轮八组已全部完成：104 个头的 401 项头／pose 地面检查全部通过，最低间距 **2.368019 mm**。Step3 有 3 组全载荷通过；其余五组均为 pose2 未覆盖全部原始载荷。Step4 生成 **1 个连接候选，0 个完整验收通过**：pose3+6 为 **243.173914 cm³**，两种摆放退出失败、pose6 载荷检查未通过；另外七组在初始身体找合法脚面处失败，原头穿地拒绝已消除。[当前淡蓝色实体与全部头图](output/B/pose2+9+13+15+17/step4/data/codesign_vis.html)；[独立复核记录](output/B/pose2+9+13+15+17/step4/data/surface_independent_review.json)。保留有限搜索结论，不据此声称其他形状或方向都无解。以下是改动前的记录。
+
+之前未筛选的独立 Step3：20 个 pose 中 18 个覆盖全部 32,768 个原始载荷；pose2 为 31,533/32,768，pose20 为 32,551/32,768。这些原选头结果未覆盖本轮的组内 2 mm 约束；原始载荷仍沿用。[历史逐 pose 结果](output/B/independent_poses/report.md)。
+
+当前实体入口为 [run_codesign.py](step4_connect_support/run_codesign.py)，复制的构造与可视化源文件在 [codesign_port](step4_connect_support/codesign_port/)。先输出每组 `all_heads.png`：同一 pose、同一个物体周围的全部头。随后按原代码长最近合法地面的局部身体、补脚面和连接；PNG 使用原 Step5 的 CAD 渲染器，HTML 使用原 Step5 viewer，接口扩展到 N 个 pose 与独立头。
+
+上轮有限厚度八组结果：**pose3+6 的八个头形成一个 252.049655 cm³ 的闭合连接候选；完整验收未通过。** 两种摆放退出失败，pose6 的载荷检查未通过。五组因原头在其他 pose 下穿地被原构造器拒绝；pose5+7、pose6+8+10+19 的初始身体在有限菜单中未找到合法脚面，未生成实体。该轮证据已移入各组 `step4/data/history/before_surface_heads/`，不作为当前结果。不能把有限菜单失败当作一般无解。
+
+先前平行通道／多工位布局已被用户拒绝，其“8 组连接、2 组通过”不属于当前模型。旧公开图与 shape 已移入各组 `data/rejected_stations/`；下面其余记录均为历史。
+
+2026-09-29 B 输入重新生成：当前 **20 个 pose** 中有 206 组三姿态、100 组四姿态、5 组五姿态通过地面兼容检查；pose1+2+3+4+5 是完整五姿态示例。正式 baseline 从新 setup 重建全部载荷后逐对复核一致。[新姿态总览](../../objects/B/overview.png)；[正式 Step0 五姿态示例](output/B/pose1+2+3+4+5/step0_pose_selection/report.json)。后续选头／实体尝试见上方八组记录；新机器人轨迹仍未生成。旧十姿态输入保留在 `objects/B/history/before_compatible_poses_860a4233e74b/`，旧 baseline 输出已按要求删除；下面无三、四 pose 解的结论仅针对旧输入。
+
+2026-09-29：当前流程改为 **Step0 随机选择并筛选 n 个 pose → Step1 载荷 → Step2 候选头 → Step3 顺序选头 → Step4 实体构造**。入口 `run_sequential_batch.py B --n 3`，多组入口 `B --n 2 3 4 --groups-per-n 2 --jobs 2`；旧 Step4 检查前移到 Step0，旧 Step5 改名 Step4。组合穿地就换一组，全部尝试后仍失败则停止。[当前说明](step0_pose_selection/README.md)。用户清空输出后重新运行：n=2 选中 3+4、5+10，Step3 均全覆盖；Step4 均未找到整组头的无碰撞候选退出方向，没有生成实体。n=3、4 分别穷尽 120、210 组，无地面兼容组合。[历史十姿态报告](output/B/history/before_compatible_poses_860a4233e74b/step0_pose_selection/batch_report.md)。下面的运行记录及阶段编号为历史。
+
+2026-09-28 头部全局约束修正：顺序式 Step3 现在从所有输入 pose 的非工作、离地表面交集中生成候选，并要求每个实际头实体在所有 pose 下不穿地；不参与当前 pose 受力也不能豁免。新输出在 `sequential_k_global/`。使用 `run_sequential_batch.py B --existing-groups` 重跑保留的四组新结果；保持旧 pose1+3 做图结果。候选合法只覆盖头本身，不能替代 Step5 的地面需求、连接和完整支架检查。
+
+2026-09-28 当前入口为 [run_sequential_batch.py](run_sequential_batch.py)：随机抽取 2／3／4 pose 各两组，每组按编号顺序逐 pose 求解。Step3 每 pose 先找 3 个头，不足则补第 4 个；后续 pose 从此前所有头中选贡献最大的一个共享头，再补自己的头，先前已完成的接触集合不变。固定每头 1% 面积，不扩尺寸；所有原始 32,768 样本全覆盖才通过。每组最多十条链，首个成功即止，再执行 Step4 与多 pose Step5。同步评分版本已由用户复制到 `../co_design_algo/`，本次只读不改。详见 [当前规则与运行命令](step3_scheculer/README.md)。以下其他算法和结果均为历史记录。
+
+2026-09-28 共享头纠错：**共享头必须是同一个物理头，两份完整接触面和头实体在支撑坐标系中重合。此前五个 ID、六块接触面的 Step5 构造无效，已撤回。** 当前入口强制检查配准；[五组 B 总图](output/B/pose1+3/step4/data/batch.png)及各组 overview 显示拒绝原因，不再导出旧支撑 OBJ。旧几何与报告保留在各组 `data/history/before_fast_construction/`。严格按原接触对应关系配准后，五组保存输入均违反地面需求必要条件；pose1+3 的 pose1 有 1713/32768 个需求越界。当前没有有效的五头完整支撑，详见 [Step5 说明](step4_connect_support/README.md)。
+
+此前的 Step5 设计检查：顺序式 3+2 的五对、11 组接触成功，在保持原共享曲面配准时均违反两 pose 地脚兼容的必要条件。见 [共享头核查](step4_connect_support/shared_head_diagnosis.md)。后来的双黄色接触面构造改变了物理头定义，不能作为绕过该失败的解。
 
 2026-09-26 新增用户指定的顺序式实验：[run_sequential.py](step3_scheculer/run_sequential.py)。十条 particle 先求 pose1 三头，再各选一个对 pose2 贡献最大的合法共享头，为 pose2 增加两个新头。各组三头独立验收固定载荷和共同退出，完整五头实体／地脚留给 Step5；固定 1% 和末尾 >98% 小幅补全保留。详见 [规则与结果](step3_scheculer/README.md#sequential-3plus2)。原共同五头算法保留为对照。
 
@@ -152,7 +180,7 @@ f_i\text{ 属于相应的单边接触力锥},
 
 ## Step4：只计算地面需求
 
-入口：[whole_assembly.py](step4_floor_contact/whole_assembly.py)；[阶段说明](step4_floor_contact/README.md)。
+入口：[whole_assembly.py](step0_pose_selection/whole_assembly.py)；[阶段说明](step0_pose_selection/README.md)。
 
 读取纯重力、Step1 样本和 Step3 新增反例的完整六维载荷，计算所需地面压力中心。另用工作三角形顶点与方向锥外包多面体构造连续需求保守外包，再映射到地面。
 
@@ -233,7 +261,7 @@ A1-f/pose_1 未找到完整框架；B/pose_4 和 C5/pose_4 没有选出头，因
 
 当前两例均在 μ=64 下通过样本、连续承载、底座和整件轨迹及独立证据审计。B/pose_1 选方向 459、外扩 10.177 mm；B/pose_2 选方向 792、外扩 2.098 mm。μ 是充分摩擦见证，不是实测材料参数。两个最终视频均为 9 秒。
 
-Step1–4 的 198 个原有文件逐项哈希不变；新结果位于各案例 `step5_base/` 与 `step6_connect_support/`，面积和输入检查见 `rerun_verification.json`。Step5 的报告保留全部承载筛除记录和已选反力证书。旧 `step5_connect_support/` 输出保留为历史证据。
+Step1–4 的 198 个原有文件逐项哈希不变；新结果位于各案例 `step5_base/` 与 `step6_connect_support/`，面积和输入检查见 `rerun_verification.json`。Step5 的报告保留全部承载筛除记录和已选反力证书。旧 `step4_connect_support/` 输出保留为历史证据。
 
 ## 运行
 
@@ -299,7 +327,7 @@ A1-f/pose_1 另取 20 个合格候选做纯方向检查：单进程 105.1 秒，
 
 不要因算法未成功删除其失败证据，也不要将旧坐标迁移或图像更新记录当成本次重新搜索。当前 B 的换轴对照由 `coordinate_equivalence.json` 和 `coordinate_reference.npz` 保存；坐标迁移不改变既定姿态。
 
-代码或输入改变后按来源哈希重算/审计；仅修改本文不构成新实验。2026-09-13 的代码清理删除了未被当前入口使用的独立底脚、旧连接搜索、贴面腰带搜索及对应的旧实验测试；当前共用的几何、力学求解、轨迹和失败诊断仍保留。当时 Step4/Step5 的命令入口直接调用整体结构实现，测试共用接触块放在 `step5_connect_support/fixtures.py`。清理不改变选头、尺寸优化、几何搜索及承载验收规则。
+代码或输入改变后按来源哈希重算/审计；仅修改本文不构成新实验。2026-09-13 的代码清理删除了未被当前入口使用的独立底脚、旧连接搜索、贴面腰带搜索及对应的旧实验测试；当前共用的几何、力学求解、轨迹和失败诊断仍保留。当时 Step4/Step5 的命令入口直接调用整体结构实现，测试共用接触块放在 `step4_connect_support/fixtures.py`。清理不改变选头、尺寸优化、几何搜索及承载验收规则。
 
 清理验收：272 项回归测试通过；12 个案例最终保存的 Step5 几何、轨迹、承载报告及已记录的网格/视频文件与清理前一致，当前来源校验和独立审计通过。Step1–4 的 1136 个已记录文件哈希不变。逐案例对照见 Step5 的 `cleanup_verification.json`，临时对照副本已移除；“结果一致”包括 baseline 原有的设计失败。
 

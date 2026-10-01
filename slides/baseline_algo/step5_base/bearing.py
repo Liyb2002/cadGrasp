@@ -6,7 +6,7 @@ floor contacts. Connecting them changes collision geometry, not these equations.
 from time import perf_counter
 import numpy as np
 from scipy.spatial import ConvexHull
-from step4_floor_contact import equilibrium as Q
+from step0_pose_selection import equilibrium as Q
 
 def bearing_rays(domain, contacts, pivot, friction):
     """Use the same sufficient floor friction at the workpiece pivot and base."""

@@ -1,7 +1,37 @@
-# 连续十姿态 setup
+# 姿态生成与机器人轨迹
+
+## 兼容组合优先的姿态生成（2026-09-29）
+
+当前 B 已重新生成 **20 个接地目标姿态**，其中有 206 组三姿态、100 组四姿态、5 组五姿态通过完整原始载荷的地面兼容检查。`pose_1` 至 `pose_5` 就是一组合法五姿态；前三、前四个也是合法子集。20 个姿态的最小两两重力方向夹角为 19.783°，保留至少 18° 的差异要求。这里认证的是 Step0 条件。后续同一批 n=2、3、4、5 各两组 baseline 已加入 Step3 整组退出方向继承并重跑：1/8 组选头全覆盖且构造连接实体（后续 Step4 完整退出通过，但联合载荷验收失败），其余七组在十条链内未全覆盖，详见[八组运行结果](../../slides/baseline_algo/output/B/pose2+9+13+15+17/step4/data/batch_report.md)。
+
+```sh
+# 生成并发布 20 个目标，要求存在至少一个五姿态兼容组
+PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 python codes/setup/demo_regrasp.py B --poses-only --pose-count 20 --compatible-size 5 --pose-seed 20260929
+
+# 只产生候选计划，不替换 objects/B；--publish 才发布
+python codes/setup/compatible_pose_search.py B --output /tmp/B-pose-plan --pose-count 20 --compatible-size 5
+
+# 独立重算全部载荷与组合；以及通过 baseline 正式输入再次复验
+python codes/setup/verify_sequences.py B
+python codes/setup/verify_baseline_pose_set.py B
+```
+
+`compatible_pose_search.py` 随机生成完整三维旋转，按最低点接地，仍要求唯一原始顶点接地、质心投影与支点相差至少 1 mm。每个候选先固定一块可见、朝上、离地的连通工作面（总面积 6–10%），再计算兼容性；载荷规则仍为 `K=0.5`、30° 半角、固定种子。没有缩小加工力来获得通过。
+
+候选图中一条边表示双方所有地面需求都不穿入对方地面，并且姿态差异足够。先用同一固定样本流的前 1024 个载荷筛选；搜索五顶点两两相连的组合，使用完整 32768 个载荷复验，删除不通过的边后继续搜索。面内凸包顶点只是仿射高度检查的精确加速，最终独立验证仍遍历全部样本。找到合法组合后补齐其他有足够差异的姿态；有有限候选预算，失败不会发布半成品，也不宣称全局无解。
+
+`compatible_pose_export.py` 在临时目录完成完整复核后才替换输入；保存固定工作面，后续不重新抽工作面。正式 baseline 从这些 setup 重建载荷，已核对 20×20 个方向的冲突计数完全一致，并输出三、四、五姿态示例的 Step0 结果。
+
+当前数据使用 `cadgrasp_pose_set_v1`，**只有目标姿态，没有新机器人轨迹或视频**。完整运动流程另做；不得把历史轨迹当作这 20 个 pose 的机器人验证。`poses.json`、每个 `setup.json` 都显式标记 `placement_trajectory_verified=false`。旧十姿态输入、视频在 `objects/B/history/before_compatible_poses_860a4233e74b/`；旧 baseline 结果在 `slides/baseline_algo/output/B/history/before_compatible_poses_860a4233e74b/`。新旧 pose 编号代表不同姿态。
+
+结果入口：[20 姿态总览](../../objects/B/overview.png)、[全部兼容计数与见证组合](../../objects/B/floor_compatibility.json)、[baseline 复验](../../slides/baseline_algo/output/B/step0_pose_selection/pose_set_validation.json)。
+
+## 连续机器人轨迹生成（历史十姿态流程）
 
 每个物体保存一条 `rest → pose_1 → … → pose_10` 轨迹。姿态按搬运可行性筛选，
 允许 cherry-pick；这是共享被动支撑研究的准备流程，不作为抓取或运动规划贡献。
+
+此节适用于 `cadgrasp_sequence_v1` 数据。目标数量现可由 `demo_regrasp.py` / `regrasp_sequence.py` 的 `--pose-count` 指定（默认仍为 10）；导出、分段、总览和验证读取实际数量。直接运行机器人搜索会寻找自己的目标，不代表已复现上面的兼容目标集。带 `--compatible-size` 的组合保证目前仅用于 `--poses-only` 分支。
 
 新一轮 demo 入口是 `demo_regrasp.py`，搜索核心是 `regrasp_sequence.py`：每次先回到可自稳定的中间落座姿态，张开
 夹爪并退开，再换接触位置和接近／夹紧方向，搬到下一个目标。中间落座是实际

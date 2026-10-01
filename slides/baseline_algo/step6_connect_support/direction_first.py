@@ -11,8 +11,8 @@ from shapely.geometry import Polygon, Point
 from shapely.ops import nearest_points
 
 from step2_local_support import insertion as D
-from step5_connect_support import belt_geometry as B, routing as T, ground as G
-from step5_connect_support import whole_assembly as A, floor_design as FD, rigid_path as P
+from step4_connect_support import belt_geometry as B, routing as T, ground as G
+from step4_connect_support import whole_assembly as A, floor_design as FD, rigid_path as P
 
 FRAME_GAP_FRACTION = .02
 FRAME_WIDTH_FRACTION = .05

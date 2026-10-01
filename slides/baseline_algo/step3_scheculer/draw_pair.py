@@ -19,7 +19,7 @@ from step3_scheculer.sample_acceptance import read_report
 def draw(name, poses, max_heads=None, fixed_area=False, terminal_expansion=False):
     folder = completion_folder if terminal_expansion else fixed_area_folder if fixed_area else pair_folder
     step3 = folder(name, poses, 'step3_scheculer')
-    step4 = folder(name, poses, 'step4_floor_contact')
+    step4 = folder(name, poses, 'step0_pose_selection')
     if max_heads is not None:
         step3 = step3/f'heads_{max_heads}'
         step4 = step4/f'heads_{max_heads}'

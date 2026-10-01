@@ -18,7 +18,7 @@ import kuka_transfer as K
 def find(name,pairs=160,candidate_budget=120,resume=True,physics_steps=2,downward_component=.65,
          comfortable_transit=False,roll_step=None,pairwise_grasp_direction=12.,
          anchor_index=0,anchor_yaw=0.,grasp_method='rays',joint_transit=False,tool='standard',min_grasp_width=.015,
-         com_weight=2.5):
+         com_weight=2.5,pose_count=10):
     if not np.isfinite(com_weight) or com_weight<0:
         raise ValueError('com_weight must be finite and nonnegative')
     if grasp_method not in ('rays','sampled'):
@@ -162,7 +162,7 @@ def find(name,pairs=160,candidate_budget=120,resume=True,physics_steps=2,downwar
         return R.find(name,pairs,candidate_budget,resume=resume,grasp_method=grasp_method,ideal_grasp=True,
                       pairwise_grasp_direction_deg=pairwise_grasp_direction,
                       anchor_index=anchor_index,anchor_yaw=anchor_yaw,tool=tool,
-                      min_grasp_width=min_grasp_width,com_weight=com_weight)
+                      min_grasp_width=min_grasp_width,com_weight=com_weight,pose_count=pose_count)
     finally:
         A.candidates,R.G.candidates=original_rays,original_sampled
         K.solve,R.export=original_solve,original_export
@@ -174,6 +174,11 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('object');parser.add_argument('--pairs',type=int,default=160)
     parser.add_argument('--candidate-budget',type=int,default=120)
+    parser.add_argument('--pose-count',type=int,default=10)
+    parser.add_argument('--poses-only',action='store_true',help='Generate floor-compatible target poses without robot motion')
+    parser.add_argument('--compatible-size',type=int,help='Required mutually floor-compatible subset, for --poses-only')
+    parser.add_argument('--pose-candidate-budget',type=int,default=1600)
+    parser.add_argument('--pose-seed',type=int,default=20260929)
     parser.add_argument('--physics-steps',type=int,choices=(1,2,3),default=2)
     parser.add_argument('--downward-component',type=float,default=.65)
     parser.add_argument('--grasp-method',choices=('rays','sampled'),default='rays')
@@ -188,6 +193,20 @@ if __name__=='__main__':
     parser.add_argument('--anchor-yaw',type=float,default=0.)
     parser.add_argument('--fresh',action='store_true')
     args=parser.parse_args()
+    if args.pose_count < 1:parser.error('pose-count must be positive')
+    if args.poses_only:
+        import tempfile
+        from compatible_pose_search import search
+        from compatible_pose_export import publish
+        with tempfile.TemporaryDirectory(prefix=f'cadgrasp-{args.object}-pose-plan-') as plan:
+            search(args.object,plan,args.pose_count,args.compatible_size or 5,
+                   args.pose_seed,args.pose_candidate_budget)
+            publish(args.object,plan)
+        from overview import render
+        render(args.object)
+        raise SystemExit(0)
+    if args.compatible_size is not None:
+        parser.error('--compatible-size currently requires --poses-only; robot trajectories are a separate stage')
     if not 0 <= args.downward_component < 1:parser.error('downward-component must be in [0, 1)')
     if args.roll_step is not None and not 0 < args.roll_step <= 90:parser.error('roll-step must be in (0, 90]')
     if args.grasp_method=='sampled' and args.roll_step is not None:parser.error('--roll-step requires --grasp-method rays')
@@ -195,4 +214,4 @@ if __name__=='__main__':
     if not np.isfinite(args.com_weight) or args.com_weight<0:parser.error('com-weight must be finite and nonnegative')
     find(args.object,args.pairs,args.candidate_budget,not args.fresh,args.physics_steps,args.downward_component,
          args.comfortable_transit,args.roll_step,args.pairwise_grasp_direction,
-         args.anchor_index,args.anchor_yaw,args.grasp_method,args.joint_transit,args.tool,args.min_grasp_width,args.com_weight)
+         args.anchor_index,args.anchor_yaw,args.grasp_method,args.joint_transit,args.tool,args.min_grasp_width,args.com_weight,args.pose_count)

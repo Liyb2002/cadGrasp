@@ -12,17 +12,8 @@ function quat(r){return new THREE.Quaternion().setFromRotationMatrix(new THREE.M
 const fq=D.poses.map(p=>quat(p.fixtureR)),oq=D.poses.map(p=>quat(p.objectR));
 const centers=D.poses.map(p=>{const c=new THREE.Vector3();for(let i=0;i<p.object.v.length;i+=3)c.add(new THREE.Vector3(...p.object.v.slice(i,i+3)));return c.multiplyScalar(3/p.object.v.length);});
 const fixture=new THREE.Group();scene.add(fixture);
-const fg=geom(D.fixture).toNonIndexed(),fc=[],fv=fg.getAttribute('position');
-for(let i=0;i<fv.count;i+=3){
- const x=(fv.getX(i)+fv.getX(i+1)+fv.getX(i+2))/3;
- const y=(fv.getY(i)+fv.getY(i+1)+fv.getY(i+2))/3;
- const z=(fv.getZ(i)+fv.getZ(i+1)+fv.getZ(i+2))/3;
- const c=new THREE.Color(x>.165?'#738894':D.colors[(z<0?2:0)+(y>0?1:0)]);
- for(let j=0;j<3;j++)fc.push(c.r,c.g,c.b);
-}
-fg.setAttribute('color',new THREE.Float32BufferAttribute(fc,3));
-const fm=material('#ffffff');fm.vertexColors=true;fm.flatShading=false;
-fixture.add(new THREE.Mesh(fg,fm));
+fixture.add(new THREE.Mesh(geom(D.fixture),material(D.fixtureColor)));
+for(const part of D.headOverlays){const mat=material(part.color);mat.polygonOffset=true;mat.polygonOffsetFactor=-1;mat.polygonOffsetUnits=-1;fixture.add(new THREE.Mesh(geom(part),mat));}
 const raw=D.poses[0].object,local=[],inv=oq[0].clone().invert();
 for(let i=0;i<raw.v.length;i+=3)local.push(...new THREE.Vector3(...raw.v.slice(i,i+3)).sub(centers[0]).applyQuaternion(inv).toArray());
 const og=geom({v:local,f:raw.f}).toNonIndexed();og.computeVertexNormals();
@@ -30,10 +21,10 @@ const om=material(0xffffff);om.vertexColors=true;om.transparent=false;om.opacity
 const object=new THREE.Mesh(og,om);scene.add(object);let workIndex=-1;
 function work(k){if(k===workIndex)return;workIndex=k;const ids=new Set(D.poses[k].work),colors=[];for(let f=0;f<raw.f.length/3;f++){const c=new THREE.Color(ids.has(f)?'#b4c7b2':'#bac0c5');for(let j=0;j<3;j++)colors.push(c.r,c.g,c.b);}og.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));}
 const floor=new THREE.Mesh(new THREE.PlaneGeometry(1,1),material('#f0f2f4'));floor.position.z=-.002;floor.receiveShadow=true;scene.add(floor);
-let mode='overview',time=0,playing=false,last=0,az=2.6,el=.48,zoom=1,videoFrame=null;
-const VIDEO_MAGNIFICATION=1.2;
+let mode='overview',time=0,playing=false,last=0,az=-Math.PI*.75,el=.526,zoom=1,videoFrame=null;
+const VIDEO_MAGNIFICATION=1;
 const V=a=>new THREE.Vector3(...a),mix=(a,b,t)=>a.clone().lerp(b,t),ease=t=>t*t*(3-2*t);
-function state(k){const p=D.videoLayout?.task_placements?.[k];return p?{k,op:V(p.object.p),oq:new THREE.Quaternion(...p.object.q),fp:V(p.fixture.p),fq:new THREE.Quaternion(...p.fixture.q),phase:0}:{k,op:centers[k].clone(),oq:oq[k].clone(),fp:V(D.poses[k].fixtureT),fq:fq[k].clone(),phase:0};}
+function state(k){return {k,op:centers[k].clone(),oq:oq[k].clone(),fp:V(D.poses[k].fixtureT),fq:fq[k].clone(),phase:0};}
 const robot=new THREE.Group();scene.add(robot);
 const robotLinks=D.robot.map(parts=>{const g=new THREE.Group();for(const p of parts){const mat=material(new THREE.Color(...p.color));mat.flatShading=false;g.add(new THREE.Mesh(geom(p),mat));}robot.add(g);return g;});
 for(const root of [fixture,object,robot])root.traverse(m=>{if(m.isMesh){m.castShadow=true;m.receiveShadow=false;}});
@@ -54,7 +45,7 @@ function sceneCorners(){
 function videoDirection(){
  // One stationary camera. The task assemblies themselves are arranged with
  // their openings along +Y; no camera or table motion conceals a backwards pose.
- const angle=Math.PI/2+az-2.6-.28,elevation=el;
+ const angle=Math.atan2(1,.28)+az+Math.PI*.75,elevation=el;
  return V([Math.cos(angle)*Math.cos(elevation),Math.sin(angle)*Math.cos(elevation),Math.sin(elevation)]);
 }
 function basis(dir){const right=new THREE.Vector3().crossVectors(V([0,0,1]),dir).normalize();return {right,up:new THREE.Vector3().crossVectors(dir,right).normalize()};}
@@ -80,7 +71,7 @@ function view(s,rect,video=false,wide=false){
  apply(s);robot.visible=video;
  const bound=new THREE.Box3().setFromObject(fixture);if(object.visible)bound.union(new THREE.Box3().setFromObject(object));
  const focus=bound.getCenter(new THREE.Vector3());
- const fixtureAxis=V([1,0,0]).applyQuaternion(s.fq),angle=az+Math.atan2(fixtureAxis.y,fixtureAxis.x);
+ const angle=az;
  const dir=video?videoDirection():V([Math.cos(angle)*Math.cos(el),Math.sin(angle)*Math.cos(el),Math.sin(el)]);
  const {right,up}=basis(dir),aspect=rect.w/rect.h;let height;
  if(wide&&mode==='video'){
@@ -103,23 +94,24 @@ function view(s,rect,video=false,wide=false){
 function draw(){
  ctx.fillStyle='white';ctx.fillRect(0,0,screen.width,screen.height);
  const W=screen.width,H=screen.height;
- if(mode==='overview'){const margin=W*.015,gap=W*.01,w=(W-margin*2-gap*2)/3;for(let i=0;i<3;i++)view(state(i),{x:margin+i*(w+gap),y:H*.035,w,h:H*.93});}
+ if(mode==='overview'){const count=D.poses.length,margin=W*.015,gap=W*.01,w=(W-margin*2-gap*(count-1))/count;for(let i=0;i<count;i++)view(state(i),{x:margin+i*(w+gap),y:H*.035,w,h:H*.93});}
  else if(mode==='fixture')view(state(0),{x:W*.035,y:H*.03,w:W*.93,h:H*.94});
- else {const s=mode==='video'?animated(time):state(Number(mode.slice(-1)));view(s,{x:W*.02,y:H*.025,w:W*.96,h:H*.95},true,true);}
+ else {const s=mode==='video'?animated(time):state(Number(mode.slice(-1)));view(s,{x:W*.02,y:H*.025,w:W*.96,h:H*.95},mode==='video',mode==='video');}
  document.getElementById('time').value=time;
 }
 function setMode(m){mode=m;playing=false;document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));draw();}
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{setMode(b.dataset.mode);if(mode==='video'){time=0;playing=true;}});
 document.getElementById('play').onclick=()=>{if(mode!=='video')setMode('video');playing=!playing;if(time>=D.duration)time=0;};
 document.getElementById('time').oninput=e=>{const t=Number(e.target.value);setMode('video');time=t;draw();};
-document.getElementById('reset').onclick=()=>{az=2.6;el=.48;zoom=1;videoFrame=null;draw();};
+document.getElementById('reset').onclick=()=>{az=-Math.PI*.75;el=.526;zoom=1;videoFrame=null;draw();};
 document.getElementById('save').onclick=()=>{const a=document.createElement('a');a.download=`reuse_${mode}.png`;a.href=screen.toDataURL('image/png');a.click();};
 let drag=null;screen.onpointerdown=e=>{drag=[e.clientX,e.clientY];screen.setPointerCapture(e.pointerId);};screen.onpointermove=e=>{if(!drag)return;az-=(e.clientX-drag[0])*.007;el=Math.max(.08,Math.min(1.45,el+(e.clientY-drag[1])*.006));drag=[e.clientX,e.clientY];videoFrame=null;draw();};screen.onpointerup=()=>drag=null;
 screen.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.65,Math.min(1.7,zoom*Math.exp(e.deltaY*.001)));draw();},{passive:false});
 function tick(now){if(playing){time=Math.min(D.duration,time+(now-last)/1000);draw();if(time>=D.duration)playing=false;}last=now;requestAnimationFrame(tick);}requestAnimationFrame(tick);
 document.getElementById('time').max=D.duration;
 function getState(){
- const opening=V([-1,0,0]).applyQuaternion(fixture.quaternion),towardCamera=V([0,0,1]).applyQuaternion(camera.quaternion);
+ const k=mode==='video'?sample(time).a.k:mode.startsWith('pose')?Number(mode.slice(-1)):0;
+ const opening=V(D.poses[k].withdrawalDirection).applyQuaternion(fq[k].clone().invert()).applyQuaternion(fixture.quaternion),towardCamera=V([0,0,1]).applyQuaternion(camera.quaternion);
  const projected=mode==='video'?sceneCorners().map(p=>p.project(camera)):[];
  let framingMaxAbs=Math.max(0,...projected.map(p=>Math.max(Math.abs(p.x),Math.abs(p.y))));
  if(framingMaxAbs>1){

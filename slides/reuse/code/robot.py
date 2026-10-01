@@ -23,20 +23,22 @@ def tool(point,normal,closing):
     x=np.array(closing,dtype=float);x-=z*(z@x);x/=np.linalg.norm(x)
     return T(np.column_stack([x,np.cross(z,x),z]),point)
 OP=[];FP=[];stage_yaws=[]
-# The opening stays along world +Y. Rotate each complete task assembly about
-# vertical, preserving its object/fixture relationship and height above ground.
-# All tasks use the same station; only the fixture's roll changes between them.
+# Align each task's saved object-withdrawal direction with world +Y while
+# preserving its complete object/fixture relationship and floor height.
 stage_offsets=np.tile([.03,0.,0.],(len(D['poses']),1))
 opening_direction=np.array([0.,1.,0.])
 for k,p in enumerate(D['poses']):
     v=np.array(p['object']['v']).reshape(-1,3)
     source_fixture=np.asarray(p['fixtureR']);pivot=np.asarray(p['fixtureT'])
-    opening=-source_fixture[:,0]
+    opening=np.asarray(p['withdrawalDirection'])
     yaw=np.pi/2-np.arctan2(opening[1],opening[0]);stage_yaws.append(yaw)
     turn=Rotation.from_euler('z',yaw).as_matrix()
-    OP.append(T(turn@np.asarray(p['objectR']),turn@(v.mean(0)-pivot)+pivot+stage_offsets[k]))
-    FP.append(T(turn@source_fixture,pivot+stage_offsets[k]))
-    assert np.allclose(-FP[-1][:3,0],opening_direction,atol=1e-10)
+    rotated_fixture=np.asarray(D['fixture']['v']).reshape(-1,3)@(turn@source_fixture).T
+    translation=np.r_[np.array([.02,-.05])-(rotated_fixture[:,:2].min(0)+rotated_fixture[:,:2].max(0))/2,
+                      -rotated_fixture[:,2].min()]
+    OP.append(T(turn@np.asarray(p['objectR']),turn@(v.mean(0)-pivot)+translation))
+    FP.append(T(turn@source_fixture,translation))
+    assert np.allclose(turn@opening,opening_direction,atol=1e-10)
     original_relative=np.linalg.inv(T(source_fixture,pivot))@T(np.asarray(p['objectR']),v.mean(0))
     assert np.allclose(np.linalg.inv(FP[-1])@OP[-1],original_relative,atol=1e-10)
 source_vertices=np.asarray(D['poses'][0]['object']['v']).reshape(-1,3)
@@ -44,8 +46,10 @@ v=(source_vertices-source_vertices.mean(0))@np.asarray(D['poses'][0]['objectR'])
 fixture_vertices=np.asarray(D['fixture']['v']).reshape(-1,3)
 withdrawal_distances=[]
 for pose in D['poses']:
-    local=(np.asarray(pose['object']['v']).reshape(-1,3)-pose['fixtureT'])@np.asarray(pose['fixtureR'])
-    withdrawal_distances.append(float(local[:,0].max()-fixture_vertices[:,0].min()+.012))
+    direction=np.asarray(pose['withdrawalDirection'])
+    obj=np.asarray(pose['object']['v']).reshape(-1,3)
+    fixture_world=fixture_vertices@np.asarray(pose['fixtureR']).T+pose['fixtureT']
+    withdrawal_distances.append(float((fixture_world@direction).max()-(obj@direction).min()+.018))
 m=trimesh.Trimesh(vertices=v,faces=np.array(D['poses'][0]['object']['f']).reshape(-1,3),process=False)
 def object_grasp(direction):
     normal=np.asarray(direction,dtype=float);normal/=np.linalg.norm(normal)
@@ -64,16 +68,50 @@ def object_grasp(direction):
     return gap,tool(point,normal,axis)
 # Regrasp at the parking station. Each task uses a surface approach that remains
 # above the part in both its parked and assembled orientation.
-object_grasps=[object_grasp(n) for n in ([.9,-.05,.35],[-.05,-.35,.94],[.9,-.05,.35])]
-normal=np.array([.9,-.05,.35]);normal/=np.linalg.norm(normal)
 parks,probs=m.compute_stable_poses(sigma=0,n_samples=1,threshold=0)
-options=[(prob,t) for prob,t in zip(probs,parks) if (t[:3,:3]@normal)[2]>.25]
-PARK=max(options,key=lambda x:x[0])[1].copy()
-outward=PARK[:3,:3]@normal
-PARK=T(Rotation.from_euler('z',-np.arctan2(outward[1],outward[0])+.3).as_matrix())@PARK
+# A stable parking orientation should expose a top approach shared with both
+# task poses; the most probable resting pose can put that surface underneath.
+park_scores=[min(t[2,:3]@p[2,:3] for p in OP)+.05*float(prob)
+             for t,prob in zip(parks,probs)]
+PARK=parks[int(np.argmax(park_scores))].copy()
+PARK=T(Rotation.from_euler('z',.3).as_matrix())@PARK
 pv=trimesh.transform_points(v,PARK)
 PARK[:2,3]+=np.array([.07,.27])-(pv[:,:2].min(0)+pv[:,:2].max(0))/2
 PARK[2,3]-=pv[:,2].min()
+object_grasps=[object_grasp(p[:3,:3].T@[0,0,1]+PARK[:3,:3].T@[0,0,1]) for p in OP]
+
+def fixture_grasp():
+    """Pinch an existing solid region with clearance in both resting poses."""
+    fixture=trimesh.Trimesh(fixture_vertices,np.array(D['fixture']['f']).reshape(-1,3),process=False)
+    np.random.seed(260928)
+    points,faces=fixture.sample(1800,return_index=True)
+    points-=fixture.face_normals[faces]*.0015
+    heights=np.column_stack([(points@p[:3,:3].T+p[:3,3])[:,2] for p in FP])
+    points=points[np.argsort(-heights.min(1))[:180]]
+    points=points[fixture.contains(points)]
+    normal=FP[0][:3,:3].T@[0,0,1]+FP[-1][:3,:3].T@[0,0,1]
+    normal/=np.linalg.norm(normal)
+    first=np.cross(normal,[0,0,1]);first/=np.linalg.norm(first)
+    second=np.cross(normal,first)
+    options=[]
+    for point in points:
+        for angle in np.linspace(0,np.pi,12,endpoint=False):
+            axis=first*np.cos(angle)+second*np.sin(angle)
+            hit,rays,_=fixture.ray.intersects_location([point,point],[axis,-axis],multiple_hits=True)
+            if len(np.unique(rays))!=2:continue
+            ds=[min(np.linalg.norm(h-point) for h in hit[rays==i]) for i in range(2)]
+            gap=sum(ds)/2+.004
+            if not .006<gap<.040:continue
+            center=point+axis*(ds[0]-ds[1])/2
+            clear=min((p[:3,:3]@center+p[:3,3])[2] for p in FP)
+            if clear<.018:continue
+            options.append((clear-.3*gap,gap,tool(center,normal,axis)))
+    if not options:raise RuntimeError('No accessible pinch region on the new fixture')
+    _,gap,grasp=max(options,key=lambda item:item[0])
+    return gap,grasp
+
+fixture_closed,fixture_tool=fixture_grasp()
+print('New fixture grasp',fixture_tool[:3,3].tolist(),'jaw half-gap',fixture_closed,flush=True)
 HOME=tool([.10,.10,.50],[0,0,1],[1,0,0])
 current=dict(o=PARK.copy(),f=FP[0].copy(),h=HOME.copy(),gap=.072,k=0)
 segments=[];clock=0.;carry_groups=[]
@@ -90,23 +128,17 @@ def add(seconds,moving=None,pose=None,hand=None,g=None,k=None,grasp=None,horizon
 
 def carry(body,dest,k,initial=False):
     first_segment=len(segments)
-    # Grab exposed rear rails from a tilted approach that remains accessible
-    # at both ends of the flip, keeping the hand away from the object opening.
-    rear_point=[.178,.04,.074] if k==0 else [.178,-.074,.04]
-    outward=[1,-1,1] if k==0 else [1,-1,-1]
-    grasp=object_grasps[k][1] if body=='o' else tool(rear_point,outward,[1,0,0])
-    closed=object_grasps[k][0] if body=='o' else .018
+    grasp=object_grasps[k][1] if body=='o' else fixture_tool.copy()
+    closed=object_grasps[k][0] if body=='o' else fixture_closed
     source=current[body];h=source@grasp
     pre=tool(h[:3,3]+[0,0,.13],[0,0,1],[1,0,0])
     add(1.1,hand=pre,g=.072);add(.8,hand=h);add(.35,g=closed)
     # Remove horizontally first; adjust height only after clearing the opening.
     seated_source=body=='o' and not initial and not np.allclose(source,PARK)
     seated_dest=body=='o' and not np.allclose(dest,PARK)
-    source_axis=source[:3,0] if body=='f' else FP[k][:3,0]
-    dest_axis=dest[:3,0] if body=='f' else FP[k][:3,0]
     travel=withdrawal_distances[k]
-    source_outer=shift(source,-source_axis*travel) if seated_source else source
-    dest_outer=shift(dest,-dest_axis*travel) if seated_dest else dest
+    source_outer=shift(source,opening_direction*travel) if seated_source else source
+    dest_outer=shift(dest,opening_direction*travel) if seated_dest else dest
     if seated_source:add(1.,moving=body,pose=source_outer,grasp=grasp,horizontal=True)
     lift=.12 if body=='f' else .18
     high=shift(source_outer,[0,0,lift]);desthigh=shift(dest_outer,[0,0,lift])
@@ -129,7 +161,7 @@ stamps=[1.]
 opening_times=dict(fixture_ready=0.,separated=1.)
 moments=carry('o',OP[0],0);opening_times['object_inserted']=moments['seated']
 add(2.);stamps.append(clock-1)
-for k in range(2):
+for k in range(len(D['poses'])-1):
     moments=carry('o',PARK,k);stamps.append(moments['airborne'])
     moments=carry('f',FP[k+1],k);stamps.append(moments['airborne'])
     moments=carry('o',OP[k+1],k+1);stamps.append(moments['seated'])
@@ -319,7 +351,7 @@ for t in np.arange(0,clock,1/24):
 assert minimum_clearance>=0,minimum_clearance
 measured_speed=float(np.max(np.abs(np.diff(qs,axis=0))/np.diff(frame_times)[:,None]))
 D.update(playbackSpeed=PLAYBACK_SPEED,openingTimes={key:retime(t) for key,t in opening_times.items()},horizontalSegments=horizontal_rows,robot=robot,kinematics=dict(base=arm.base.tolist(),rotation=Rotation.from_matrix(arm.rotation).as_quat().tolist(),offsets=[x.tolist() for x in arm.offsets],axes=[x.tolist() for x in arm.axes]),motion=frames,duration=round(clock,3),motionEnd=end_motion,storyTimes=stamps,robotCheck=dict(max_tcp_error_m=worst,max_orientation_error_rad=worst_angle,samples=len(frames),max_sample_joint_change_rad=max(jumps),max_joint_speed_rad_s=max_speed,max_joint_acceleration_rad_s2=max_accel,unloaded_home_returns=0,minimum_robot_link_floor_clearance_m_24fps=minimum_clearance,max_joint_speed_rad_s_measured=measured_speed,scope='Kinematic concept only; no collision, grip strength or insertion certification.'))
-D['videoLayout']=dict(stage_offsets_m=stage_offsets.tolist(),stage_yaw_degrees=np.rad2deg(stage_yaws).tolist(),opening_direction_world=opening_direction.tolist(),task_placements=[dict(source=p['source'],object=serialize(o),fixture=serialize(f)) for p,o,f in zip(D['poses'],OP,FP)],park_center_xy_m=[.07,.27],fixture_grasp='rear rails with tilted approach',airborne_rotation='fixture rolls around its fixed opening axis',withdrawal_distances_m=withdrawal_distances)
+D['videoLayout']=dict(stage_yaw_degrees=np.rad2deg(stage_yaws).tolist(),opening_direction_world=opening_direction.tolist(),task_placements=[dict(source=p['source'],object=serialize(o),fixture=serialize(f)) for p,o,f in zip(D['poses'],OP,FP)],park_center_xy_m=[.07,.27],fixture_grasp='pinch on existing material, with endpoint floor clearance',fixture_grasp_local=fixture_tool.tolist(),fixture_grasp_half_gap_m=fixture_closed,airborne_rotation='shortest rigid rotation between the two saved fixture placements',withdrawal_distances_m=withdrawal_distances)
 D['robotCheck'].update(playback_speed=PLAYBACK_SPEED,carrying_postures=posture_records,joint_total_travel_deg=np.rad2deg(np.abs(np.diff(qs,axis=0)).sum(0)).tolist())
 (OUT/'data.js').write_text('window.REUSE_DATA='+json.dumps(D,separators=(',',':'))+';\n')
 (OUT/'robot_check.json').write_text(json.dumps(D['robotCheck'],indent=2)+'\n')

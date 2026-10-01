@@ -1,10 +1,18 @@
 # Slides
 
-最新可见实体：[B / pose1+3 窄地框合并模型](baseline_algo/output/B/pose1+3/step5/overview.png)、[单独结构对比](baseline_algo/output/B/pose1+3/step5/separate.png)、[交互查看](baseline_algo/output/B/pose1+3/step5/index.html)。每个 pose 分别设计地框与头部连接，再合并，约 60.8 cm³；此前 575.2 cm³ 鞍形厚体已因材料浪费而替换。五组标识、六块接触面保持，原载荷和整件退出通过，尚未校核强度。详见 [当前 Step5](baseline_algo/step5_connect_support/README.md)。
+当前 Step4 按参考图重做了两组双 pose 的外侧小脚垫和渐缩身体：[pose5+7 总览](baseline_algo/output/B/pose5+7/step4/overview.png) 为 155.47 cm³，既有静力、接地和退出条件通过；pose3+6 仍有原载荷失败。**新增加工通道核查发现八组共 28 个摆放均会挡住原始加工射线，不能称为完整加工可用。** pose5+7 分别挡住 9,344 和 1,488 条原始方向（每 pose 32,768 条）；见 [实际反例](baseline_algo/output/B/pose5+7/step4/data/work_access_witnesses.png) 和 [完整说明](baseline_algo/step4_connect_support/README.md)。原代码关闭了过程接近检查，最终支撑也未补查；新审计记录在各组 `step4/data/work_access_check.json`，未修改实体或载荷。用户要求的 [八组撒点图](baseline_algo/output/B/pose5+7/step4/data/floor_demands_all_groups.png) 也已全部完成：每组一个固定半透明物体，各 pose 的点云反变换到物体坐标系，替换了此前错误的多物体图。`B/` 顶层无 JSON，不生成 HTML。下方为历史记录，旧输出链接可能已删除。
+
+2026-09-30 最新实验：[B 的紧凑独立就位支撑与退出视频](baseline_algo/output/B/compact_layout.html)。保留各 pose 的原独立头组，搜索整组相对同一实体的紧凑摆放，允许翻面，检查全部闲置材料和完整退出。先做 pose3+6、pose5+7，不共享头；原共同物体配准的结果保持原样。详见 [当前 baseline](baseline_algo/baseline_algo.md) 与 [实体构造说明](baseline_algo/step4_connect_support/README.md)。以下为历史流程与结果。
+
+2026-09-29：当前流程改为 **Step0 随机选择并筛选 n 个 pose → Step1 载荷 → Step2 候选头 → Step3 顺序选头 → Step4 实体构造**。入口 `run_sequential_batch.py B --n 3`；旧 Step4 检查前移到 Step0，旧 Step5 改名 Step4。组合穿地就换一组，全部尝试后仍失败则停止。[当前说明](baseline_algo/step0_pose_selection/README.md)；B 的 n=2 验证在第 7 次选中 [pose3+4](baseline_algo/output/B/pose3+4/step0_pose_selection/floor_point_conflicts.png)，尚未选头或造实体。已有图与模型保留，下面的运行记录及阶段编号为历史。
+
+2026-09-28 当前 baseline 使用[逐 pose 顺序求解](baseline_algo/step3_scheculer/README.md)：每 pose 3–4 个头，后续 pose 从此前所有头中选一个最佳共享头。新增所有 pose 的头部工作面／地面排除；`baseline_algo/run_sequential_batch.py B --existing-groups` 已重跑保留的四组，3/4 组接触全覆盖，另一组 pose9 为 32379/32768。所有已选头均通过新增检查，但三组完整接触输入仍未通过 Step5 固定摆放的落脚条件；0/4 个完整支架。[当前四组图](baseline_algo/output/B/pose6+9+10/step4/data/batch.png)。`co_design_algo/` 未修改，旧 pose1+3 做图结果保留。下方其他构造说明为历史。
+
+当前 Step5 快速构造：[五组 B 总图](baseline_algo/output/B/pose1+3/step4/data/batch.png)、[pose1+3](baseline_algo/output/B/pose1+3/step4/overview.png)、[支撑 OBJ](baseline_algo/output/B/pose1+3/step4/shape.obj)。每个头向最近合法地面长身体，再补脚面和短连接；缓存禁入区与构造决策，默认不重新运行最终受力/退出验收及独立审计。pose1+3 保持约 135.85 cm³ 的原形状。每组外层只放 overview.png、shape.obj，其余记录在 data/；当前仍为五个 ID、六块接触面。详见 [Step5 说明](baseline_algo/step4_connect_support/README.md)。
 
 配对输出直接按任务对组织：`baseline_algo/output/B/pose1+3/` 等目录下分别是 Step1–5；不再把双 pose 结果放在 `B/pose_1/.../pair_pose_3/`。每对 Step1 下保留两个任务的原始输入，详见 [输出入口](baseline_algo/step3_scheculer/README.md)。
 
-此前的 Step5 固定配准检查：[共享结构设计与检查](baseline_algo/step5_connect_support/shared_design.md) 复核五对、11 组接触成功，固定当时的共享曲面配准时均违反地脚兼容的必要条件。此结论保留；当前双接触面表示下的实体见上方链接。
+此前的 Step5 固定配准检查：[共享结构设计与检查](baseline_algo/step4_connect_support/shared_design.md) 复核五对、11 组接触成功，固定当时的共享曲面配准时均违反地脚兼容的必要条件。此结论保留；当前双接触面表示下的实体见上方链接。
 
 2026-09-26 新增顺序式 Step3 实验：每条 particle 先求 pose1 三头，选一个对 pose2 贡献最大的合法共享头，再为 pose2 补两个；分别验收两套三头，完整共享实体留给 Step5。入口及结果见 [3+2 实验](baseline_algo/step3_scheculer/README.md#sequential-3plus2)。以下共同五头版本保留为对照。
 
@@ -59,6 +67,18 @@ PYTHONDONTWRITEBYTECODE=1 /Users/yuanboli/miniforge3/envs/cadgrasp/bin/python sl
 
 Floor loads are shown together in one [five-case overview](sys_floor/on_the_floor.png).
 
+[B/pose1+3 contact areas and floor demands](sys_floor/contact_areas.png) has three
+panels: each pose separately, then both aligned to the same object in Pose 1.
+A [second version](sys_floor/contact_areas_pose3.png) uses Pose 3 for the combined panel.
+[Drawing code and frame convention](sys_floor/contact_areas.md).
+
+The [B/pose1+3 shared-head correction](sys_floor/steps.png) shows five correctly
+registered heads, one shared yellow head, both floor-demand clouds and a faint
+B/Pose 1 workpiece. The former six-patch construction was invalid; under the fixed
+original contact correspondence, floor feasibility fails before body growth.
+[Source and reproduction notes](sys_floor/steps.md);
+[drawing code](sys_floor/steps.py).
+
 | Group | Other current figures |
 |---|---|
 | `setup` | [Working-area forces](setup/working_area.png); B/pose_2 aliases: [target pose](setup/poses/target_pose.png), `setup/poses/tip_B.png` |
@@ -69,15 +89,13 @@ Floor loads are shown together in one [five-case overview](sys_floor/on_the_floo
 | `equations` | [Setup equations](setup/equations/three_equations.png), [workpiece equations](obj_supp/two_equations.png), [Step3 conditions](obj_supp/demand/demand_equation.png), [matrix expansion](obj_supp/solution/solution.png) |
 | `trajectory` | [Insertion](trajectory/sweep_demo.png), [sweep equations](trajectory/sweep_eq.png) |
 
-The current multi-pose concept is in [reuse](reuse/README.md): one rigid four-arm
-fixture changes orientation and uses different arm tips as object contacts while
-other arm bodies support it on the floor. Curved arms follow the latest visual
-direction, with a larger footprint and side entry for horizontal insertion and
-withdrawal. A single KUKA parks the object on the floor, reorients the fixture
-separately, then reorients and reinserts the object. It does not preserve their
-relative pose or promise one-time loading. The object is opaque; the requested
-video uses one full-width robot scene with no split screen or text. These are
-illustrative shapes and movements, not validated multi-pose contact or load results.
+The current [reuse presentation](reuse/README.md) uses the exact saved
+B/pose1+3 Step5 fixture and its two task placements. Fixed head colors distinguish
+the contact regions from the grey-white local bodies. A single KUKA parks the
+object, reorients the fixture separately, and reinserts the object along the
+saved task direction. The object is opaque; the video uses one full-width robot
+scene with a fixed camera and table, with no split screen or text. Geometry is
+imported from Step5; the new robot movement is a kinematic illustration.
 See the [current design decision](../codes/algorithm_design_notes.md).
 
 The earlier `belt_test` multi-pose research figures share one blue contact module and one fixed orange
@@ -123,7 +141,7 @@ under the repository's existing ignore rules.
 
 ## 当前决定与讨论记录
 
-2026-09-23 用户确认：以 [一件刚性支撑的多姿态共同设计](../codes/research_notes/multipose_rigid_fixture_design.md) 为 SIGGRAPH 研究主线。共享实体通过重新摆放改变接触／接地角色，物体与支撑分开搬运并重复装载；旧模块＋dock 保留为对照。主要待证收益为工装资源与重复用料减少，方法、实际装卸及收益尚待验证。当前四臂 [reuse 图示](reuse/README.md) 不限定算法拓扑，也不构成物理证据。
+2026-09-23 用户确认：以 [一件刚性支撑的多姿态共同设计](../codes/research_notes/multipose_rigid_fixture_design.md) 为 SIGGRAPH 研究主线。共享实体通过重新摆放改变接触／接地角色，物体与支撑分开搬运并重复装载；旧模块＋dock 保留为对照。主要待证收益为工装资源与重复用料减少，方法、实际装卸及收益尚待验证。[reuse 展示](reuse/README.md) 现已使用 B/pose1+3 的 Step5 实体；机器人动画不构成实际搬运或抓持验证。
 
 以下“要解决的问题”、坐标载荷约定与 Step1–6 流程描述的是**既有单姿态 baseline**，保留 2026-09-21 的初始躺姿安装／固定底座定义；不是新一体支撑的模型。完整操作定义、停止规则和结果统一见 [baseline_algo.md](baseline_algo/baseline_algo.md)。本次文档更新不修改搜索和验收规则。
 

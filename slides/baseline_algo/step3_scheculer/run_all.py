@@ -28,9 +28,9 @@ STAGES = (
     'step3_scheculer/draw_schedule.py',
     'step3_scheculer/draw_directions.py',
     'step3_scheculer/draw_result.py',
-    'step4_floor_contact/floor_contact.py',
-    'step4_floor_contact/audit.py',
-    'step4_floor_contact/draw.py',
+    'step0_pose_selection/floor_contact.py',
+    'step0_pose_selection/audit.py',
+    'step0_pose_selection/draw.py',
     'step5_base/base.py',
     'step5_base/draw.py',
     'step6_connect_support/connect.py',
@@ -40,7 +40,7 @@ STAGES = (
 
 
 def floor_verified(name):
-    from step4_floor_contact.floor_contact import read
+    from step0_pose_selection.floor_contact import read
     return bool(read(name).get('continuous_demand_enclosure_proved'))
 
 
@@ -98,7 +98,7 @@ def _run(objects,from_step=1,resume=False,no_round_drawings=False,through_step=6
     from step3_scheculer.random_search import configuration
     search = search or configuration()
     starts={1:'step1/needs.py',2:'step2_local_support/circles.py',3:'step3_scheculer/scheduler.py',
-            4:'step4_floor_contact/floor_contact.py',5:'step5_base/base.py',6:'step6_connect_support/connect.py'}
+            4:'step0_pose_selection/floor_contact.py',5:'step5_base/base.py',6:'step6_connect_support/connect.py'}
     active = list(objects)
     blocked = []
     cached=[]
@@ -118,7 +118,9 @@ def _run(objects,from_step=1,resume=False,no_round_drawings=False,through_step=6
             cached_candidates.append(name)
             print(name,'reusing completed, audited Step 1/2 after acquiring case lock',flush=True)
     for stage in STAGES[STAGES.index(starts[from_step]):]:
-        number = int(stage[4])
+        # Historical single-pose pipeline retains its six-stage numbering;
+        # only the shared floor helper package moved during the Step0 migration.
+        number = 4 if stage.startswith('step0_pose_selection/') else int(stage[4])
         if number > through_step:
             break
         # Step 4/5 also produce explicit partial diagnostics after a completed,
@@ -258,7 +260,7 @@ if __name__ == '__main__':
         from step3_scheculer.timing import StageTimings
         import os
         last = args.through_step or 6
-        directory = {1:'step_1_needs',2:'step2_local_support',3:'step3_scheculer',4:'step4_floor_contact',5:'step5_base',6:'step6_connect_support'}[last]
+        directory = {1:'step_1_needs',2:'step2_local_support',3:'step3_scheculer',4:'step0_pose_selection',5:'step5_base',6:'step6_connect_support'}[last]
         timings = StageTimings([HERE/'output'/name/pose_name()/directory/args.timing_name for name in objects],
             dict(command=sys.argv, from_step=args.from_step, through_step=last, resume=args.resume, force_directions=args.force_directions,
                  environment={k:v for k,v in os.environ.items() if k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','VECLIB_MAXIMUM_THREADS','CADGRASP_SCORE_WORKERS','CADGRASP_DIRECTION_WORKERS')}))

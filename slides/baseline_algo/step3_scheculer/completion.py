@@ -61,7 +61,7 @@ def read_passed(name):
 def archive_downstream(name):
     """Invalidate downstream status in place; never create history directories."""
     root = I.OUTPUTS/name/pose_name()
-    for stage in ('step4_floor_contact', 'step5_connect_support', 'step5_base', 'step6_connect_support'):
+    for stage in ('step0_pose_selection', 'step4_connect_support', 'step5_base', 'step6_connect_support'):
         folder = root/stage
         if folder.exists():
             I.save(folder/'status.json', dict(

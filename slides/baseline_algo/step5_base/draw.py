@@ -11,7 +11,7 @@ from matplotlib.collections import PolyCollection
 from step1.needs import OUTPUTS, OBJECTS
 from step1.cases import pose_name
 from step5_base import base as C
-from step5_connect_support import whole_assembly as A
+from step4_connect_support import whole_assembly as A
 
 
 def draw(name):

@@ -38,7 +38,7 @@ def floor_cloud(name='B', pose='pose_2'):
     domain = S.load(name, pose)
     sample = S.samples(domain)
     points, normal = landings(sample['q'], sample['push'], domain.com)
-    with np.load(S.stage_path(domain, 'step4_floor_contact')/'floor_contact.npz') as saved:
+    with np.load(S.stage_path(domain, 'step0_pose_selection')/'floor_contact.npz') as saved:
         assert np.allclose(points[:, [0, 1]], saved['floor_demands_xy_m'][1:1+len(points)], atol=1e-10, rtol=0)
     picture, cam, ids = S.render(domain, size=1200, ground_points=points)
     draw = ImageDraw.Draw(picture)

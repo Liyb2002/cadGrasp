@@ -116,7 +116,7 @@ def apply_saved(source):
         sampling_rerun=False, original_successful_particles=old['successful_particles'])
     result['provenance']['code'].update(I.hashes([Path(__file__)]))
     R.save(search.out/'schedule.json', result)
-    step4 = completion_folder(name, poses, 'step4_floor_contact')/suffix
+    step4 = completion_folder(name, poses, 'step0_pose_selection')/suffix
     search.floor(result, step4)
     R.save(step4/'terminal_expansion_check.json', dict(passed=True, particles_checked=len(checks),
         source_schedule_sha256=I.sha256(source), schedule_sha256=I.sha256(search.out/'schedule.json'),
@@ -143,7 +143,7 @@ def main():
         raise ValueError('No saved fixed-area searches found')
     for source in paths:
         saved = json.loads(source.read_text())
-        step4 = completion_folder(args.object, saved['poses'], 'step4_floor_contact')/f'heads_{args.max_heads}'
+        step4 = completion_folder(args.object, saved['poses'], 'step0_pose_selection')/f'heads_{args.max_heads}'
         R.save(step4/'status.json', dict(complete=False, status='running', scope='terminal expansion of saved chains'))
         started = time.monotonic()
         try:

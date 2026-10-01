@@ -20,9 +20,9 @@ def run(name, static_only=False):
                      'connectivity_union_mm.stl', 'connectivity_extra_shells_mm.stl'):
         (out/filename).unlink(missing_ok=True)
     draw_assembly(name, static_only)
-    from step5_connect_support.bearing_failure import run as draw_bearing_failure
+    from step4_connect_support.bearing_failure import run as draw_bearing_failure
     draw_bearing_failure(name)
-    from step5_connect_support.connectivity_failure import run as draw_connectivity_failure
+    from step4_connect_support.connectivity_failure import run as draw_connectivity_failure
     draw_connectivity_failure(name)
 
 

@@ -43,7 +43,7 @@ def plan(root):
         if tail and tail[0].startswith('pair_pose_'):
             pair = PT.canonical_pair((pose, tail[0].removeprefix('pair_')))
             mapping[path].append(root/PT.pair_name(pair)/stage/Path(*tail[1:]))
-        elif stage in ('step_1_needs', 'step4_floor_contact'):
+        elif stage in ('step_1_needs', 'step0_pose_selection'):
             for pair in sorted(pairs):
                 if pose in pair:
                     mapping[path].append(root/PT.pair_name(pair)/stage/pose/Path(*tail))
@@ -94,7 +94,7 @@ def migrate(root, dry_run=False):
             choices = [PT.pair_name(p) for p in sorted(pairs) if pose in p]
             selected = pair if pair in choices else choices[0]
             return f'output/{root.name}/{selected}/{stage}/{pose}'
-        return re.sub(rf'output/{re.escape(root.name)}/(pose_\d+)/(step_1_needs|step4_floor_contact)(?=/|$)', single, value)
+        return re.sub(rf'output/{re.escape(root.name)}/(pose_\d+)/(step_1_needs|step0_pose_selection)(?=/|$)', single, value)
 
     def rewrite(value, pair):
         if isinstance(value, dict):
@@ -128,7 +128,7 @@ def migrate(root, dry_run=False):
                 revised['provenance']['path_migration'] = dict(
                     source_sha256=old_digest[source], solver_rerun=False,
                     physical_values_changed=False, binary_artifacts_changed=False,
-                    manifest=str((root/pair/'step4_floor_contact/path_migration.json').relative_to(ROOT)))
+                    manifest=str((root/pair/'step0_pose_selection/path_migration.json').relative_to(ROOT)))
             result = raw if revised == data else (json.dumps(revised, indent=2, ensure_ascii=False, allow_nan=False)+'\n').encode()
         elif source.suffix in ('.log', '.txt', '.md'):
             result = remap_string(raw.decode(), pair).encode()
@@ -160,7 +160,7 @@ def migrate(root, dry_run=False):
             poses=pair, solver_rerun=False, additional_loads_added=False,
             original_generator_hashes_preserved=True, all_destination_bytes_verified=True,
             files=files, provenance=dict(code=migration_code))
-        (root/label/'step4_floor_contact/path_migration.json').write_text(
+        (root/label/'step0_pose_selection/path_migration.json').write_text(
             json.dumps(ledger, indent=2, ensure_ascii=False)+'\n')
     # Delete only the enumerated, byte-verified originals after every copy passes.
     for source in original:

@@ -114,7 +114,7 @@ No path found is an unresolved finite-roadmap result, not an impossibility proof
 
 
 class PairGeometry:
-    def __init__(self, problems, count=200, initialize_candidates=True):
+    def __init__(self, problems, count=200, initialize_candidates=True, *, head_exclusion_problems=None):
         self.problems = problems
         self.mesh = problems[0].domain.mesh
         self.scale = float(self.mesh.extents.max())
@@ -127,13 +127,24 @@ class PairGeometry:
             np.testing.assert_allclose(self.mesh.vertices@transform[:3, :3].T+transform[:3, 3],
                                        problem.domain.mesh.vertices, atol=1e-12, rtol=0)
         self.planes = np.array([t[2] for t in self.transforms])
-        work = set(np.concatenate([p.domain.work_ids for p in problems]).tolist())
+        # The tasks that use a head for load support can be fewer than the tasks
+        # in which its material must avoid work surfaces and the ground.
+        exclusions = problems if head_exclusion_problems is None else head_exclusion_problems
+        head_transforms = [np.asarray(p.domain.data['frame']['T_world_mesh'])@np.linalg.inv(transforms[0])
+                           for p in exclusions]
+        for problem, transform in zip(exclusions, head_transforms):
+            np.testing.assert_array_equal(self.mesh.faces, problem.domain.mesh.faces)
+            np.testing.assert_allclose(self.mesh.vertices@transform[:3, :3].T+transform[:3, 3],
+                                      problem.domain.mesh.vertices, atol=1e-12, rtol=0)
+        self.head_planes = np.array([t[2] for t in head_transforms])
+        self.head_exclusion_poses = [p.pose for p in exclusions]
+        work = set(np.concatenate([p.domain.work_ids for p in exclusions]).tolist())
         polygons = {}
         for face, triangle in enumerate(self.mesh.triangles):
             if face in work:
                 continue
             polygon = triangle.copy()
-            for plane in self.planes:
+            for plane in self.head_planes:
                 polygon = G.clip_plane(polygon, -plane, inset=S.FLOOR_CLEARANCE_M)
                 if len(polygon) < 3:
                     break
@@ -191,7 +202,7 @@ class PairGeometry:
             return entry
         cells = [G.head_cell(self.mesh, p, f, self.clearance.offsets) for f, p in polygons.items()]
         points = np.concatenate(cells)
-        if (points@self.planes[:, :3].T+self.planes[:, 3]).min() < -self.scale*1e-10:
+        if (points@self.head_planes[:, :3].T+self.head_planes[:, 3]).min() < -self.scale*1e-10:
             entry['reason'] = 'head_hits_other_task_floor'
             return entry
         tri = self.mesh.triangles[contact['center_face']]

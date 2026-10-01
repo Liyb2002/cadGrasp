@@ -9,7 +9,7 @@ import trimesh
 
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from step2_local_support import work_volume as W
-from step5_connect_support.fixtures import contact
+from step4_connect_support.fixtures import contact
 from step2_local_support import insertion as D
 
 

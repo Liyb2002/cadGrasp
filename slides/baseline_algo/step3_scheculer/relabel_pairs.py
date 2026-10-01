@@ -74,7 +74,7 @@ def reassess(path):
         particle_results=[{k: v for k, v in r.items() if k != 'independent_sample_checks'} for r in records],
         provenance=dict(inputs=inputs, code=I.hashes([Path(__file__), Path(S.__file__), Path(A.__file__), Path(R.__file__)])))
     R.save(folder/'sample_result.json', result)
-    floor_folder = pair_folder(name, poses, 'step4_floor_contact')/suffix
+    floor_folder = pair_folder(name, poses, 'step0_pose_selection')/suffix
     search = R.PairSearch.__new__(R.PairSearch)
     search.name, search.poses, search.out = name, poses, folder
     search.problems, search.inputs = problems, input_hashes(problems)

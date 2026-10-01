@@ -11,8 +11,8 @@ import trimesh
 from shapely.geometry import Polygon
 from step5_base import base as C
 from step6_connect_support import direction_first as X
-from step5_connect_support import belt_geometry as B, whole_assembly as A
-from step5_connect_support.fixtures import contacts
+from step4_connect_support import belt_geometry as B, whole_assembly as A
+from step4_connect_support.fixtures import contacts
 from step2_local_support import withdrawal as W
 
 

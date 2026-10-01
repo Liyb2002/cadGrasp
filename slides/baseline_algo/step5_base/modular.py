@@ -13,7 +13,7 @@ from step1.needs import OUTPUTS, sha256
 from step1.cases import pose_name
 from step2_local_support import withdrawal as W, installation as INIT
 from step3_scheculer import contacts as I, connection as C
-from step5_connect_support import whole_assembly as A, belt_geometry as B, solids as S, floor_design as FD
+from step4_connect_support import whole_assembly as A, belt_geometry as B, solids as S, floor_design as FD
 from step5_base import rectangular_dock as J
 
 SCHEMA='stationary_base_removable_module_v1'

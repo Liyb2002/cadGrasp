@@ -235,11 +235,13 @@ def main():
     parser.add_argument('--replay',action='store_true',help='Render the already exported trajectory without rerunning search')
     args=parser.parse_args()
     if args.replay:
+        manifest=json.loads((G.ROOT/'objects'/args.object/'poses.json').read_text())
+        if manifest.get('schema') == 'cadgrasp_pose_set_v1':
+            parser.error('These are target-only poses; no robot trajectory has been generated for this revision')
         if args.video is None:args.video=G.ROOT/'objects'/args.object/'video.mp4'
         with np.load(G.ROOT/'objects'/args.object/'trajectory.npz') as z:
             history=list(zip(z['qpos'],z['mocap_pos'],z['mocap_quat']))
             robot_track=(z['robot_frame_indices'].copy(),z['robot_q'].copy())
-        manifest=json.loads((G.ROOT/'objects'/args.object/'poses.json').read_text())
         hand_xml=G.ROOT/manifest['grasp']['model']
         model=G.build(args.object,hand_xml=hand_xml,floor_hull=True)
         rendered_q=K.render(model,history,args.video,args.object,'parallel',robot_track=robot_track,hand_xml=hand_xml)

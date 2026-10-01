@@ -15,7 +15,7 @@ from step1.needs import ROOT, ContinuousNeeds, setup_geometry
 from step1 import needs
 from step1.registry import task_poses
 from step3_scheculer import contacts
-from step4_floor_contact import floor_contact
+from step0_pose_selection import floor_contact
 from step3_scheculer import run_all
 class CaseIsolationTests(unittest.TestCase):
     def test_environment_and_numeric_cli_are_normalized(self):

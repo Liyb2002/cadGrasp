@@ -501,10 +501,12 @@ def append_track(trial,frames,qs,start):
         trial.track_frames.append(int(frame));trial.track_q.append(q.copy())
 
 
-def find(name, pairs=120, candidate_budget=80, resume=True, anchor_index=0, anchor_yaw=0., grasp_method='sampled', com_weight=2.5, soft_pads=False, ideal_grasp=False,pairwise_grasp_direction_deg=12.,tool='standard',min_grasp_width=.015):
+def find(name, pairs=120, candidate_budget=80, resume=True, anchor_index=0, anchor_yaw=0., grasp_method='sampled', com_weight=2.5, soft_pads=False, ideal_grasp=False,pairwise_grasp_direction_deg=12.,tool='standard',min_grasp_width=.015,pose_count=10):
     from regrasp_contacts import measured_grasps
     measured_contact_min=.006
     measured_direction_min=29.5
+    if isinstance(pose_count, bool) or not isinstance(pose_count, int) or pose_count < 1:
+        raise ValueError('pose_count must be a positive integer')
     folder = G.ROOT/'objects'/name
     saved = json.loads((folder/'poses.json').read_text())
     mesh = trimesh.load(folder/'mesh.stl',force='mesh')
@@ -543,6 +545,8 @@ def find(name, pairs=120, candidate_budget=80, resume=True, anchor_index=0, anch
     scale = float(mesh.extents.max())
     trial=None; poses=[]; checks=[]; grasps=[]; first_candidate=None
     checkpoint_path=Path(tempfile.gettempdir())/f'cadgrasp-regrasp-{name}{"-compact" if tool=="compact" else ""}{"-ideal" if ideal_grasp else "-pads" if soft_pads else ""}-checkpoint.npz'
+    if pose_count != 10:
+        checkpoint_path = checkpoint_path.with_name(f'{checkpoint_path.stem}-n{pose_count}.npz')
     if resume and checkpoint_path.exists():
         with np.load(checkpoint_path) as z:
             first_candidate=json.loads(str(z['first_candidate']))
@@ -572,7 +576,9 @@ def find(name, pairs=120, candidate_budget=80, resume=True, anchor_index=0, anch
     if grasps and any('measured' not in grasp for grasp in grasps):
         for grasp,actual in zip(grasps,measured_grasps(model,trial.history,trial.events)):
             grasp['measured']=actual
-    for target_index in range(len(poses),10):
+    if len(poses) > pose_count:
+        raise ValueError('Checkpoint has more targets than requested')
+    for target_index in range(len(poses),pose_count):
         if trial is not None:
             return_start=len(trial.history)-1
             previous_q=trial.arm_q[-1]
@@ -636,7 +642,7 @@ def find(name, pairs=120, candidate_budget=80, resume=True, anchor_index=0, anch
                             stride=3,initial_q=pickup_q[-1],hand_xml=hand_xml)
                         # Verify that the new target can return to the regrasp rest.
                         finish=trial.snapshot()
-                        if target_index<9:
+                        if target_index<pose_count-1:
                             return_frame=len(trial.history)-1
                             trial.release(anchor)
                             K.check_scene(model,trial.history[return_frame:],name,
@@ -671,7 +677,7 @@ def find(name, pairs=120, candidate_budget=80, resume=True, anchor_index=0, anch
                 print(json.dumps(dict(object=name,target=target_index+1,candidate=ci,
                                       rejected=str(error))),flush=True)
         if not success:
-            raise RuntimeError(f'{name}: found {len(poses)}/10 diverse regrasp targets; exhausted {tried} grasps')
+            raise RuntimeError(f'{name}: found {len(poses)}/{pose_count} diverse regrasp targets; exhausted {tried} grasps')
     track=None
     if trial.track_frames and trial.track_frames[0]==0:
         track=(np.asarray(trial.track_frames),np.asarray(trial.track_q))
@@ -686,7 +692,7 @@ def find(name, pairs=120, candidate_budget=80, resume=True, anchor_index=0, anch
         minimum_measured_adjacent_contact_change_m=measured_contact_min,
         minimum_measured_adjacent_grasp_direction_deg=measured_direction_min,
         description='Different contact locations and approach/closing axes for every target; '
-                    'released stable intermediate rests connect the ten unstable task targets.')
+                    f'released stable intermediate rests connect the {pose_count} unstable task targets.')
     metadata=dict(grasps=grasps,regrasp_events=trial.events,
         transfer_mode='Return to stable rest, open and retreat, approach a different grasp, lift with swept-tool floor clearance, reorient and seat',
         trajectory_revision='diverse_regrasp_v1',
@@ -715,6 +721,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('object');parser.add_argument('--pairs',type=int,default=120)
     parser.add_argument('--candidate-budget',type=int,default=80)
+    parser.add_argument('--pose-count',type=int,default=10)
     parser.add_argument('--fresh',action='store_true',help='Ignore the temporary search checkpoint')
     parser.add_argument('--anchor-index',type=int,default=0,
                         help='0 keeps original rest; 1..N chooses a mesh-computed stable intermediate rest')
@@ -731,4 +738,4 @@ if __name__=='__main__':
          anchor_index=args.anchor_index,anchor_yaw=args.anchor_yaw,grasp_method=args.grasp_method,
          com_weight=args.com_weight,soft_pads=args.soft_pads,ideal_grasp=args.ideal_grasp,
          pairwise_grasp_direction_deg=args.pairwise_grasp_direction,tool=args.tool,
-         min_grasp_width=args.min_grasp_width)
+         min_grasp_width=args.min_grasp_width,pose_count=args.pose_count)
