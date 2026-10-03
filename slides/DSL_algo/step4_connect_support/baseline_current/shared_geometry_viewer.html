@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B · 可翻面的共享支架</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f8fafb;color:#243440;font:15px system-ui,sans-serif}
+main{max-width:1500px;margin:auto;padding:22px}h1{font-size:25px;margin:0 0 8px;font-weight:600}p{margin:6px 0 16px;color:#657581;line-height:1.5}
+nav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:15px 0}button,a{border:1px solid #cdd9df;background:white;border-radius:7px;padding:9px 15px;color:#334c60;text-decoration:none;cursor:pointer}button.active{background:#e1edf4;border-color:#98b5c8}
+canvas{width:100%;height:650px;display:block;background:white;border-radius:12px;touch-action:none}footer{display:flex;gap:20px;flex-wrap:wrap;padding:12px 0;color:#667985;font-size:13px}.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+</style></head><body><main>
+<h1>B · 一件支架，两个摆放</h1>
+<p id="description">彩色标记接触头及附近区域，灰白色显示身体。两种摆放使用同一个刚体；橙色对应同一块共享接触面。</p>
+<nav><button data-mode="overview" class="active">总览</button><button data-mode="0">Pose 1</button><button data-mode="1">Pose 3</button><button data-mode="fixture">只看支架</button><button id="separate" hidden>各 pose 单独结构</button><select id="local-body" hidden aria-label="查看同一局部身体在两个姿态中的位置"></select><button id="ghost">透视工件</button><button id="reset">重置视角</button><a href="fixture_mm.stl" download>STL · mm</a><a href="fixture.obj" download>OBJ · m</a></nav>
+<canvas id="view" width="1500" height="850"></canvas>
+<footer><span>拖动旋转 · 滚轮缩放</span><span><i class="dot" style="background:#dc9d47"></i>彩色：接触头及附近</span><span><i class="dot" style="background:#c9cdcb"></i>灰白：身体</span><span id="status"></span></footer>
+</main><script>__THREE__</script><script>
+const DATA=__DATA__,canvas=document.getElementById('view');
+document.title=DATA.report.object+' · 共享支架';
+document.querySelector('h1').textContent=DATA.report.object+' · '+DATA.poses.map(p=>p.name.replace('pose_','Pose ')).join(' / ');
+document.querySelectorAll('[data-mode="0"],[data-mode="1"]').forEach(b=>b.remove());
+DATA.poses.forEach((p,i)=>{const b=document.createElement('button');b.dataset.mode=String(i);b.textContent=p.name.replace('pose_','Pose ');document.querySelector('nav').insertBefore(b,document.querySelector('[data-mode="fixture"]'));});
+if(DATA.report.presentation_description)document.getElementById('description').textContent=DATA.report.presentation_description;
+if(DATA.report.diagnostic_only){
+ document.querySelector('h1').textContent+=' · 未通过地面相容性检查';
+ document.querySelector('[data-mode="fixture"]').textContent='只看五个头';
+ document.querySelectorAll('a[download]').forEach(a=>a.remove());
+ const plot=document.createElement('img');plot.src='floor_conflict.png';plot.alt='原始地面需求与另一姿态地面约束';plot.style.cssText='width:100%;margin-top:20px';document.querySelector('main').appendChild(plot);
+}
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});
+renderer.setClearColor(0xffffff);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setPixelRatio(1);
+let mode='overview',theta=-2.35,phi=.53,zoom=1,drag=null;
+const scenes=[],objects=[],fixturePairs=[],localViews=[];let ghost=false,separate=false;
+function makeMesh(data,color){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(data.vertices,3));g.setIndex(data.faces);g.computeVertexNormals();return new THREE.Mesh(g,new THREE.MeshStandardMaterial({color,roughness:.65,metalness:.06,side:THREE.DoubleSide}));}
+// Clip exterior triangles for color only. Interpolate their original normals,
+// so the border between gray and color does not introduce a geometric seam.
+function headOverlay(geometry,region,color){
+ const positions=geometry.attributes.position,normals=geometry.attributes.normal,indices=geometry.index.array,xyz=[],ns=[];
+ function clip(poly,axis,bound,sign){const result=[];for(let j=0;j<poly.length;j++){const a=poly[j],b=poly[(j+1)%poly.length],da=sign*(a.p[axis]-bound),db=sign*(b.p[axis]-bound);if(da>=0)result.push(a);if((da>=0)!==(db>=0)){const t=da/(da-db);result.push({p:a.p.map((v,k)=>v+t*(b.p[k]-v)),n:a.n.map((v,k)=>v+t*(b.n[k]-v))});}}return result;}
+ for(let i=0;i<indices.length;i+=3){let polygon=[];for(let j=0;j<3;j++){const index=indices[i+j];polygon.push({p:[positions.getX(index),positions.getY(index),positions.getZ(index)],n:[normals.getX(index),normals.getY(index),normals.getZ(index)]});}
+  if([0,1,2].some(axis=>polygon.every(v=>v.p[axis]<region.low[axis])||polygon.every(v=>v.p[axis]>region.high[axis])))continue;
+  for(let axis=0;axis<3&&polygon.length;axis++){polygon=clip(polygon,axis,region.low[axis],1);polygon=clip(polygon,axis,region.high[axis],-1);}
+  for(let j=1;j+1<polygon.length;j++)for(const v of [polygon[0],polygon[j],polygon[j+1]]){xyz.push(...v.p);ns.push(...v.n);}
+ }
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(xyz,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(ns,3));g.normalizeNormals();
+ const overlay=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color,roughness:.65,metalness:.06,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));overlay.renderOrder=1;return overlay;
+}
+function transform(group,pose){const r=pose.rotation,t=pose.translation;const m=new THREE.Matrix4();m.set(r[0][0],r[0][1],r[0][2],t[0],r[1][0],r[1][1],r[1][2],t[1],r[2][0],r[2][1],r[2][2],t[2],0,0,0,1);group.applyMatrix4(m);}
+function coloredBody(data,regions){const group=new THREE.Group(),body=makeMesh(data,0xc9cdcb);group.add(body);for(const [index,region] of regions.entries()){const part=DATA.parts.find(part=>part.id===region.id),overlay=headOverlay(body.geometry,region,part.color);overlay.renderOrder=index+1;overlay.material.polygonOffsetFactor=-1-index;overlay.material.polygonOffsetUnits=-1-index;group.add(overlay);}return group;}
+function makeScene(index){const scene=new THREE.Scene();scene.add(new THREE.HemisphereLight(0xffffff,0xb8c4c8,2.0));const light=new THREE.DirectionalLight(0xffffff,2.8);light.position.set(-.3,-.4,.7);scene.add(light);
+ const fixture=new THREE.Group(),merged=coloredBody(DATA.fixture,DATA.head_regions);fixture.add(merged);scene.add(fixture);
+ if(DATA.local_bodies){const locals=DATA.local_bodies.map(part=>{const body=coloredBody(part,DATA.head_regions.filter(r=>r.id===part.id&&r.pose===part.head_pose));body.visible=false;fixture.add(body);return body;});localViews.push({merged,locals});}
+ if(index!==null&&DATA.design_parts){const solo=coloredBody(DATA.design_parts[index],DATA.head_regions.filter(r=>r.pose===DATA.poses[index].name));solo.visible=false;fixture.add(solo);fixturePairs.push({merged,solo});}
+ if(index!==null){const p=DATA.poses[index];transform(fixture,p);const object=makeMesh(p.object,0xb9c0c4);const colors=[];const work=new Set(p.work_faces);const raw=object.geometry.toNonIndexed();object.geometry.dispose();object.geometry=raw;
+ for(let i=0;i<p.object.faces.length/3;i++){const c=new THREE.Color(work.has(i)?0x9cb893:0xb9c0c4);for(let j=0;j<3;j++)colors.push(c.r,c.g,c.b);}raw.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));object.material.vertexColors=true;object.material.color.set(0xffffff);scene.add(object);objects.push(object);}
+ const bounds=new THREE.Box3().setFromObject(scene);const focus=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
+ if(index!==null){const floor=new THREE.Mesh(new THREE.PlaneGeometry(Math.max(size.x,size.y)*1.35,Math.max(size.x,size.y)*1.35),new THREE.MeshBasicMaterial({color:0xf0f3f5,side:THREE.DoubleSide}));floor.position.set(focus.x,focus.y,-.0003);scene.add(floor);}
+ return {scene,focus,span:size.length()*.75,camera:new THREE.OrthographicCamera()};}
+scenes.push(...DATA.poses.map((p,i)=>makeScene(i)),makeScene(null));
+function draw(){const w=canvas.width,h=canvas.height;renderer.setSize(w,h,false);renderer.setScissorTest(true);const chosen=mode==='overview'?scenes.map((s,i)=>i):[mode==='fixture'?DATA.poses.length:Number(mode)];const width=w/chosen.length;
+ chosen.forEach((index,slot)=>{const s=scenes[index],cam=s.camera,half=s.span*.64/zoom,aspect=width/h;cam.left=-half*aspect;cam.right=half*aspect;cam.top=half;cam.bottom=-half;cam.near=.001;cam.far=20;cam.up.set(0,0,1);cam.position.copy(s.focus).add(new THREE.Vector3(Math.cos(theta)*Math.cos(phi),Math.sin(theta)*Math.cos(phi),Math.sin(phi)).multiplyScalar(2));cam.lookAt(s.focus);cam.updateProjectionMatrix();renderer.setViewport(slot*width,0,width,h);renderer.setScissor(slot*width,0,width,h);renderer.render(s.scene,cam);});renderer.setScissorTest(false);}
+function setMode(next){mode=next;document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));zoom=mode==='overview'?.60:1;draw();}
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));document.getElementById('reset').onclick=()=>{theta=-2.35;phi=.53;setMode(mode);};
+document.getElementById('ghost').onclick=()=>{ghost=!ghost;for(const object of objects){object.material.transparent=ghost;object.material.opacity=ghost?.22:1;object.material.depthWrite=!ghost;object.material.needsUpdate=true;}document.getElementById('ghost').classList.toggle('active',ghost);draw();};
+if(DATA.design_parts){const button=document.getElementById('separate');button.hidden=false;button.onclick=()=>{separate=!separate;for(const pair of fixturePairs){pair.merged.visible=!separate;pair.solo.visible=separate;}button.classList.toggle('active',separate);if(mode==='fixture')setMode('overview');else draw();};}
+function setLocalBody(index){for(const view of localViews){view.merged.visible=index<0;view.locals.forEach((body,i)=>body.visible=i===index);}const select=document.getElementById('local-body');select.value=String(index);draw();}
+if(DATA.local_bodies){const select=document.getElementById('local-body');select.hidden=false;select.style.cssText='padding:9px;border:1px solid #cdd9df;border-radius:7px;background:white;color:#334c60';select.add(new Option('整件 · 查看局部身体','-1'));DATA.local_bodies.forEach((body,i)=>select.add(new Option(body.label,String(i))));select.onchange=()=>setLocalBody(Number(select.value));}
+canvas.onpointerdown=e=>{drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);};canvas.onpointerup=()=>drag=null;canvas.onpointermove=e=>{if(!drag)return;theta-=(e.clientX-drag[0])*.007;phi=Math.max(-1.3,Math.min(1.4,phi+(e.clientY-drag[1])*.006));drag=[e.clientX,e.clientY];draw();};canvas.onwheel=e=>{e.preventDefault();zoom=Math.max(.2,Math.min(4,zoom*Math.exp(-e.deltaY*.001)));draw();};
+document.getElementById('status').textContent=DATA.report.diagnostic_only
+ ? '5 个实体头 · 1 个共享面 · 没有完整支架'
+ : DATA.report.verification?.performed===false ? '一个封闭连通实体 · 本次未重新运行最终验收'
+ : (DATA.report.checks||[]).map(c=>c.pose+': '+c.verified_sample_count.toLocaleString()+'/'+c.original_sample_count.toLocaleString()).join(' · ');
+window.GEOMETRY={setMode,setLocalBody,draw,resize:(w,h)=>{canvas.width=w;canvas.height=h;draw();},canvas,data:DATA};setMode('overview');
+</script></body></html>

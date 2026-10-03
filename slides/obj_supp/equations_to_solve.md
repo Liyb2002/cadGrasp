@@ -1,5 +1,7 @@
 # Equations to solve — force balance, moment balance, and their joint solutions
 
+当前完整问题的[四项条件与 baseline 验收分工](README.md)统一说明见链接；本文的平衡展开只对应其中的力学条件。
+
 **Current scope (2026-09-06): [README.md](../README.md#当前决定与讨论记录).** Only `t=K=0.5` is
 checked. Independent rigid supports may be inserted sequentially and fit perfectly at
 the endpoint. Indices below count contact generators, not separate support solids.

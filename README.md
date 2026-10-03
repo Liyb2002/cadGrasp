@@ -1,14 +1,10 @@
 # cadGrasp
 
-2026-09-29：当前流程改为 **Step0 随机选择并筛选 n 个 pose → Step1 载荷 → Step2 候选头 → Step3 顺序选头 → Step4 实体构造**。入口 `run_sequential_batch.py B --n 3`；旧 Step4 检查前移到 Step0，旧 Step5 改名 Step4。组合穿地就换一组，全部尝试后仍失败则停止。[当前说明](slides/baseline_algo/step0_pose_selection/README.md)；B 的 n=2 验证在第 7 次选中 [pose3+4](slides/baseline_algo/output/B/pose3+4/step0_pose_selection/floor_point_conflicts.png)，尚未选头或造实体。已有图与模型保留，下面的运行记录及阶段编号为历史。
-
-2026-09-28 当前 baseline 使用[逐 pose 顺序求解](slides/baseline_algo/step3_scheculer/README.md)：每 pose 3–4 个头，后续 pose 从所有已选头中继承一个最佳共享头。每个实体头现在必须避开所有输入 pose 的工作面和地面，包括闲置时。`run_sequential_batch.py B --existing-groups` 已重跑保留的四组：3/4 组全覆盖，但 Step5 仍因固定摆放的落脚条件失败；另一组 pose9 为 32379/32768。0/4 个完整支架。[当前结果](slides/baseline_algo/output/B/pose6+9+10/step4/data/batch_summary.json)与头部 PNG 已更新，旧 pose1+3 做图结果保留。`slides/co_design_algo/` 副本未修改；下方其他构造记录为历史。
+2026-10-02 当前规则：支撑设计须满足[四项条件](slides/obj_supp/README.md)：联合力与力矩平衡、整体不上抬、有限厚度连通实体、完整实体共同插入。[Step3](slides/baseline_algo/step3_scheculer/README.md) 各 pose 独立选头，不要求继承或共享旧头；Step3 验收原始采样载荷的受力，Step4 构造并验证完整实体几何。下方旧流程记录不作为当前入口。
 
 可见 Step5 结果：[B / pose1+3 窄地框合并模型](slides/baseline_algo/output/B/pose1+3/step4/overview.png)、[单独结构对比](slides/baseline_algo/output/B/pose1+3/step4/separate.png)、[旋转查看](slides/baseline_algo/output/B/pose1+3/step4/index.html)。每个 pose 分别连接自己的三头和空心地框，再合并；约 60.8 cm³，比此前厚体少约 89.4%。原载荷与完整退出通过，尚未校核强度。详见 [Step5](slides/baseline_algo/step4_connect_support/README.md)。
 
 当前 B 的配对输出位于 [baseline_algo/output/B](slides/baseline_algo/output/B)：`pose1+3/`、`pose1+4/`、`pose1+6/`、`pose2+8/`、`pose6+9/`，每对下面按 Step1–5 组织。全部旧结果及依赖已迁移，载荷和搜索结果保持原样。
-
-2026-09-26 新增顺序式 Step3 实验：十条 particle 先各找 pose1 的三个头，再从各组三头中选对 pose2 贡献最大的合法共享头，为 pose2 补两个新头，形成 `3 + 3 − 1 = 5`。每个 pose 只用自己的三头验收，共享实体和闲置部位接地留到 Step5。入口为 [run_sequential.py](slides/baseline_algo/step3_scheculer/run_sequential.py)，规则与结果见 [顺序式实验](slides/baseline_algo/step3_scheculer/README.md#sequential-3plus2)。下方原五头共同接触版本保留为对照。
 
 2026-09-26 最新 Step3 决定：当前双 pose baseline 在每轮选头时固定每头为工件总表面积的 **1%**（相对拟合容差 `1e-4`），只按原 top5 sampling 选择，不优化覆盖／面积比。选头停止后，若尚未完成且**两姿态各自严格超过 98%**，才在原中心、原头数上尝试终止补全，单头面积依次尝试 1.01%、1.02%、1.05%、1.10%；达到全部样本通过即停，否则失败。已经全覆盖的不扩大。面积最小化仍留到后续 structural geometry 阶段。新结果保存在各 pair 阶段下的 `fixed_area_1pct/terminal_expansion/`，见 [当前 Step3](slides/baseline_algo/step3_scheculer/README.md)。
 
@@ -57,8 +53,8 @@ Git 保存代码、Markdown、模板和固定测试样例；物体数据及生�
 # 重绘当前 slides；不执行 baseline 搜索
 python slides/tools/render.py
 
-# 当前固定 1% 多 pose 联合选头，止于 Step4
-python slides/baseline_algo/run_sequential_batch.py B --seed 20260928
+# 当前各 pose 独立选头
+python slides/baseline_algo/step3_scheculer/run_independent.py B --jobs 2
 ```
 
 使用已安装项目依赖的 `cadgrasp` Python 环境。运行完成、审计通过、设计通过是不同状态，具体以算法说明和当前案例报告为准。

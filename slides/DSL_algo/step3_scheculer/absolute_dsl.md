@@ -1,0 +1,21 @@
+# Absolute-direction DSL
+
+The active search optimizes directions in the fixed fixture frame, not the object-attached frame. A contact reaction on the object is the negative actual mesh surface normal. Row vectors transform as `normal @ pose_basis`; object exit directions use the same transform. The original object mesh rotation is not applied a second time. Contacts on different object parts need not coincide.
+
+Head count has no reward, penalty or acceptance constraint. The previous qualified V6 state is the incumbent. Search proposals include a geodesic descent of area-weighted contact reaction and exit directions toward a common direction, an independently force-complete upward-exit branch, and translation descent bringing contact centers together. The upward branch uses CUDA NNLS ranking on real surface patches, followed by all original 32768 load checks. Patch sizes may vary; contact identities may be independent across poses. Connected support material can unite their different contact regions.
+
+Direction coherence is guidance, not a proof of a small fixture. Each candidate must retain equilibrium, local exit and working/floor constraints; translation seating checks actual foreign contact roots against continuous withdrawal sweeps. The latest copied baseline EnvelopeGrow then constructs one complete support with one in-memory full-body acceptance, including all-pose ground coverage, withdrawals and complete 5 mm cores. The existing documented short contact transitions remain allowed. No exported-model geometric replay is performed.
+
+The accepted Step4 mesh is measured with the latest baseline Step5 implementation. The primary metric is the aggregate XYZ bounding box of all saved object and installed support poses in their saved workstation axes; XY area and actual material volume are secondary diagnostics. A proposal replaces the public incumbent only if this real occupied volume decreases. Qualified search branches may initially be larger and are allowed to become smaller before replacing the incumbent. Failed proposals preserve the previous qualified state. A finite search is not a guarantee of improvement or a global minimum.
+
+Run a saved set with `.venv/bin/python slides/DSL_algo/step3_scheculer/run_absolute_dsl.py pose1+3` and `PYTHONPATH=slides/DSL_algo`. Every set publishes its final Step4 and Step5; the batch comparison is in `output/B/pose1+3/step5_evaluate/absolute_comparison.md` and `.png`. Historical V5/V6 sources and witnesses are retained intact.
+
+## Second measured round
+
+`absolute_local_descent.py` avoids the coarse all-contact/global-sweep separation restriction during common-floor compaction. Small horizontal moves are proposed using an occupied-box proxy from actual contact cells and pressure demand clouds. Each move checks exact foreign-root/continuous-sweep solid intersections. Only after complete EnvelopeGrow construction and actual Step5 improvement does the branch replace the public incumbent. The proxy is never reported as the final volume. This preserves different contact regions while permitting more overlap of the pose layouts.
+
+The second round starts from qualified first-round finals and separately explores qualified common-up branches that were initially larger. It writes `dsl_absolute_refined`, preserving first-round states and source proofs. Run both rounds and audit all saved sets with `PYTHONPATH=slides/DSL_algo .venv/bin/python slides/DSL_algo/step3_scheculer/run_absolute_batch.py --jobs 2`. `--resume` skips hash-valid completed stages.
+
+## Evidence-driven floor recovery
+
+Some rejected common-up constructions exposed an existing mismatch: the constructor's volume-only legal-part predicate could accept a very small spherical cap below the floor, whereas final acceptance correctly requires vertex floor clearance. `absolute_floor_recovery.py` adds the vertex/all-floor condition during candidate generation and tries another complete core position. It cuts no rods and loosens no final acceptance tolerance. The batch activates this branch from recorded common-up floor failures, without case-specific geometry. It retains the qualified second-round incumbent and accepts a recovered body only after actual Step5 improvement. A regression reproduces a sub-tolerance cap and checks its rejection before construction acceptance.

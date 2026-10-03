@@ -1,20 +1,16 @@
 # Slides
 
+2026-10-02 当前规则：支撑设计须满足[四项条件](obj_supp/README.md)：联合力与力矩平衡、整体不上抬、有限厚度连通实体、完整实体共同插入。[Step3](baseline_algo/step3_scheculer/README.md) 各 pose 独立选头，不要求继承或共享旧头；Step3 验收原始采样载荷的受力，Step4 构造并验证完整实体几何。下方旧流程记录不作为当前入口。
+
 当前 Step4 按参考图重做了两组双 pose 的外侧小脚垫和渐缩身体：[pose5+7 总览](baseline_algo/output/B/pose5+7/step4/overview.png) 为 155.47 cm³，既有静力、接地和退出条件通过；pose3+6 仍有原载荷失败。**新增加工通道核查发现八组共 28 个摆放均会挡住原始加工射线，不能称为完整加工可用。** pose5+7 分别挡住 9,344 和 1,488 条原始方向（每 pose 32,768 条）；见 [实际反例](baseline_algo/output/B/pose5+7/step4/data/work_access_witnesses.png) 和 [完整说明](baseline_algo/step4_connect_support/README.md)。原代码关闭了过程接近检查，最终支撑也未补查；新审计记录在各组 `step4/data/work_access_check.json`，未修改实体或载荷。用户要求的 [八组撒点图](baseline_algo/output/B/pose5+7/step4/data/floor_demands_all_groups.png) 也已全部完成：每组一个固定半透明物体，各 pose 的点云反变换到物体坐标系，替换了此前错误的多物体图。`B/` 顶层无 JSON，不生成 HTML。下方为历史记录，旧输出链接可能已删除。
 
 2026-09-30 最新实验：[B 的紧凑独立就位支撑与退出视频](baseline_algo/output/B/compact_layout.html)。保留各 pose 的原独立头组，搜索整组相对同一实体的紧凑摆放，允许翻面，检查全部闲置材料和完整退出。先做 pose3+6、pose5+7，不共享头；原共同物体配准的结果保持原样。详见 [当前 baseline](baseline_algo/baseline_algo.md) 与 [实体构造说明](baseline_algo/step4_connect_support/README.md)。以下为历史流程与结果。
-
-2026-09-29：当前流程改为 **Step0 随机选择并筛选 n 个 pose → Step1 载荷 → Step2 候选头 → Step3 顺序选头 → Step4 实体构造**。入口 `run_sequential_batch.py B --n 3`；旧 Step4 检查前移到 Step0，旧 Step5 改名 Step4。组合穿地就换一组，全部尝试后仍失败则停止。[当前说明](baseline_algo/step0_pose_selection/README.md)；B 的 n=2 验证在第 7 次选中 [pose3+4](baseline_algo/output/B/pose3+4/step0_pose_selection/floor_point_conflicts.png)，尚未选头或造实体。已有图与模型保留，下面的运行记录及阶段编号为历史。
-
-2026-09-28 当前 baseline 使用[逐 pose 顺序求解](baseline_algo/step3_scheculer/README.md)：每 pose 3–4 个头，后续 pose 从此前所有头中选一个最佳共享头。新增所有 pose 的头部工作面／地面排除；`baseline_algo/run_sequential_batch.py B --existing-groups` 已重跑保留的四组，3/4 组接触全覆盖，另一组 pose9 为 32379/32768。所有已选头均通过新增检查，但三组完整接触输入仍未通过 Step5 固定摆放的落脚条件；0/4 个完整支架。[当前四组图](baseline_algo/output/B/pose6+9+10/step4/data/batch.png)。`co_design_algo/` 未修改，旧 pose1+3 做图结果保留。下方其他构造说明为历史。
 
 当前 Step5 快速构造：[五组 B 总图](baseline_algo/output/B/pose1+3/step4/data/batch.png)、[pose1+3](baseline_algo/output/B/pose1+3/step4/overview.png)、[支撑 OBJ](baseline_algo/output/B/pose1+3/step4/shape.obj)。每个头向最近合法地面长身体，再补脚面和短连接；缓存禁入区与构造决策，默认不重新运行最终受力/退出验收及独立审计。pose1+3 保持约 135.85 cm³ 的原形状。每组外层只放 overview.png、shape.obj，其余记录在 data/；当前仍为五个 ID、六块接触面。详见 [Step5 说明](baseline_algo/step4_connect_support/README.md)。
 
 配对输出直接按任务对组织：`baseline_algo/output/B/pose1+3/` 等目录下分别是 Step1–5；不再把双 pose 结果放在 `B/pose_1/.../pair_pose_3/`。每对 Step1 下保留两个任务的原始输入，详见 [输出入口](baseline_algo/step3_scheculer/README.md)。
 
 此前的 Step5 固定配准检查：[共享结构设计与检查](baseline_algo/step4_connect_support/shared_design.md) 复核五对、11 组接触成功，固定当时的共享曲面配准时均违反地脚兼容的必要条件。此结论保留；当前双接触面表示下的实体见上方链接。
-
-2026-09-26 新增顺序式 Step3 实验：每条 particle 先求 pose1 三头，选一个对 pose2 贡献最大的合法共享头，再为 pose2 补两个；分别验收两套三头，完整共享实体留给 Step5。入口及结果见 [3+2 实验](baseline_algo/step3_scheculer/README.md#sequential-3plus2)。以下共同五头版本保留为对照。
 
 2026-09-26 最新实施：双 pose Step3 每轮固定每头为工件总面积 1%，只按覆盖增量做 top5 sampling。选头停止后，仅对两姿态各自严格超过 98% 且未完成的链尝试终止补全：中心和头数不变，单头面积最多到 1.10%，重新检查受力、插入和基本连通性；仍未全覆盖则失败。已经全覆盖的不扩大，面积最小化留到后续结构实体阶段。载荷验收仍为每 pose 原始 32,768 个样本全部通过，纯重力只作诊断。当前流程止于 Step4；下方单 pose、连续验证与 dock 说明为历史模型。见 [当前 Step3](baseline_algo/step3_scheculer/README.md)。
 
@@ -212,13 +208,4 @@ Step3 还要求所有头作用于工件的竖直力之和非负，即工件对�
 
 ### 当前 baseline 的流程
 
-1. **Step1：载荷需求。** 按工作面积、方向立体角和力度采样，保留 32,768 个可达工况，生成配对六维需求。
-2. **Step2：候选接触头。** 在非工作曲面按真实面积分配 200 个中心；拟合目标面积为物体总面积 1% 的连通接触圆，检查整块法向夹角、实体净空和各头的退出方向。
-3. **Step3：十条 top5 搜索链。** 每条最多 3 个头，先筛几何、面积、共同初次安装方向、有厚度连接和纯重力平衡；在联合覆盖评分前五中抽样，轮流调整全部已选头的尺寸。优化后样本全覆盖才做连续域验证。
-4. **Step4：地面需求。** 映射重力、加工样本、已发现反例和连续载荷外包，输出地面压力中心及外包点，不设计底脚。
-5. **Step5：模块与固定底座。** 构造实际蓝块、矩形插头、静态地面环与插座；验证蓝块初始安装与组合竖直对接，检查工件／蓝块／底座三刚体共享反力的连续承载。
-6. **Step6：搬运与视频。** 重放几何和承载证据，构造避开固定底座的高处搬运路径，生成初次装蓝块、一起抓起、整体对接的 15 秒示意视频；抓持及机器人运动学未认证。
-
-完整设计通过需同时满足 Step3 连续覆盖、Step5 底座检查、Step6 实体/间隙/接触/实际接地检查、整件连续轨迹和共享反力的连续承载。视频能播放、样本全覆盖或审计通过都不能单独替代这一结论。
-
-历史记录（旧整件模型）：2026-09-17 将共享承载加入 Step5 底座筛选后，B/pose_1、B/pose_2 均完整通过，底座占地较原流程分别减少约 48% 和 55%。其余十例尚未按新流程重跑；历史结果与当前停止点见 [当前结果](baseline_algo/baseline_algo.md#当前保存结果)。
+Step1 生成原始载荷，Step2 生成候选接触面，Step3 各 pose 独立进行 top5 选头并验收全部原始采样载荷，Step4 构造共享刚性实体并验收几何，Step5 评价整组占地。[四项条件及验收边界](obj_supp/README.md)；[Step3 运行规则](baseline_algo/step3_scheculer/README.md)。

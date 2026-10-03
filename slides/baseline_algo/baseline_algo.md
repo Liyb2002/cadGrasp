@@ -1,4 +1,10 @@
+Current Step4: [fixed-envelope greedy growth](step4_connect_support/envelope_growth.md), entry `step4_connect_support/run_envelope_growth.py`. All nine active supports and ten Step5 groups / 32 placements have been regenerated. One construction acceptance; historical pose1+3 Step4 and all Step3 inputs are preserved. Previous entries below are historical.
+
+Current Step4 experiment: [joint connectivity and ground growth](step4_connect_support/joint_growth.md), entry `step4_connect_support/run_joint_growth.py`. Nine active groups are rebuilt; all ten Step5 groups are measured. Step3 and historical pose1+3 Step4 remain unchanged. Earlier entries below are historical records.
+
 # 当前 baseline 算法
+
+2026-10-02 当前规则：支撑设计须满足[四项条件](../obj_supp/README.md)：联合力与力矩平衡、整体不上抬、有限厚度连通实体、完整实体共同插入。[Step3](step3_scheculer/README.md) 各 pose 独立选头，不要求继承或共享旧头；Step3 验收原始采样载荷的受力，Step4 构造并验证完整实体几何。下方旧流程记录不作为当前入口。
 
 新增 [Step5 占地评价](step5_evaluate/README.md)：将整组静态 pose 的物体放进一个总 XY bounding box，再将整组物体加支撑放进另一个总 bounding box，比较面积与额外占地比例。沿用实际工位坐标，不累加各 pose 面积，不新增尺寸门槛。单组入口 `step5_evaluate/evaluate.py`；全部组合入口 `step5_evaluate/run_all.py`；[全部 BBX 对比](output/B/pose1+3/step5_evaluate/all_groups.png)。
 
@@ -22,17 +28,9 @@
 
 2026-09-29 B 输入重新生成：当前 **20 个 pose** 中有 206 组三姿态、100 组四姿态、5 组五姿态通过地面兼容检查；pose1+2+3+4+5 是完整五姿态示例。正式 baseline 从新 setup 重建全部载荷后逐对复核一致。[新姿态总览](../../objects/B/overview.png)；[正式 Step0 五姿态示例](output/B/pose1+2+3+4+5/step0_pose_selection/report.json)。后续选头／实体尝试见上方八组记录；新机器人轨迹仍未生成。旧十姿态输入保留在 `objects/B/history/before_compatible_poses_860a4233e74b/`，旧 baseline 输出已按要求删除；下面无三、四 pose 解的结论仅针对旧输入。
 
-2026-09-29：当前流程改为 **Step0 随机选择并筛选 n 个 pose → Step1 载荷 → Step2 候选头 → Step3 顺序选头 → Step4 实体构造**。入口 `run_sequential_batch.py B --n 3`，多组入口 `B --n 2 3 4 --groups-per-n 2 --jobs 2`；旧 Step4 检查前移到 Step0，旧 Step5 改名 Step4。组合穿地就换一组，全部尝试后仍失败则停止。[当前说明](step0_pose_selection/README.md)。用户清空输出后重新运行：n=2 选中 3+4、5+10，Step3 均全覆盖；Step4 均未找到整组头的无碰撞候选退出方向，没有生成实体。n=3、4 分别穷尽 120、210 组，无地面兼容组合。[历史十姿态报告](output/B/history/before_compatible_poses_860a4233e74b/step0_pose_selection/batch_report.md)。下面的运行记录及阶段编号为历史。
-
-2026-09-28 头部全局约束修正：顺序式 Step3 现在从所有输入 pose 的非工作、离地表面交集中生成候选，并要求每个实际头实体在所有 pose 下不穿地；不参与当前 pose 受力也不能豁免。新输出在 `sequential_k_global/`。使用 `run_sequential_batch.py B --existing-groups` 重跑保留的四组新结果；保持旧 pose1+3 做图结果。候选合法只覆盖头本身，不能替代 Step5 的地面需求、连接和完整支架检查。
-
-2026-09-28 当前入口为 [run_sequential_batch.py](run_sequential_batch.py)：随机抽取 2／3／4 pose 各两组，每组按编号顺序逐 pose 求解。Step3 每 pose 先找 3 个头，不足则补第 4 个；后续 pose 从此前所有头中选贡献最大的一个共享头，再补自己的头，先前已完成的接触集合不变。固定每头 1% 面积，不扩尺寸；所有原始 32,768 样本全覆盖才通过。每组最多十条链，首个成功即止，再执行 Step4 与多 pose Step5。同步评分版本已由用户复制到 `../co_design_algo/`，本次只读不改。详见 [当前规则与运行命令](step3_scheculer/README.md)。以下其他算法和结果均为历史记录。
-
 2026-09-28 共享头纠错：**共享头必须是同一个物理头，两份完整接触面和头实体在支撑坐标系中重合。此前五个 ID、六块接触面的 Step5 构造无效，已撤回。** 当前入口强制检查配准；[五组 B 总图](output/B/pose1+3/step4/data/batch.png)及各组 overview 显示拒绝原因，不再导出旧支撑 OBJ。旧几何与报告保留在各组 `data/history/before_fast_construction/`。严格按原接触对应关系配准后，五组保存输入均违反地面需求必要条件；pose1+3 的 pose1 有 1713/32768 个需求越界。当前没有有效的五头完整支撑，详见 [Step5 说明](step4_connect_support/README.md)。
 
 此前的 Step5 设计检查：顺序式 3+2 的五对、11 组接触成功，在保持原共享曲面配准时均违反两 pose 地脚兼容的必要条件。见 [共享头核查](step4_connect_support/shared_head_diagnosis.md)。后来的双黄色接触面构造改变了物理头定义，不能作为绕过该失败的解。
-
-2026-09-26 新增用户指定的顺序式实验：[run_sequential.py](step3_scheculer/run_sequential.py)。十条 particle 先求 pose1 三头，再各选一个对 pose2 贡献最大的合法共享头，为 pose2 增加两个新头。各组三头独立验收固定载荷和共同退出，完整五头实体／地脚留给 Step5；固定 1% 和末尾 >98% 小幅补全保留。详见 [规则与结果](step3_scheculer/README.md#sequential-3plus2)。原共同五头算法保留为对照。
 
 2026-09-26 最新更新：当前双 pose Step3 在选头期间**固定每头为工件总表面积 1%**；未达到目标面积或该尺寸下几何非法则排除，相对拟合容差 `1e-4`。沿用十链 top5 sampling，每轮不调尺寸、不使用覆盖／面积目标。选头停止后，若两姿态各自严格超过 98% 且尚未完成，保持中心和头数，按单头面积 1.01%、1.02%、1.05%、1.10% 尝试小幅扩大，每次重查受力、共同插入方向和基本连通性；全部原样本通过即停。任一姿态不超过 98% 直接失败；扩完仍未全覆盖也失败。已经完成的链保持原样，面积最小化留到后续 structural geometry 阶段。当前仍止于 Step4，未实现共享实体。输出及同五对 B 的五头预算结果见 [当前 Step3](step3_scheculer/README.md)。本文其余逐轮调半径和连续验证说明保留为历史。
 

@@ -1,0 +1,15 @@
+# Joint connectivity and ground growth
+
+Run `run_joint_growth.py` for all nine active Step4 groups. Keep Step3 inputs and the historical `pose1+3` Step4 unchanged. The copied reference uses its archived poses.
+
+Start with the original contact roots and legal short transitions as separate components. The Step0 demand hulls constrain the convex hull of actual ground contact in each installed pose; they do not prescribe feet. Generate optional sole candidates from demand neighborhoods and initial-envelope floor sections. No previous support footprint is used to select feet.
+
+At each iteration, propose both component joins and ground branches for every uncovered pose. Attach to existing head ends, ground starts or projections on grown rods. Prefer complete straight rods. Use lazy obstacle routing only when direct proposals fail. Every accepted rod and sole must avoid the full withdrawal exclusions, satisfy all installed floors and preserve the original contact conditions.
+
+Keep four distinct partial constructions: the combined compactness/progress score winner, the coverage-progress winner, the connectivity-progress winner and the smallest occupied-box winner. The combined score is normalized XYZ box volume plus normalized XY box area plus remaining connectivity plus twice normalized coverage deficit, with a small length penalty. Ground proposals include low box cost per coverage gain, large coverage gain and low box cost. Coverage deficit uses Euclidean distance of required hull vertices to the current ground hull. There is no relative-gain cutoff, head-first phase or pose-sequential completion phase.
+
+Search at most 120 iterations and at most 32 further iterations after the first complete support. Retain completed candidates, conservatively remove unnecessary ground leaves, and measure up to four candidates. Select by actual occupied XYZ box volume, then XY box area, then support material volume. The occupied box is workstation min/max over all object poses and all installed copies of the support. The bounded search is deterministic but does not guarantee a global minimum or an improvement over the preceding algorithm.
+
+Use one construction acceptance for connectivity, contacts, full continuous 500 mm withdrawal exclusions, installed floors and required ground coverage. Do not perform exported-model recheck or independent replay. Complete rod and foot cores retain the 5 mm minimum thickness requirement; recorded short contact transitions and original contact margins remain exceptions. Report construction, acceptance and setup times separately.
+
+Publish only `overview.png` and `construction_steps.png` for each active Step4 group. The latter shows contacts, exit exclusions, actual partial joint growth, final support with one object pose, and the measured usage box. Blue outlines indicate required coverage regions. The copied reference retains the historical first two illustration panels. Run all ten Step5 groups after the Step4 models and images are final.
