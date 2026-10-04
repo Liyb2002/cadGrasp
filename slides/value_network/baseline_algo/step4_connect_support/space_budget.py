@@ -11,8 +11,9 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'slides/baseline_algo/output'
+from step3_scheculer import contacts as I
+ROOT = I.ROOT
+OUTPUT = I.OUTPUTS
 TOL_M = 1e-9
 
 

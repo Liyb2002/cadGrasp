@@ -220,7 +220,7 @@ class Grow:
                 for m,b,o in zip(self.search.sweep_meshes,self.bases,self.offsets)]
         with contextlib.redirect_stdout(io.StringIO()):
             checks,cert=S.verify(self.case.tasks,self.case.groups,self.case.support_seeds,
-                self.directions,self.bases,self.offsets,mesh,sweeps,check_equilibrium=False)
+                self.directions,self.bases,self.offsets,mesh,sweeps,check_equilibrium=False,object_exit_mode=getattr(self.case,'object_exit_mode',False))
         coverage=[]
         for check,demands in zip(checks,self.case.demands):
             actual=MultiPoint(check['actual_ground_hull_xy_m']).convex_hull

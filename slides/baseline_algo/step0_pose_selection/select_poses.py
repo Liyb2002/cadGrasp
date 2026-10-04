@@ -22,33 +22,36 @@ from step0_pose_selection import floor_points as F
 
 SCHEMA = 'random_n_pose_floor_selection_v1'
 
-
-def shuffled_combinations(available, n, seed):
-    """Every unordered set appears at most once; exhaustion always terminates."""
-    available = tuple(sorted(available, key=lambda p: int(p.split('_')[1])))
-    if isinstance(n, bool) or not isinstance(n, int) or not 2 <= n <= len(available):
-        raise ValueError(f'n must be between 2 and {len(available)} for this multi-pose baseline')
-    if len(set(available)) != len(available):
-        raise ValueError('Available poses must be distinct')
-    groups = list(itertools.combinations(available, n))
-    random.Random(seed).shuffle(groups)
-    return groups
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from codes.precompute_objects.dataset import selected_sets, read_sets
+from codes.precompute_objects.selection import shuffled_combinations, choose, choose_many
 
 
-def choose(available, n, seed, evaluate, progress=None):
-    """Pure selection loop. Never advance downstream on failed floor demands."""
-    groups = shuffled_combinations(available, n, seed)
-    attempts = []
-    for group in groups:
-        verdict = evaluate(group)
-        attempts.append(dict(poses=list(group), **verdict))
-        if progress:
-            progress(attempts[-1], len(attempts), len(groups))
-        if verdict['passed']:
-            return dict(passed=True, status='pose_set_selected', selected_poses=list(group),
-                        attempted_count=len(attempts), total_combinations=len(groups), attempts=attempts)
-    return dict(passed=False, status='no_floor_compatible_pose_set', selected_poses=None,
-                attempted_count=len(attempts), total_combinations=len(groups), attempts=attempts)
+def dataset_selections(name, n, seed, count, cache=None):
+    rows = selected_sets(name, n, seed, count)
+    if rows is None:
+        return None
+    cache = TaskCache(name) if cache is None else cache
+    dataset_path = I.ROOT/'objects'/name/'pose_sets.json'
+    ledger = cache.root/f'selection_n{n}_seed{seed}_groups{count}.json'
+    selections = []
+    for row in rows:
+        check = publish_check(name, row['poses'], cache)
+        report = dict(passed=True, status='precomputed_pose_set_selected', selected_poses=row['poses'],
+            n=n, seed=seed, dataset=str(dataset_path.relative_to(I.ROOT)))
+        selections.append(Selection(report, ledger, check))
+    result = dict(schema='precomputed_pose_set_selection_v1', complete=True,
+        passed=len(rows)==count, requested_count=count, selected_groups=[r['poses'] for r in rows],
+        status='pose_sets_selected' if len(rows)==count else 'insufficient_precomputed_pose_sets',
+        attempted_count=0, pose_search_repeated=False, dataset=str(dataset_path.relative_to(I.ROOT)),
+        dataset_sha256=I.sha256(dataset_path), selected_checks=[str(s.check_path.relative_to(I.ROOT)) for s in selections])
+    I.save(ledger, result)
+    return selections, result
+
+
+
+
+
 
 
 class TaskCache:
@@ -72,7 +75,13 @@ class TaskCache:
                         build_loads(self.name, output_folder=source)
             task = read_task(self.name, pose, folder=source)
             self.tasks[pose], self.sources[pose] = task, source
-            self.clouds[pose] = F.pressure_centers(task.targets/task.scale, task.domain.com)[0]
+            cached_floor = I.ROOT/'objects'/self.name/'poses'/pose/'floor_contact.npz'
+            if cached_floor.is_file():
+                with np.load(cached_floor) as saved:
+                    np.testing.assert_allclose(saved['load_wrenches'], task.targets/task.scale, atol=1e-15, rtol=1e-14)
+                    self.clouds[pose] = saved['floor_demands_xy_m'].copy()
+            else:
+                self.clouds[pose] = F.pressure_centers(task.targets/task.scale, task.domain.com)[0]
         return self.tasks[pose]
 
     def evaluate(self, poses):
@@ -146,6 +155,9 @@ class Selection:
 
 
 def select(name, n, seed=20260929):
+    reused = dataset_selections(name, n, seed, 1)
+    if reused is not None:
+        return reused[0][0]
     available = task_poses(name)
     shuffled_combinations(available, n, seed)  # validate before creating output
     cache = TaskCache(name)
@@ -159,7 +171,8 @@ def select(name, n, seed=20260929):
         repeated_combinations=False, complete_fixture_verified=False,
         scope='Only fixed-pose floor compatibility of original demands; no head or body search',
         provenance=dict(inputs=input_hashes(list(cache.tasks.values())),
-                        code=I.hashes([Path(__file__), Path(F.__file__)])))
+                        code=I.hashes([Path(__file__), Path(F.__file__), I.ROOT/'codes/precompute_objects/floor_points.py',
+                            I.ROOT/'codes/precompute_objects/selection.py'])))
     check = None
     if result['passed']:
         check = publish_check(name, result['selected_poses'], cache)
@@ -168,28 +181,12 @@ def select(name, n, seed=20260929):
     return Selection(result, ledger_path, check)
 
 
-def choose_many(available, n, seed, evaluate, count=2, progress=None):
-    """Continue the same random permutation until count distinct sets pass."""
-    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-        raise ValueError('Positive integer group count required')
-    groups = shuffled_combinations(available, n, seed)
-    attempts, selected = [], []
-    for group in groups:
-        verdict = evaluate(group)
-        attempts.append(dict(poses=list(group), **verdict))
-        if progress:
-            progress(attempts[-1], len(attempts), len(groups))
-        if verdict['passed']:
-            selected.append(list(group))
-            if len(selected) == count:
-                break
-    return dict(passed=len(selected) == count,
-        status='pose_sets_selected' if len(selected) == count else 'insufficient_floor_compatible_pose_sets',
-        requested_count=count, selected_groups=selected, attempted_count=len(attempts),
-        total_combinations=len(groups), exhausted=len(attempts) == len(groups), attempts=attempts)
 
 
 def select_many(name, n, seed=20260929, count=2, cache=None):
+    reused = dataset_selections(name, n, seed, count, cache)
+    if reused is not None:
+        return reused
     available = task_poses(name)
     cache = TaskCache(name) if cache is None else cache
     if cache.name != name:
@@ -202,7 +199,8 @@ def select_many(name, n, seed=20260929, count=2, cache=None):
         n=n, seed=seed, sample_count_per_pose=32768, repeated_combinations=False,
         complete_fixture_verified=False,
         provenance=dict(inputs=input_hashes(list(cache.tasks.values())),
-                        code=I.hashes([Path(__file__), Path(F.__file__)])))
+                        code=I.hashes([Path(__file__), Path(F.__file__), I.ROOT/'codes/precompute_objects/floor_points.py',
+                            I.ROOT/'codes/precompute_objects/selection.py'])))
     ledger = cache.root/f'selection_n{n}_seed{seed}_groups{count}.json'
     selections = []
     for poses in result['selected_groups']:

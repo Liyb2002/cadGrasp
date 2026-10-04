@@ -1,9 +1,14 @@
-"""Current baseline simplification: contacts avoid work faces, not access rays."""
+"""Algorithm adapter for the shared dataset contact-head kernel."""
+import importlib.util
+from pathlib import Path
+import sys
+_ROOT=Path(__file__).resolve().parents[3]
+sys.path.insert(0,str(_ROOT))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+_spec=importlib.util.spec_from_file_location(__name__,_ROOT/'codes/precompute_objects/heads/support_policy.py')
+_module=importlib.util.module_from_spec(_spec)
+sys.modules[__name__]=_module
+_spec.loader.exec_module(_module)
 
-ENFORCE_PROCESS_ACCESS = False
-
-
-def skipped_access_check():
-    return dict(passed=True, enforced=False, verified=False,
-                classification='disabled_by_support_model',
-                reason='Process-access volume is omitted; contact faces still exclude the working surface.')
+if __name__ == "__main__" and hasattr(_module, "main"):
+    _module.main()

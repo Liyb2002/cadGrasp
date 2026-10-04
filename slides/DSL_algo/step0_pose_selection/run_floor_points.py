@@ -114,7 +114,8 @@ def build_tasks(name, tasks, destination, *, compat=()):
         compatibility_directories=[str(p) for p in compat],
         provenance=dict(inputs=input_hashes(tasks), code=I.hashes([
             Path(__file__), Path(C.__file__), Path(__file__).with_name('draw_floor_points.py'),
-            Path(__file__).with_name('floor_points.py')])))
+            Path(__file__).with_name('floor_points.py'),
+            I.ROOT/'codes/precompute_objects/floor_points.py'])))
     report['presentation'] = draw(name, poses, vertices, faces, frames, clouds, result, destination)
     report['artifacts'] = {str(p.relative_to(destination)): I.sha256(p)
                            for p in sorted(destination.rglob('*')) if p.is_file()}

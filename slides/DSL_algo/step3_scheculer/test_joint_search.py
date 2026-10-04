@@ -461,6 +461,7 @@ class JointInputsTests(unittest.TestCase):
         with TemporaryDirectory() as tmp, \
                 patch('step3_scheculer.joint_tasks.OUTPUTS', Path(tmp)), \
                 patch('step3_scheculer.pair_tasks.OUTPUTS', Path(tmp)), \
+                patch('step3_scheculer.pair_tasks.ROOT', Path(tmp)), \
                 patch('step3_scheculer.joint_tasks.read_task', side_effect=lambda name, pose, folder: folder):
             for a, b in [('1', '3'), ('6', '9')]:
                 for pose in (f'pose_{a}', f'pose_{b}'):

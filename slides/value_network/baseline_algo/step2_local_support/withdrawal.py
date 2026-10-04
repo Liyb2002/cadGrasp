@@ -119,7 +119,10 @@ class Analyzer(H.Analyzer):
     def test(self, heads, direction):
         """Convex head cells swept continuously until an AABB separates forever."""
         d = np.asarray(direction)
-        if d@self.floor[:3] < -NORMAL_TOL: return dict(clear=False,reason='initial_floor_direction')
+        object_motion=self.catalogue.get('object_withdrawal_from_static_support',False)
+        if object_motion:
+            if -d@self.floor[:3] < -NORMAL_TOL:return dict(clear=False,reason='object_moves_below_floor')
+        elif d@self.floor[:3] < -NORMAL_TOL:return dict(clear=False,reason='initial_floor_direction')
         points = np.vstack([h.vertices for h in heads])
         if np.min(points@self.floor[:3]+self.floor[3]) < -self.scale*1e-10:
             return dict(clear=False,reason='initial_installed_floor_collision')

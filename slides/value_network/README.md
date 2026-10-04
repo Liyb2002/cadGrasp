@@ -1,3 +1,9 @@
+# 当前目标：绝对方向与真实占用空间
+
+新版不再优化头数，也不把退出方向转回物体坐标系。用共同工位中的绝对方向引导接触与摆放，最终 value 的目标是成功支撑的 Step5 占用包围盒体积。[方法](method/method.md) · [真实 Step4/Step5 实验](absolute_direction/REPORT.md)。
+
+新版网络已训练，使用实际成功解的体积标签，入口和结果见 [train/absolute_volume](train/absolute_volume/README.md)。下面的固定任务训练、旧数据和组合泛化结果属于 `N_remaining + D_object` 历史版本；原数据和权重保留。
+
 # Value network
 
 - [方法与公式图](method/method.md)。

@@ -1,3 +1,7 @@
+# Shared per-object Step2 precomputation
+
+Current head geometry is implemented in `codes/precompute_objects/heads/` and `head_geometry.py`. Native pose candidates, raw wrench generators, checked finite exit directions and figures are stored in `objects/<name>/poses/pose_<i>/step2/`. See `codes/precompute_objects/README.md` for configuration and validation. Group-dependent exclusions, common exits, force LPs and complete support construction remain runtime checks. Historical algorithm outputs use the previous pose revision.
+
 2026-09-29 当前 Step2 仅在 Step0 地面兼容检查通过后运行，候选生成由顺序 Step3 的准备阶段调用。每个 pose 默认 200 个中心、固定 1% 面积，避开所有 pose 工作面及地面；本步内容未因新增 Step0 而改变。完整实体现称 Step4。以下旧双 pose／单 pose 说明保留作历史。
 
 # 当前双 pose：固定 1% 候选

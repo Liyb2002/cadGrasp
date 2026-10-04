@@ -1,3 +1,7 @@
+# 新目标入口：绝对方向 / Step5 占用空间
+
+运行 `run_absolute_direction.py`，结果在 `../absolute_direction/output/B/`。当前是共同工位 +Z 方向下的联合接触／摆放和真实 Step4/Step5 试验，没有头数惩罚；[分数定义](../method/method.md) 和 [实际结果](../absolute_direction/REPORT.md)。下方 `run_step3.py` 和旧网络继续保留为历史版本，不能解释为新版 value 网络已经训练。
+
 # Value-network baseline copy
 
 This is a full copy of `slides/baseline_algo/`. The original remains the comparison baseline. Object meshes and poses still come from the shared `objects/` directory.

@@ -38,6 +38,9 @@ def prepare_tasks(name, poses):
                 with selected_pose(pose):
                     build(name, output_folder=target)
             else:
-                shutil.copytree(source, target, dirs_exist_ok=True)
+                target.mkdir(parents=True, exist_ok=True)
+                for filename in ('needs.json','samples.json','setup.npz','setup.json','floor_contact.npz','examples.json'):
+                    path=source/filename
+                    if path.is_file():shutil.copy2(path,target/filename)
         problems.append(read_task(name, pose, folder=target))
     return problems

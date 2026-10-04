@@ -1,3 +1,5 @@
+2026-10-03 当前输入：`objects/<name>/poses/pose_<i>/` 的固定 `needs.json`、`samples.json`。Step1 只复用原始文件，默认不得重撒点；姿态与组合清单见 `poses.json`、`pose_sets.json`。实现已迁入 [precompute_objects](../../../codes/precompute_objects/README.md)，本目录保留算法适配器。下方为历史格式与说明。
+
 2026-09-29 流程更新：Step0 先用固定原始载荷筛选 pose set，只有通过者进入本步。Step1 发布 Step0 用过的同一批样本，不重新采样；拒绝组合不创建正式 Step1 输出。完整入口 `run_sequential_batch.py <object> --n <数量>`。以下载荷公式与采样定义不变。
 
 # Step 1：采样近似六维需求

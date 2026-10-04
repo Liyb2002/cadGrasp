@@ -23,14 +23,14 @@ def patch_mesh(points):
     return trimesh.Trimesh(points, np.arange(len(points)).reshape(-1, 3), process=False)
 
 
-def prepare(case, relief_m):
+def prepare(case, relief_m, *, bases=None, offsets=None):
     """Replace required old probe volumes with patches and bounded new roots.
 
     Root normal depth is at most twice the non-contact relief, and no generated
     root vertex moves farther than half the minimum patch/floor clearance.
     Actual transformed root vertices are independently checked on every floor.
     """
-    bases, offsets = H.fixed_placements(case.tasks)
+    if bases is None:bases, offsets = H.fixed_placements(case.tasks)
     case.probe_heads = case.heads
     case.heads = [[list(np.asarray(c['triangles_m'], float)) for c in row] for row in case.groups]
     seeds, records = [], []

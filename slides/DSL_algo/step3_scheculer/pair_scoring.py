@@ -24,6 +24,10 @@ class TaskProblem:
     def supply(self, contacts):
         groups = [U.floor(F.columns(self.floor, self.domain.com), self.scale)]
         for contact in contacts:
+            if 'wrench_generators' in contact:
+                np.testing.assert_array_equal(contact['wrench_com_m'], self.domain.com)
+                groups.append(U.heads(contact['wrench_generators'], self.scale))
+                continue
             points = contact['triangles_m'].reshape(-1, 3)
             normals = np.repeat(-self.domain.mesh.face_normals[contact['source_faces']], 3, axis=0)
             groups.append(U.heads(np.c_[normals, np.cross(points-self.domain.com, normals)], self.scale))

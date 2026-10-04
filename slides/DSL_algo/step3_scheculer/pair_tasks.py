@@ -43,6 +43,9 @@ def task_folder(name, pose, poses=None):
     """Read explicit pair inputs; unqualified reads require identical saved loads."""
     from step1.cases import normalize_pose
     pose = normalize_pose(pose)
+    cached = ROOT/'objects'/name/'poses'/pose
+    if poses is None and (cached/'samples.json').is_file():
+        return cached
     if poses is not None:
         if pose not in canonical_pair(poses):
             raise ValueError('Task pose is not a member of the pair')
@@ -73,7 +76,10 @@ def prepare_pair_inputs(name, poses):
             with selected_pose(pose):
                 build(name, output_folder=target)
         else:
-            shutil.copytree(source, target, dirs_exist_ok=True)
+            target.mkdir(parents=True, exist_ok=True)
+            for filename in ('needs.json','samples.json','setup.npz','setup.json','floor_contact.npz'):
+                path=source/filename
+                if path.is_file():shutil.copy2(path,target/filename)
 
 
 def fixed_area_folder(name, poses, stage):

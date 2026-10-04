@@ -19,9 +19,11 @@ from step2_local_support.circles import DEPTH_FRACTION
 
 def geometry_sources():
     here = Path(__file__).parent
+    from codes.precompute_objects import head_cache as HC
+    shared=[HC.ROOT/path for path in HC.sources()]
     return (list((here.parent/'step2_local_support').glob('*.py'))+
             [here/name for name in ('joint_geometry.py', 'joint_prepared.py',
-                                    'sequential_geometry.py', 'pair_geometry.py', 'contacts.py')])
+                                    'sequential_geometry.py', 'pair_geometry.py', 'contacts.py')]+shared)
 
 
 def scoring_sources():

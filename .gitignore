@@ -1,37 +1,78 @@
-# Python, compiled helpers and local editor/cache files
-__pycache__/
-*.py[cod]
-*.so
-*.dylib
-.venv/
-.pytest_cache/
-.DS_Store
+# Ignore everything by default. Keep directories traversable for the allowlist.
+*
+!*/
 
-# Local datasets and generated results (at any directory depth)
-objects/
-output/
-dataset/
+# Project documentation.
+!*.md
 
-# Private research material and downloaded papers
-cad_grasp.md
-proposals/
-papers/
+# Source code and scripts.
+!*.py
+!*.pyi
+!*.sh
+!*.bash
+!*.zsh
+!*.c
+!*.h
+!*.cc
+!*.hh
+!*.cpp
+!*.hpp
+!*.cxx
+!*.hxx
+!*.cu
+!*.cuh
+!*.rs
+!*.go
+!*.java
+!*.kt
+!*.kts
+!*.cs
+!*.js
+!*.mjs
+!*.cjs
+!*.jsx
+!*.ts
+!*.tsx
+!*.html
+!*.htm
+!*.css
+!*.scss
+!*.sass
+!*.less
+!*.lua
+!*.rb
+!*.pl
+!*.r
+!*.R
+!*.jl
+!*.m
+!*.mm
+!*.swift
+!*.f
+!*.f90
+!*.f95
+!*.glsl
+!*.vert
+!*.frag
+!*.geom
+!*.comp
 
-# Generated slide data and media; keep the source and documentation in Git
-slides/**/*.json
-slides/**/*.npz
-slides/**/*.png
-slides/**/*.jpg
-slides/**/*.jpeg
-slides/**/*.gif
-slides/**/*.mp4
-slides/**/*.stl
-slides/**/*.obj
-slides/**/*.log
+# Keep this policy itself under version control.
+!/.gitignore
 
-# Small fixed regression inputs are part of the test code
-!slides/**/fixtures/*.json
-!slides/**/fixtures/*.npz
-
-# Provenance for the explicitly requested Step5 method archive
-!slides/baseline_algo/step5_connect_support/archive/*/manifest.json
+# Dependencies, caches and local tooling are never project source.
+**/.git/
+**/.venv/
+**/venv/
+**/env/
+**/node_modules/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.tox/
+**/.nox/
+**/.ipynb_checkpoints/
+/.agents/
+/.codex/
+/.aws/

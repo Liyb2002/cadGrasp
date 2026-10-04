@@ -182,7 +182,7 @@ class PairScoringTests(unittest.TestCase):
             pair_folder('B', ['pose_1', 'pose_2'], 'step5_base')
 
     def test_new_pair_reuses_exact_samples_without_single_pose_output(self):
-        with TemporaryDirectory() as tmp, patch('step3_scheculer.pair_tasks.OUTPUTS', Path(tmp)):
+        with TemporaryDirectory() as tmp, patch('step3_scheculer.pair_tasks.OUTPUTS', Path(tmp)), patch('step3_scheculer.pair_tasks.ROOT', Path(tmp)):
             for pose, pair in [('pose_1', ['pose_1', 'pose_3']), ('pose_4', ['pose_4', 'pose_6'])]:
                 folder = task_folder('B', pose, pair)
                 folder.mkdir(parents=True)
@@ -197,7 +197,7 @@ class PairScoringTests(unittest.TestCase):
             self.assertFalse((Path(tmp)/'B/pose_4').exists())
 
     def test_unqualified_task_read_rejects_conflicting_pair_samples(self):
-        with TemporaryDirectory() as tmp, patch('step3_scheculer.pair_tasks.OUTPUTS', Path(tmp)):
+        with TemporaryDirectory() as tmp, patch('step3_scheculer.pair_tasks.OUTPUTS', Path(tmp)), patch('step3_scheculer.pair_tasks.ROOT', Path(tmp)):
             for other in ('pose_3', 'pose_6'):
                 folder = task_folder('B', 'pose_1', ['pose_1', other])
                 folder.mkdir(parents=True)

@@ -1,31 +1,14 @@
-"""Initial lying installation expressed in the task's coordinates.
-
-Loads remain in the task frame. Only module assembly uses the declared rest pose.
-Horizontal placement of that rest pose can change in the presentation scene.
-"""
-import json
+"""Algorithm adapter for the shared dataset contact-head kernel."""
+import importlib.util
 from pathlib import Path
-import numpy as np
-from step1.needs import ROOT
+import sys
+_ROOT=Path(__file__).resolve().parents[3]
+sys.path.insert(0,str(_ROOT))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+_spec=importlib.util.spec_from_file_location(__name__,_ROOT/'codes/precompute_objects/heads/installation.py')
+_module=importlib.util.module_from_spec(_spec)
+sys.modules[__name__]=_module
+_spec.loader.exec_module(_module)
 
-CONTACT_CLEARANCE_M = .0015
-
-
-def scene(name, domain):
-    path = ROOT/'objects'/name/'poses.json'
-    data = json.loads(path.read_text())
-    initial = np.asarray(data['rest']['T_world_mesh'], float)
-    task = np.asarray(domain.data['frame']['T_world_mesh'], float)
-    transform = initial @ np.linalg.inv(task)
-    plane = transform[2].copy()
-    return dict(kind='rest_pose_module_installation_v1', initial_pose='rest',
-                T_initial_from_task=transform.tolist(), floor_plane=plane.tolist(),
-                contact_floor_clearance_m=CONTACT_CLEARANCE_M,
-                direction_coordinate_frame='task world; transform with T_initial_from_task to display at rest',
-                initial_pose_source=str(path.relative_to(ROOT)),
-                motion='blue module moves; object remains in its initial lying pose',
-                task_floor_static_only=True, dock_direction_independent=True)
-
-
-def inputs(name):
-    return [ROOT/'objects'/name/'poses.json']
+if __name__ == "__main__" and hasattr(_module, "main"):
+    _module.main()

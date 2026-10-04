@@ -251,7 +251,7 @@ class DirectGrow(B.BatchGrow):
             material_reduction_percent=100*(1-mesh.volume/self.reference.volume),
             previous_space_budget=self.reference_report['space_budget'],seconds=time.monotonic()-started,
             deterministic=True,random_sampling=False,global_optimality_claim=False,
-            provenance=dict(inputs=I.hashes([self.source/'report.json',self.source/'shape.obj']+self.case.paths),
+            provenance=dict(inputs=I.hashes(getattr(self,'construction_input_paths',[self.source/'report.json',self.source/'shape.obj'])+self.case.paths),
                 code=I.hashes([Path(__file__),Path(L.__file__),Path(B.__file__),Path(B.ADAPTER.__file__),Path(D.__file__),Path(F.__file__),Path(S.__file__),
                     Path(G.__file__),Path(S.swept_solid.__code__.co_filename)]+A.sources())),
             artifacts={p:I.sha256(self.out/p) for p in ('shape.obj','geometry_certificate.npz')})

@@ -1,5 +1,47 @@
 # Fixed belt + dock: three-pose interface pressure screen
 
+## Paper-ready wording: edge contact and pressure (2026-10-03)
+
+### Mechanism / motivation
+
+> A clearance-fit docking interface can transmit moments through opposing contact forces concentrated near its edges. If the effective contact area is bounded by \(A_{\mathrm{eff}}\leq \ell b\), the peak contact pressure satisfies \(p_{\max}\geq N/(\ell b)\), where \(N\) is the normal reaction, \(\ell\) is the contact-edge length, and \(b\) is the effective contact-band width. This motivates evaluating local contact pressure rather than only the net interface force.
+
+中文参考：带间隙的插接接口可通过相对接触面的反力传递力矩，载荷可能集中在接头边缘。若有效接触面积满足 \(A_{\mathrm{eff}}\leq\ell b\)，则峰值接触压强满足 \(p_{\max}\geq N/(\ell b)\)，其中 \(N\) 为该接触面的法向反力，\(\ell\) 为接触边缘长度，\(b\) 为有效接触带宽。因此，接口评价应考虑局部接触压强，不能仅依据接口净合力。
+
+Here \(N\) is a face's compressive normal-force sum, not the magnitude of the vector-summed force on the whole dock. Opposing face reactions can cancel in net force while transmitting a moment. The bound follows from \(p_{\max}\geq N/A_{\mathrm{eff}}\); it does not assume uniform actual pressure.
+
+### Units and normalization
+
+\(mg\) denotes object weight, a force measured in N. Pressure is force divided by area and should be reported in Pa or MPa. For scale-normalized comparisons, define
+
+\[
+A_{\mathrm{ref}}=0.01A_{\mathrm{obj}},\qquad
+p_{\mathrm{ref}}=\frac{mg}{A_{\mathrm{ref}}},\qquad
+\hat p=\frac{p}{p_{\mathrm{ref}}}=\frac{pA_{\mathrm{ref}}}{mg},
+\]
+
+where \(A_{\mathrm{obj}}\) is the total object surface area. \(\hat p\) is dimensionless. Use the figure-axis label **Normalized contact pressure, \(pA_{\mathrm{ref}}/(mg)\)**; never label a pressure as “\(Xmg\).” A force may instead be labeled \(N/(mg)\), also dimensionless, with the quantity explicitly identified as force.
+
+Suggested methods sentence:
+
+> We normalize contact pressure by \(p_{\mathrm{ref}}=mg/A_{\mathrm{ref}}\), where \(A_{\mathrm{ref}}\) is 1% of the total object surface area, and report the dimensionless quantity \(pA_{\mathrm{ref}}/(mg)\).
+
+### Conditional numerical result
+
+> For an assumed effective contact-band width of 0.1 mm, the mean and maximum pressure lower bounds over 100 matched loads are respectively 4.40 and 3.86 times the corresponding nominal pressure demands of the passive support.
+
+中文参考：在假设有效接触带宽为 0.1 mm 时，100 个相同载荷下，dock 的压强下界的平均值与最大值分别为被动支撑对应名义压强需求的 4.40 倍和 3.86 倍。
+
+These are ratios of the respective means and maxima, not the mean and maximum of per-load ratios. “Maximum” refers only to the 100 sampled loads. The comparison uses the existing Pose 3 inputs, object-ground load sharing, mu=64 ground model and shared no-uplift condition. The dock bound uses the unlocked frictionless sleeve, relaxed cavity-face force locations, a full-area end stop and assumed side-contact area caps; the support quantity is its optimized nominal peak-pressure demand. This compares different specified contact-area models, not measured elastic peak pressures.
+
+Suggested limitation sentence:
+
+> These conditional bounds illustrate potential pressure concentration at the interface; they do not establish the actual contact-band width or material failure.
+
+Keep **assumed** and **lower bounds** in any numerical claim. The 0.1 mm band width is a scenario parameter, not a measured value or a value inferred from the 0.5 mm assembly clearance. Actual width and pressure require a specified contact/deformation model or measurement. These results motivate examining the interface and retaining belt + dock as a comparison; they do not establish that every dock is inferior or that the present dock necessarily fails. The ideal locked, full-face model below gives lower nominal pressure demand than the support and must not be conflated with this edge-contact scenario.
+
+Numerical provenance: [conditional-bound implementation](clearance_contact_bound.py), with recorded results at `pressure_data/clearance_pressure_bound.json`; matched nominal comparison: [implementation](compare_contact_pressure.py), with results at `pressure_data/pressure_comparison_100.json`. This section records paper wording from existing results; no calculation was rerun for this documentation edit.
+
 ## Final presentation and retained evidence
 
 ![Shared-base scene and same-view 3D joint detail](../dock_pressure_zoom.png)

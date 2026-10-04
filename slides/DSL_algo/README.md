@@ -1,4 +1,24 @@
-# Active: absolute-direction DSL
+# Current dataset: searched common world exit (2026-10-04)
+
+New contact-program entry: `python -m step3_scheculer.shared_direction_search B --sets pose3+15 pose1+12+29 pose8+9+13+30`, with `PYTHONPATH=slides/DSL_algo`, project `.venv/bin/python`, and one BLAS/OpenMP thread. Fixed native object poses; a common world-XYZ direction is searched jointly with actual cached head positions. Direction/head refinements are committed atomically after force and own-head path checks. This stage does **not** construct a complete shared support or certify its foreign-head/connection clearance. [Algorithm, commands and exact scope](step3_scheculer/shared_direction_search.md). Historical whole-body algorithms below use previous pose inputs and remain preserved.
+
+2026-10-03 dataset update: use `objects/<name>/poses/pose_<i>/` for immutable inputs and `pose_sets.json` for the 20 saved sets. All 21 objects have 30 poses; Step1 reuses samples without resampling. The registry and task readers support the new layout. Saved fixtures and hard-coded historical batch menus below refer to the previous pose revision and require fresh initialization before use with this dataset. See [precompute_objects](../../codes/precompute_objects/README.md).
+
+# Active: joint common-cavity DSL
+
+This round jointly changes stance XY placement, yaw about the common exit, and real contact regions. Head count is not optimized. Blocked contacts may be exchanged for force-complete actual-surface patches instead of forcing the stances apart. CUDA NNLS ranks repairs; all original loads and full construction acceptance remain hard constraints.
+
+All **10/10 sets / 32 task instances** completed Step4 and Step5. **8 sets improve further by 2.81–38.92% relative to the previous qualified direction-optimization finals**; two retain their smaller qualified incumbents. All final exit mean-pair angles are zero. Every task passes all 32768 original loads, accepted construction witnesses and actual Step5 metrics pass the final audit, and 26 tests pass. Pose5+7 reaches the object-only aggregate bounding-box lower bound under the current Step5 definition.
+
+This round prioritizes occupied box volume; area-weighted reaction-normal coherence is not constrained to improve monotonically. Pose2+12+15 and pose3+6 increase their reaction-normal angles. Those angles are surface-normal proxies, not load-weighted actual resultant forces. All original force feasibility remains verified.
+
+[All-set comparison including direction tradeoffs](output/B/pose1+3/step5_evaluate/cavity_comparison.md) · [Comparison plot](output/B/pose1+3/step5_evaluate/cavity_comparison.png) · [Algorithm](step3_scheculer/cavity_dsl.md)
+
+Each set publishes its current connected fixture in `step4/shape.obj`, two English Step4 images, and the actual `step5_evaluate/report.json` / `bbox.png`. Run `PYTHONPATH=slides/DSL_algo .venv/bin/python slides/DSL_algo/step3_scheculer/run_cavity_batch.py --jobs 3`; use `--resume` only after an earlier run finishes. The finite search is not a global optimum. Historical sources and accepted witnesses remain intact; no exported-body geometric replay is performed.
+
+---
+
+## Historical: absolute-direction DSL
 
 Head count is no longer an optimization target. Support reaction normals and object exits are evaluated in the fixed fixture frame; different object poses may contact completely different regions. Actual Step5 occupied XYZ bounding-box volume decides whether a fully qualified proposal replaces the incumbent.
 

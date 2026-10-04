@@ -13,7 +13,11 @@ from step2_local_support import render as R
 from step3_scheculer import contacts as I
 from step0_pose_selection import floor_points as C
 
-FONT = '/System/Library/Fonts/STHeiti Light.ttc'
+FONT = next((str(p) for p in map(Path, (
+    '/System/Library/Fonts/STHeiti Light.ttc',
+    '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')) if p.is_file()), 'DejaVuSans.ttf')
 IMAGE = 'floor_point_conflicts.png'
 
 

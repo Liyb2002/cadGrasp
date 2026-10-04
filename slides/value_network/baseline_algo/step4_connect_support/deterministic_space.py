@@ -88,7 +88,7 @@ class Search:
         pad = md.Manifold.cube([2*S.RELIEF/S.SCALE]*3).translate([-S.RELIEF/S.SCALE]*3)
         cache = self.out/'sweeps'; cache.mkdir(exist_ok=True)
         for k, (task, direction) in enumerate(zip(self.case.tasks, self.directions)):
-            if abs(direction[2]) > 1e-12:
+            if abs(direction[2]) > 1e-12 and not getattr(self.case,'object_exit_mode',False):
                 raise ValueError('Saved direction must be horizontal')
             numerical_attempts = []
             for fan_in in (64, 8, 16, 2):

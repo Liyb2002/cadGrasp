@@ -116,7 +116,7 @@ def construct(tasks, heads, directions, bases, offsets):
     return mesh, sweeps, record
 
 
-def verify(tasks, groups, heads, directions, bases, offsets, mesh, sweeps, *, check_equilibrium=True):
+def verify(tasks, groups, heads, directions, bases, offsets, mesh, sweeps, *, check_equilibrium=True, object_exit_mode=False):
     """Geometry checks; historical force replay is explicitly optional.
 
     Active Step4 callers set check_equilibrium=False: Step3 owns forces and
@@ -157,7 +157,7 @@ def verify(tasks, groups, heads, directions, bases, offsets, mesh, sweeps, *, ch
         # A separate implementation checks original convex head cells. The full
         # nonconvex body is checked against its original, unpadded object sweep.
         local_cells = [v@b+o for hs, b, o in zip(heads, bases, offsets) for group in hs for v in group]
-        analyzer = W.Analyzer(p.domain.mesh, P.DEPTH_FRACTION*p.domain.mesh.extents.max(), dict(vectors=[directions[k].tolist()]))
+        analyzer = W.Analyzer(p.domain.mesh, P.DEPTH_FRACTION*p.domain.mesh.extents.max(), dict(vectors=[directions[k].tolist()],object_withdrawal_from_static_support=object_exit_mode))
         head_check = analyzer.test([SimpleNamespace(vertices=local_to_world(v, basis, offset)) for v in local_cells], directions[k])
         check = dict(pose=p.pose, original_sample_count=len(p.targets),
             verified_sample_count=int((result['assignment'] >= 0).sum()) if check_equilibrium else None,

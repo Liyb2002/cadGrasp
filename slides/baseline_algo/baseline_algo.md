@@ -1,3 +1,5 @@
+2026-10-03：Step0、载荷采样改为 [数据集预计算](../../codes/precompute_objects/README.md)。21 个物体各 30 个 pose、20 个组合，输入来自 `objects/<name>/poses/` 和 `pose_sets.json`；算法不再重搜 pose 或重撒点。旧输出保留为旧清单的历史结果，哈希不匹配时须重新求解。下方旧案例、姿态数量及路径以此更新为准。
+
 Current Step4: [fixed-envelope greedy growth](step4_connect_support/envelope_growth.md), entry `step4_connect_support/run_envelope_growth.py`. All nine active supports and ten Step5 groups / 32 placements have been regenerated. One construction acceptance; historical pose1+3 Step4 and all Step3 inputs are preserved. Previous entries below are historical.
 
 Current Step4 experiment: [joint connectivity and ground growth](step4_connect_support/joint_growth.md), entry `step4_connect_support/run_joint_growth.py`. Nine active groups are rebuilt; all ten Step5 groups are measured. Step3 and historical pose1+3 Step4 remain unchanged. Earlier entries below are historical records.
