@@ -16,13 +16,14 @@ usage() {
   bash /Users/yuanboli/Documents/GitHub/cadGrasp/cadgrasp-sync.sh pull --dry-run    预览下载
   bash /Users/yuanboli/Documents/GitHub/cadGrasp/cadgrasp-sync.sh shell             登录 Ubuntu 项目目录
 
-只传输新增或发生变化的文件；保留目标端多出的文件。
-同名文件以传输来源为准，被覆盖的旧文件另存到目标端的备份目录。
+只传输新增或发生变化的文件；上传时保留 Ubuntu 端多出的文件。
+下载时以 Ubuntu 为准，删除 Mac 同步范围内 Ubuntu 上已不存在的文件和目录。
+同名文件以传输来源为准，被覆盖或删除的旧文件另存到目标端的备份目录。
 同步 codes、objects、simulation、slides 和根目录的非隐藏文件、.gitignore。
-保留这些目录内的模型、数据和算法输出；其他顶层目录不参与同步。
+这些目录内的模型、数据和算法输出也参与同步；其他顶层目录不参与同步。
 不传输 Git 元数据、虚拟环境、node_modules、工具缓存和传输临时目录。
-下载时保留本机 cadgrasp-sync.sh，避免远端旧脚本覆盖同步工具。
-正式传输前自动预览文件数和待传输数量；预览与传输复用 SSH 连接。
+下载时保留本机 cadgrasp-sync.sh；排除项和同步范围外的文件不受删除影响。
+正式传输前自动预览文件数、待传输和待删除数量；预览与传输复用 SSH 连接。
 需要 Homebrew rsync 3.1+（brew install rsync）；连续 300 秒无传输数据会退出。
 Python/Conda/CUDA 环境需要在 Ubuntu 上单独准备。
 EOF
@@ -145,7 +146,8 @@ else
     source_path="$REMOTE_HOST:$REMOTE_DIR/"
     destination_path="$LOCAL_DIR/"
     backup_dir="$LOCAL_BACKUPS/$stamp"
-    rsync_args+=(--exclude=/cadgrasp-sync.sh)
+    # 传输完成后清理接收端多余文件；排除项保持受保护，删除文件也会备份。
+    rsync_args+=(--delete-delay --exclude=/cadgrasp-sync.sh)
 fi
 
 printf '来源：%s\n目标：%s\n旧文件备份（在接收端）：%s\n' \
@@ -185,6 +187,7 @@ awk '
         print "源端清单（包含目录）：" $0
     }
     /^Number of regular files transferred:/ { sub(/^[^:]*: /, ""); print "本次需要传输的文件：" $0 }
+    /^Number of deleted files:/ { sub(/^[^:]*: /, ""); print "本次需要删除的条目（包含目录）：" $0 }
     /^Total transferred file size:/ { sub(/^[^:]*: /, ""); print "待传输文件总大小：" $0 }
 ' "$preview_file"
 

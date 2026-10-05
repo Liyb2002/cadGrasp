@@ -1,0 +1,24 @@
+# C5 / pose_4 / Step5
+
+当前已保存报告的索引；不代表重新审计通过，也不将几何或轨迹成功等同于完整设计成功。
+
+状态：no_selected_heads
+
+[查看主要失败原因图](failure.png)
+
+Step3 共同剩余方向：269；Step5 本次候选：24；头扫掠通过：0；框架构造：False。
+
+整件轨迹通过：False；完整设计通过：False。
+
+仅完整轨迹通过才生成装入视频。未找到共同平移方向不代表已证明所有刚体路径都不存在。
+
+- [connection.json](connection.json)
+- [audit.json](audit.json)
+- [status.json](status.json)
+- [batch_run.json](batch_run.json)
+- [batch_run.log](batch_run.log)
+- [connection.png](connection.png)
+- [failure_viewer.html](failure_viewer.html)
+- [failure.png](failure.png)
+- [failure_directions.png](failure_directions.png)
+- [failure.json](failure.json)
