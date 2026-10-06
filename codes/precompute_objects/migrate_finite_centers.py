@@ -7,7 +7,7 @@ import argparse,json,sys
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 from unittest.mock import patch
-ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'slides/DSL_algo'))
+ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'slides/baseline_algo'))
 import numpy as np
 from codes.precompute_objects import head_cache as C
 from codes.precompute_objects.head_geometry import PairGeometry,FreePaths

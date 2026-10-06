@@ -1,5 +1,9 @@
+"""Run the selected sampling and physics-guided local-gradient algorithm."""
 import sys
 from pathlib import Path
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from step42_all import main
-if __name__=='__main__':main()
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'helper_func'))
+import _bootstrap
+from solver import main
+
+if __name__ == '__main__':
+    main()

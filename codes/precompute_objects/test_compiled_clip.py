@@ -3,7 +3,7 @@ import sys,unittest
 from pathlib import Path
 import numpy as np
 import trimesh
-ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'slides/DSL_algo'))
+ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'slides/baseline_algo'))
 from step2_local_support.geometry import Clearance
 from codes.precompute_objects.heads.compiled_clip import compiled
 

@@ -1,7 +1,7 @@
 import sys,unittest
 from pathlib import Path
 import numpy as np
-ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'slides/DSL_algo'))
+ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'slides/baseline_algo'))
 from step2_local_support.circles import edge_interval,edge_interval_python
 class EdgeBoundsTests(unittest.TestCase):
     def test_exact_interval_rule(self):

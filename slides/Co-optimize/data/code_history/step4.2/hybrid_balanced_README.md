@@ -1,0 +1,13 @@
+# Balanced sampling + gradient experiment
+
+`hybrid_balanced.py` restores the original parallel sampler's exploration schedule: four common-trend and four individual-pose trials after every eight global covering proposals. It uses the entire original covering bank, a diverse three-state candidate pool, at most eight parallel gradient branches of at most two steps, and a bounded final gradient recovery of each retained state. Final recovery uses the configured iteration count, not an unlimited continuation.
+
+The additional squared-relative-residual ≤ 0.01 eligibility gate is removed. The original coverage and direction-diversity guards remain. That 0.01 gate was a search heuristic, unrelated to the mandatory geometric 1% clearance. Adaptive B results fell to 27/30, versus 28/30 in the original parallel control; this comparison does not establish that the gate alone caused every difference.
+
+Candidate pruning reuses verified real force allocations and separating planes. A numerical solve failure alone never rejects a candidate. The compiled distance field has its own cache/provenance and is optimization guidance only; its floating-point values can differ from the earlier Trimesh field. All original loads and continuous 1%-clearance sweeps still determine acceptance. Connectivity/component pruning, support-ground coverage, strength and robot motion are deferred.
+
+B testing starts from each original Step4.1 native direction set. No previous successful direction is used as initialization. The full 30-case batch is `data/experiments/history/comparisons/physics_guided_balanced_batch/B/batch.json`. Each case has at most 1,200 unique sampling proposals, bounded gradient branches/recovery, and a 3,600-second exploratory wall budget. A timeout is unresolved, not an infeasibility proof. Report wall times include constructor costs; optimization-only times are separate. Simultaneous experiments make timings observational.
+
+Other-object testing is gated on B reaching at least 28 genuinely accepted cases. `run_generalization5_balanced.py` uses the frozen first saved five-pose set of each other object, with identical search settings. It does not choose favorable sets after seeing outcomes. The distance-field backend and force model are identical to this B batch.
+
+`hybrid_contact_planes.py` and `hybrid_contact_planes_balanced.py` are separate pilots, not a silently merged source of B successes. They select useful contact normals from physical equilibrium residuals, propose legal exits in their tangent planes, and rank them with full nominal trajectories. Numerical sweep failures remain unresolved; no angular collision tolerance is loosened. Their evidence is stored in `output/physics_guided_contact_plane*_pilot`.

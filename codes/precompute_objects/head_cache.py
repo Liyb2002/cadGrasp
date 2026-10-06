@@ -11,7 +11,7 @@ def sources():
     files=[ROOT/'codes/precompute_objects'/p for p in ('head_geometry.py','head_directions.py','head_cache.py','precompute_heads.py')]
     files+=sorted((ROOT/'codes/precompute_objects/heads').glob('*.py'))
     files+=[ROOT/'slides/obj_supp/insert_trajectory/angles.py']
-    files+=[ROOT/'slides/DSL_algo/step3_scheculer'/p for p in ('contacts.py','floor_support.py','passive_support.py')]
+    files+=[ROOT/'slides/baseline_algo/step3_scheculer'/p for p in ('contacts.py','floor_support.py','passive_support.py')]
     return {str(p.relative_to(ROOT)):digest(p) for p in files}
 def inputs(folder):
     folder=Path(folder)

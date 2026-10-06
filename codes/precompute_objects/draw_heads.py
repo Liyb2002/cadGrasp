@@ -4,7 +4,7 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 ROOT=Path(__file__).resolve().parents[2]
-sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'slides/DSL_algo'))
+sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'slides/baseline_algo'))
 from codes.precompute_objects import head_cache as C
 from codes.precompute_objects.precompute_heads import picture
 from step3_scheculer.pair_tasks import read_task

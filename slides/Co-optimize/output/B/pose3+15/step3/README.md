@@ -15,6 +15,8 @@ PASS 表示这些真实接触通过原始全部载荷及 shared no-uplift 模型
 
 FAIL 必须附带对全部共同非工作表面反力生成元有效的分离证据：在固定注册和当前力学模型下，只删减接触不能补救。求解或包裹几何未决标为 UNRESOLVED，不冒充物理失败。
 
-`step3.1/overview.png`：重合物体和工作面；`step3.2/overview.png`：真实包裹实体；`step3.2/wrapped_support.obj`：原始 mesh 坐标中的实体。内部接触、载荷结果和来源记录在各阶段的 `data/`。
 
 Step3.3：[各 pose 下的壳子与圈](step3.3/overview.png)，[说明](step3.3/README.md)。
+
+Step3.1 只保存注册模型与变换，不发布图片。
+Step3.2 图片：[overview.png](step3.2/overview.png) 汇总本组全部 pose，按保存顺序排列并在旁边标注 pose 编号。各视图采用统一等轴测正交视角，以该姿态的原生摆放显示蓝色不透明支撑和灰色物体，工作面从真实开口露出。

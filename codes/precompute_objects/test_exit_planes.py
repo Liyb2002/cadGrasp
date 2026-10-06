@@ -5,7 +5,7 @@ from unittest.mock import patch
 import numpy as np
 import trimesh
 ROOT=Path(__file__).resolve().parents[2]
-sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'slides/DSL_algo'))
+sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'slides/baseline_algo'))
 from step2_local_support.withdrawal import Analyzer
 from step2_local_support.geometry import hull_mesh
 

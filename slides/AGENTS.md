@@ -1,3 +1,45 @@
+# Actual process video presentation (2026-10-06, current user direction)
+
+- User requests the actual recorded optimization video for B/pose2+3+4+7 in its own process_actual/ folder, separate from process/ demo and static process figure. Move actual_sampling_process MP4/GIF/poster there; internal replay records remain data/.
+- Actual video frames contain only pose labels (pose 2, pose 3, pose 4, pose 7), no other text or numerical annotations. Display recorded initial state, a discrete sample jump, and saved final OBJ with fixed cameras.
+- This group's saved log has one successful sample and zero gradient steps. Never invent descent/interpolated optimizer states. Explain absence of descent in README/chat, not on the video.
+- The selected group's Step4.2 may contain process_actual/ in addition to README.md, process/, final_results/ and data/; this overrides the earlier exact four-entry layout for this group.
+
+# Step4.2 process and internal artifacts (2026-10-06, current user direction)
+
+- Each output/B/<set>/step4/step4.2 contains only README.md, process/, final_results/ and data/. Put all NPZ, source OBJ, reports, logs, initialization snapshots and branch records in data/; output result report is data/report.json. Numerical solvers write to their result root's data/.
+- User requests process figures: vis_func/render_process.py uses saved Step3.3 seed, initial exits, true sampling/gradient logs and saved final material. It does not infer unrecorded intermediate meshes or invent gradient steps. Process artifacts live under process/.
+- User also requests GIF for B/pose2+3+4+7; process/exit_direction_changes.gif is converted from the saved MP4, not a new optimizer trajectory.
+
+# Step4.2 final presentation (2026-10-06, current user direction)
+
+- User explicitly requests a final_results folder for each Step4.2 result containing a static figure (saved final support, all native poses, saved exit paths) and the support STL. This supersedes the earlier no-static-Step4.2-image requirement for these final images.
+- Renderer is Co-optimize/vis_func/render_final_results.py; files are output/B/<set>/step4/step4.2/final_results/{final_results.png,support.stl}. STL coordinates are original object mesh scaled from meters to millimeters. Rendering metadata is in the result's data/final_results.json.
+- Use exact saved remaining_support.obj and report directions; do not rebuild or rerun optimization for presentation. Label unresolved candidates explicitly. Path display is first 100 mm; full checked exit length is recorded and shown in the caption.
+
+# Current code layout (2026-10-06, user cleanup direction)
+
+- Co-optimize Step4.2 exposes only run.py, run_batch.py and solver.py for the selected hybrid; current explanation is step4.2/algorithm.md. The selected wrapper class remains ClearanceFastHybridSearch for implementation continuity.
+- Current solver layers and numerical tools live in helper_func/optimization; generic input, registration, contact and clearance helpers stay in helper_func. Tests are centralized in tests/ and use unittest discovery.
+- Obsolete algorithms, control/pilot/generalization/review scripts and their exclusive tests/docs are archived in data/code_history; do not restore them to active stage folders. data/code_layout.json records source moves. Preserve historical acceptance provenance; no design rerun occurred.
+- Step3 batch summaries write B/data/step3_README.md, preserving the selected result index B/README.md.
+
+# Selected hybrid and output layout (2026-10-06, current user direction)
+
+- User confirms sampling for global exit trends plus physics-guided local gradient refinement. Selected entry is `Co-optimize/step4.2/run.py` -> `solver.py`; B force/exit acceptance is 28/30, connectivity deferred.
+- `Co-optimize/output/` must contain exactly one folder: `B/`. Results belong to each group's `step4/step4.2/`; batch ledger is `B/data/step42_batch.json`. No root aliases, caches, experimental batches or other objects in output.
+- Internal cache lives in `Co-optimize/data/cache/physics_guided/`; non-B prerequisite data in `data/object_inputs/`; historical experiments in `data/experiments/`. New experimental batches default to data/experiments and must preserve published results.
+- Original selected reports are preserved in data/experiments/selected_report_originals. Relocated report inputs use data/output_layout.json; code hashes remain historical, and layout changes are not a design rerun or renewed acceptance. Earlier output-layout instructions below are superseded.
+
+# Current algorithm and obsolete-tree removal (2026-10-05)
+
+- User confirms `slides/Co-optimize` as the current algorithm.
+- Co-optimize source layout: each step owns its folder; shared numerical/input helpers live in `helper_func/`, all plotting/video functions in `vis_func/`. Root README embeds the Step4.2 algorithm diagram. The experimental continuous implementation is step4.2/physics_guided.py; measured limitations are in step4.2/physics_guided_results.md. It remains separate from the old search batch. Directory migration does not renew historical acceptance provenance.
+- Step4.1 and Step4.2 must retain per-side exit clearance equal to 1% of the canonical object maximum extent (B: 1.548 mm), including when directions change and material regrows. Use the shared `Co-optimize/helper_func/exit_clearance.py`; retain only actual motion-compatible bearing contact cores that are collision-free under all nominal exits. Old no-clearance acceptance records are historical and must be reconstructed before reuse.
+- Step4.2 public visuals are only the requested `pose2+3+4+7` direction-change video and poster; do not regenerate deleted static images. Video performance is not a priority; generation must run correctly.
+- User explicitly authorizes deleting `DSL_algo`, `DSL_closest_neighbor`, and `co_design_algo`, including their code and generated outputs. This supersedes all preservation requirements for these trees below. Do not recreate them.
+- Co-optimize and object precomputation reuse retained baseline geometry/mechanics kernels; the native-pose task reader is local to Co-optimize. Existing recorded source hashes remain historical; dependency migration is not a design rerun.
+
 # Shared object precomputation (2026-10-03, current user direction)
 
 - Pose/work-patch generation, the fixed load sampler, floor compatibility and native-pose Step2 heads now belong to `codes/precompute_objects/`. Meshes and work meshes are capped at 5,000 faces; geometry changes invalidate all poses/loads/heads and require new images. Every one of the 21 active objects has 30 poses and 20 distinct saved sets: four each with 2, 3, 4, 5 and 6 poses.

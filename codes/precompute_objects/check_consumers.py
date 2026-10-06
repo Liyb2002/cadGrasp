@@ -7,7 +7,7 @@ import sys
 import tempfile
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[2]
-p=argparse.ArgumentParser();p.add_argument('tree',choices=['baseline_algo','DSL_algo']);args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('tree',choices=['baseline_algo']);args=p.parse_args()
 sys.path.insert(0,str(ROOT/'slides'/args.tree));sys.path.insert(0,str(ROOT))
 from step1.registry import active_cases, active_objects, task_poses
 from step1.needs import build, sha256

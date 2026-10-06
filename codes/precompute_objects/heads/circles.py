@@ -12,7 +12,7 @@ from shapely.geometry import Polygon
 from shapely.geometry.polygon import orient
 
 HERE=Path(__file__).resolve().parent
-BASELINE=Path(__file__).resolve().parents[3]/'slides/DSL_algo'
+BASELINE=Path(__file__).resolve().parents[3]/'slides/baseline_algo'
 from step1.needs import ContinuousNeeds, OUTPUTS, OBJECTS, sha256
 from step1.cases import pose_name
 from step2_local_support import surface as S, geometry as G

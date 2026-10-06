@@ -1,54 +1,49 @@
-# Co-optimize：从全接触包裹体中雕刻退出通道
+# Co-optimize
 
-本目录已按最新需求清空重建。当前已实现 Step3、Step4.1 退出初始化和 Step4.2 路径共同优化。B 的全部 20 个保存 pose set 已恢复原始力／力矩需求。
+## Step4.2 主算法与结果
 
-## Step3.1：所有 pose 注册到一起
+**Sampling 搜索大方向，物理反馈梯度做局部调整。** 当前主入口为 [solver.py](step4.2/solver.py)，继承 [混合算法](step4.2/algorithm.md)，并加入编译距离场及保守的膨胀扫掠数值修复。
 
-锁定原始 task-world 中物体摆放、地面、质心和全部 32,768 个载荷。使用各 pose 的逆 `T_world_mesh` 注册到同一个原始物体 mesh 坐标，校验所有物体几何重合。共同实体在状态 i 使用原 `T_world_mesh[i]` 放回世界，因此支撑能随状态翻转，不把所有状态当成同一固定世界支撑。
+保存的完整批次：B **28/30**，其中 2 组初始通过、26 组恢复；其他 20 个对象各固定一组 5 poses，**6/20** 通过。验收包含全部原始载荷、完整退出与每侧 1% 净空；本轮暂缓连通及完整夹具验收。
 
-## Step3.2：包裹全部共同非工作表面
+结果目录只有 [output/B/](output/B/README.md)，主算法结果统一放在各组的 `step4/step4.2/`。历史实验、其他对象测试和缓存保存在 `data/`。
 
-不使用旧 greedy、不限制头数、不从 200 个候选中选头。包裹所有状态共同允许的非工作源面；某一面只要是任一状态的工作面，就必须留空。以连续顶点外偏移构造外皮，顶点位移上限为 5 mm，保持外向方向，避免尖锐边处偏移爆长，做真实实体并集、扣除物体和工作面外皮。位移上限不是每点厚度或强度证书。
+[![Step4.2 算法](step4.2/algorithm.png)](step4.2/algorithm.png)
 
-从生成实体的真实内边界与原物体源三角面的交集提取接触片，而不是把整套理想接触强行当作实际材料。每个状态重新计算真实点、法向和关于原质心的力矩，使用原始全部载荷、原物体地面四射线摩擦模型及 shared no-uplift 方程做 CPU LP 分类。不增补、删减或重采样需求，不增加受拉接触或自由力矩。
+## 目录
 
-FAIL 只有在一个原始载荷具有对全部共同非工作源面反力生成元有效的精确分离证据时才成立。在固定注册、可接触表面和当前力学模型下，后续只删减接触无法修复这个载荷。它不证明其他布局或物理模型也无解。数值求解、几何或实际外皮覆盖未决记录为 UNRESOLVED。
+| 目录 | 内容 |
+| --- | --- |
+| `step3.1/` | pose 注册 |
+| `step3.2/` | 共同非工作表面包裹 |
+| `step3.3/` | 最小凸包围边 |
+| `step4.1/` | 退出初始化 |
+| `step4.2/` | 采样与梯度联合优化退出方向，检查承载和净空 |
+| `helper_func/` | 共用输入、几何、物理工具与批次辅助 |
+| `vis_func/` | 绘图、视频与图形辅助 |
+| `tests/` | 当前算法与前置步骤的测试 |
+| `data/` | 内部缓存、历史实验与目录迁移记录 |
+| `output/` | 仅 B 的正式结果 |
 
-PASS 是承载初始化，不是完整夹具接受。没有搜索退出路径；包裹体可能穿过状态地面或没有适合的完整连接。Step4 将雕刻地面禁区和退出通道，并重新检查剩余接触承载、实际落地覆盖、工作面和实体连通。原头与地面材料没有永久身份。
-
-## 运行与输出
+## 运行入口
 
 在项目根目录运行：
 
 ```sh
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
-  .venv/bin/python slides/Co-optimize/run_all.py B --jobs 2
+.venv/bin/python slides/Co-optimize/step3.1/run.py B --jobs 2
+.venv/bin/python slides/Co-optimize/step3.2/run.py --help
+.venv/bin/python slides/Co-optimize/step3.3/run.py --help
+.venv/bin/python slides/Co-optimize/step4.1/run.py --help
+.venv/bin/python slides/Co-optimize/step4.2/run.py --help
 ```
 
-`--sets pose3+15` 可用于单组检查。默认运行 B 的所有 20 个保存 pose set。
+确认算法的批次入口：`step4.2/run_batch.py`，默认使用 12 轮配置和 1,200 个采样提案。新实验默认写入 `data/experiments/selected_hybrid_new_batch/B/`，防止覆盖已有结果。
+指定演示入口：`vis_func/animate_exit_directions.py --set pose2+3+4+7`。
 
-查看 `output/B/README.md`：每组 `step3/` 包含可读结果，`step3.1/overview.png` 显示重合物体，`step3.2/overview.png` 和 `wrapped_support.obj` 显示包裹体。模型坐标为原始 mesh 坐标，单位米。内部接触、来源和数值记录仅放在 `data/`。
+算法说明见 [step4.2/algorithm.md](step4.2/algorithm.md)。当前代码只保留确认算法与前置步骤；内部基类位于 `helper_func/optimization/`，测试集中于 `tests/`。旧算法、review、pilot 和泛化脚本在 `data/code_history/`，历史运行结果在 `data/experiments/`。目录迁移不代表重新求解或重新验收。
 
-原 `DSL_algo`、baseline 和原始 objects 数据不修改。旧 Co-optimize 算法与输出不保留。
+运行已有测试：
 
-## Step3.3：各 pose 下的壳子与接地圈
-
-运行 `.venv/bin/python slides/Co-optimize/step3.3/run.py`，默认处理全部 B pose set。复用全部保存的撒点，生成覆盖其接地需求的圆环，不生成连接杆，也不要求实体连通。
-
-每组只发布 `step3/step3.3/overview.png` 一张图，按 pose 分格，将同一个壳子和全部圆环摆回各个原生 pose，显示地面与该 pose 的原始撒点。模型为 `support_with_rings.obj`。检查真实接地凸包覆盖及工作面自由；跨状态地面冲突、退出路径与最终连接留给后续步骤。
-
-## Step4.1：退出初始化
-
-已实现 `step4.1/run.py`，按 `step4/README.md` 运行。每个 pose 沿自己的原生世界 +z 向上方向退出，分别转入共同支撑坐标。每组 `step4/step4.1/overview.png` 展示各 pose 的扫掠及真实切除材料。切除后重新检查实际接触的全部原始力／力矩需求及剩余接地覆盖；尚未运行路径优化。
-
-## Step4.2：共同优化退出方向，恢复承载
-
-运行 `.venv/bin/python slides/Co-optimize/step4.2/run.py`。默认复用通过来源哈希检查的完整接受记录；缺失结果则搜索。`--sets <set>` 指定组；`--fresh` 以已有可行路径作初值重新构造与分类。
-
-先将各 pose 的方向朝共同方向靠拢，分别投影到自己的合法离地半球，减少通道分叉。用接触法向与失败载荷做保守筛选；任何接受都必须真实扣除全部连续扫掠，从实际剩余内边界重建反力／力矩生成元，检查每个 pose 的全部 32,768 个原始需求。共享方向搜索不足时，再独立微调关键退出路径。近临界候选评估超时标为未决并跳过，不作为失败证明。
-
-结果：20/20 组、80 个 pose 实例、2,621,440 个原始需求全部通过。所有直线运动不进入自身地面，末端完全脱离初始支撑；目前未必最紧凑。按用户要求，不以材料连通或固定接地环作为接受条件；实际接地材料重建、支撑在其他状态的地面合法性、强度仍待处理。
-
-每组发布 `step4/step4.2/overview.png`：各 pose 的优化路径为青色，相对 Step4.1 恢复的材料为绿色。公开模型为 `remaining_support.obj`、`removed_support.obj`、`restored_support.obj`；原始输入、接受记录及搜索轨迹在 `data/`。接受只在真实构造时执行一次，没有导出模型回放。
-
-另外新增 `step4/step4.2/exit_motion.png`，按 pose 分格展示不透明灰色支撑和三个半透明物体位置，无文字、无扫掠体。运行 `render_exit_motion.py` 从已保存的路径与模型绘制，不修改设计或力学结果。
+```sh
+.venv/bin/python -m unittest discover -s slides/Co-optimize/tests
+```

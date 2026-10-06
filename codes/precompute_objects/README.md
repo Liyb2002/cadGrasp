@@ -17,7 +17,6 @@ OPENBLAS_NUM_THREADS=1 .venv/bin/python codes/precompute_objects/verify.py
 
 # 检查各算法的所有输入、样本复用、六姿态适配与旧输入拒绝
 OPENBLAS_NUM_THREADS=1 .venv/bin/python codes/precompute_objects/check_consumers.py baseline_algo
-OPENBLAS_NUM_THREADS=1 .venv/bin/python codes/precompute_objects/check_consumers.py DSL_algo
 ```
 
 ## 保存格式

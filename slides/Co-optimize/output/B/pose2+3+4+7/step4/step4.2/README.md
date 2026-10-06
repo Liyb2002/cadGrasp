@@ -1,18 +1,13 @@
-# pose2+3+4+7：Step4.2 恢复承载
+# pose2+3+4+7 Step4.2
 
-**PASS：每个 pose 的全部 32,768 个原始力／力矩需求通过。** 每条退出路径在自身地面上方，并完整离开原始支撑。
+PASS。Sampling 搜索大方向，物理反馈梯度局部调整。
 
-绿色是相对 Step4.1 新恢复的材料，灰色是保留材料，青色显示前 100 mm 退出扫掠。切除与接受使用完整连续退出。
+- [过程图](process/process.png)：共享初始材料、原生退出方向、真实采样与梯度记录、保存的最终材料。
+- [最终图](final_results/final_results.png)：同一支撑在全部 pose 下的安装与退出路径。
+- [支撑 STL](final_results/support.stl)：单位毫米，原始物体坐标。
 
-搜索 2 个方向组合，实际构造检查 2 次；恢复材料 116.89 cm³。
+内部 NPZ、源模型、验收报告与搜索记录统一在 `data/`；[验收记录](data/report.json)。
 
-本阶段不要求连通，不要求保留原圆环，也未重建接地材料；不是完整共享夹具或强度接受。
+真实优化过程：[MP4](process_actual/actual_sampling_process.mp4) · [GIF](process_actual/actual_sampling_process.gif) · [Poster](process_actual/actual_sampling_process_poster.png)。该组初始失败，第一条 `common floor cone` 全局提案瞬间跳变即成功；真实记录只有 1 个提案、0 个梯度步骤，没有方向插值。视频固定镜头：初始停留 2 秒，瞬间跳到成功 sample，最终停留 3 秒；画面只保留 pose 标签。视频时间仅用于展示，不代表优化计算耗时。最终画面直接读取保存的支撑 OBJ；复现数据在 [data/actual_sampling_process.json](data/actual_sampling_process.json)。
 
-| Pose | 原始需求通过数 | 世界退出方向 |
-|---|---:|---|
-| pose_2 | 32768/32768 | 0.827, -0.463, 0.319 |
-| pose_3 | 32768/32768 | -0.114, 0.272, 0.956 |
-| pose_4 | 32768/32768 | -0.785, -0.531, 0.319 |
-| pose_7 | 32768/32768 | 0.672, 0.668, 0.319 |
-
-`exit_motion.png`：无文字的退出示意，各 pose 按上述表格顺序排列。灰色支撑为不透明实体，蓝色半透明物体显示起点、中途和完全脱离三个位置；示意距离按当前支撑计算，实际路径仍使用报告中的完整长度。
+退出方向变化演示：[MP4](process/exit_direction_changes.mp4) · [GIF](process/exit_direction_changes.gif) · [Poster](process/exit_direction_changes_poster.png)。这是此前保存的几何演示；实际优化记录见过程图。
