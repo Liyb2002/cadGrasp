@@ -1,3 +1,9 @@
+# 当前 Co-optimize 主线：多次装卸的共享支撑
+
+每个使用配置独立抓取、装入、执行任务并退出，空支撑可换摆放。新设计使用 **Direction、Juxtapose** 两个 operations：微调退出方向，或将停滞 pose 直接重叠放到已有支撑位置并决定怎么补材料；微小 translation 不再独立搜索。当前代码仍是旧 direction／translation，Juxtapose 尚未实现。先实现单物体版本，再扩展一般多对多配置与不同物体。入口为 [Step4.1](Co-optimize/step4.1/README.md) 和 [Step4.2](Co-optimize/step4.2/README.md)，定义与既有结果见 [Co-optimize](Co-optimize/algorithm.md)。下方其他算法编号属于其各自历史流程。
+
+2026-10-06：当前 Co-optimize 算法以 [统一说明](Co-optimize/algorithm.md) 为准：共同／相近方向初始化，再从 Step4.1 状态继续局部下降。下方其他算法与研究记录按各自历史日期理解，不能作为当前 Co-optimize 默认流程。
+
 # Slides
 
 2026-10-02 当前规则：支撑设计须满足[四项条件](obj_supp/README.md)：联合力与力矩平衡、整体不上抬、有限厚度连通实体、完整实体共同插入。[Step3](baseline_algo/step3_scheculer/README.md) 各 pose 独立选头，不要求继承或共享旧头；Step3 验收原始采样载荷的受力，Step4 构造并验证完整实体几何。下方旧流程记录不作为当前入口。

@@ -50,6 +50,22 @@ class DatasetTests(unittest.TestCase):
         restored=pickle.loads(pickle.dumps(domain))
         np.testing.assert_array_equal(restored.mesh.vertices,domain.mesh.vertices)
 
+    def test_categorized_groups_preserve_canonical_sets_and_expose_supplemental_sets(self):
+        totals={'legal_with_common_direction':0,'legal_without_common_direction':0,'illegal':0}
+        for name in sorted({name for name,pose in active_cases()}):
+            self.assertEqual(len(dataset.read_sets(name)['sets']),20)
+            self.assertGreaterEqual(len(dataset.read_pose_groups(name)),32)
+            selected=dataset.read_selected_pose_groups(name)
+            self.assertEqual(len(selected),30)
+            self.assertEqual(len(dataset.read_selected_pose_groups(name,'legal')),25)
+            self.assertEqual(len(dataset.read_selected_pose_groups(name,'illegal')),5)
+            groups=[]
+            for category in totals:
+                rows=dataset.read_pose_groups(name,category)
+                totals[category]+=len(rows);groups+=rows
+            self.assertEqual(len({tuple(sorted(g['poses'])) for g in groups}),len(groups))
+        self.assertEqual(totals,{'legal_with_common_direction':217,'legal_without_common_direction':456,'illegal':120})
+
     def test_manifest_hash_mismatch_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp)/'objects/shape';folder.mkdir(parents=True)

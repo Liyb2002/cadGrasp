@@ -1,64 +1,60 @@
 # cadGrasp
 
-2026-10-05：当前算法以 [Co-optimize](slides/Co-optimize/README.md) 为准；过时的 DSL_algo、DSL_closest_neighbor、co_design_algo 及其生成结果已删除。下方旧算法记录仅供历史参考。
+共同设计一件刚性支撑，使它在不同摆放 state 下承载多个 object pose，并在满足原始力／力矩需求时尽量减少实体材料。每次装入一个物体、执行任务、取出；取出物体后可以转动或重新摆放空支撑。一个 state 可承载多个 pose，数量不设上限。
 
-2026-10-03：对象输入已改为共享预计算数据集。每个物体有 30 个 pose、20 个兼容组合（2–6 个 pose 各 4 组），网格最多 5,000 面；固定载荷位于 `objects/<name>/poses/pose_<i>/`，Step2 候选头、力／力矩生成元、退出方向与图保存在其 `step2/` 下；组合与总览位于 `objects/<name>/pose_sets.json`、`sets.png`。生成与复核入口见 [precompute_objects](codes/precompute_objects/README.md)。旧姿态、轨迹及其算法输出属于历史版本；同编号不代表同姿态，不可复用旧 Step2/3/4 结果。
+当前主线是 [Co-optimize](slides/Co-optimize/README.md) 的 whole 搜索。Direction 连续调整退出方向，Juxtapose 离散改变落座关系，Translation 连续调整已落座位置。所有 pose 从初始化开始共同参与，收益和损失均进入同一个目标。
 
-2026-10-02 当前规则：支撑设计须满足[四项条件](slides/obj_supp/README.md)：联合力与力矩平衡、整体不上抬、有限厚度连通实体、完整实体共同插入。[Step3](slides/baseline_algo/step3_scheculer/README.md) 各 pose 独立选头，不要求继承或共享旧头；Step3 验收原始采样载荷的受力，Step4 构造并验证完整实体几何。下方旧流程记录不作为当前入口。
+## XYZ Translation 与 airborne
 
-可见 Step5 结果：[B / pose1+3 窄地框合并模型](slides/baseline_algo/output/B/pose1+3/step4/overview.png)、[单独结构对比](slides/baseline_algo/output/B/pose1+3/step4/separate.png)、[旋转查看](slides/baseline_algo/output/B/pose1+3/step4/index.html)。每个 pose 分别连接自己的三头和空心地框，再合并；约 60.8 cm³，比此前厚体少约 89.4%。原载荷与完整退出通过，尚未校核强度。详见 [Step5](slides/baseline_algo/step4_connect_support/README.md)。
+**已实现并跑通世界 XYZ 平移，允许工件 airborne。** X、Y、Z 使用同一梯度、范数和步幅池。工件朝向保持任务原值，最低点不能穿过地面；着地时可以向上移动，离地后也可以向下返回地面。
 
-当前 B 的配对输出位于 [baseline_algo/output/B](slides/baseline_algo/output/B)：`pose1+3/`、`pose1+4/`、`pose1+6/`、`pose2+8/`、`pose6+9/`，每对下面按 Step1–5 组织。全部旧结果及依赖已迁移，载荷和搜索结果保持原样。
+airborne 表示工件由支撑承载、工件自身不接触地面。绕质心的原始力／力矩需求和重力不变；离地后立即移除工件的四个物理地面反力列，保留原第七方程及非负 slack。需求数据不再按 grounded／airborne 分两份。最终位置改变系统对地面的力矩，Step5 按最终布局设计 base。见 [物理公式](slides/obj_supp/airborne_equations.md) 和 [Translation 实现](slides/Co-optimize/helper_func/translation/README.md)。
 
-2026-09-26 最新 Step3 决定：当前双 pose baseline 在每轮选头时固定每头为工件总表面积的 **1%**（相对拟合容差 `1e-4`），只按原 top5 sampling 选择，不优化覆盖／面积比。选头停止后，若尚未完成且**两姿态各自严格超过 98%**，才在原中心、原头数上尝试终止补全，单头面积依次尝试 1.01%、1.02%、1.05%、1.10%；达到全部样本通过即停，否则失败。已经全覆盖的不扩大。面积最小化仍留到后续 structural geometry 阶段。新结果保存在各 pair 阶段下的 `fixed_area_1pct/terminal_expansion/`，见 [当前 Step3](slides/baseline_algo/step3_scheculer/README.md)。
+## 当前算法
 
-2026-09-26 用户最终确定：每个 pose 固定使用 Step1 的 32,768 个采样载荷，全部通过即通过；不运行连续载荷域验证，不搜索或追加反例。每个样本仍包含重力，并须满足六维平衡和共享合力不上抬条件。单独的零加工力重力检查只作诊断，不另设通过门槛。插入和基本连通性要求保留。此规则覆盖此前关于连续证明的要求。
+| 阶段 | 内容 |
+| --- | --- |
+| Step3.1 | 整组注册到共同参考，生成贴合支撑并扣除所有工作禁区 |
+| Step3.2 | 单独显示工作禁区的环绕等轴测图 |
+| Step4.1 | 初始化共同／相近合法退出方向，切除完整装卸空间 |
+| Step4.2 | 全组 Direction／XYZ Translation 梯度，停滞时 Juxtapose，可行后减材料 |
+| [Step5.1](slides/Co-optimize/step5.1/README.md) | 按最终XYZ位置确定性重算系统—地面撒点，画出每个pose与共同支撑的点云 |
+| Step5后续 | 按这些需求构造共享base，尚未实现 |
 
-给定工件的多个指定任务姿态、工作区域与载荷，研究如何共同设计一件可打印的刚性被动支撑，通过重新摆放，在各姿态下承担不同的工件接触和地面支撑功能，并保持承载、工具可达与简单装卸。当前计算与图像统一为 Z-up，地面为 `z=0`。
+梯度对全部需求到当前非负反力锥的加权平方距离求数值差分。Direction 和 Translation 同时考虑释放与新锁定接触；Juxtapose 是有界离散搜索。局部下降及竞争分支固定需求求积点和权重，接触／材料增删使用缓存，候选不重建实体 Boolean。接触事件平台允许少量明确记录的 sampling。
 
-2026-09-23 用户确认以**多姿态一体支撑的共同设计**为 SIGGRAPH Technical Papers 研究主线。问题与动机已明确；新方法、制造与实际收益仍待验证。当前四臂概念图不限定新算法拓扑，也不代表已经求得合法的多姿态结构。
+每个 pose 的 **32,768 个原始力／力矩需求全部通过即 PASS**，判据使用搜索接触模型。工作锥、物体和退出通道在搜索中限制接触。选定结果后复用已有 mask／反力，仅导出固定布局名义 mesh 和图片。整件支撑安装、连通与强度留到后续阶段。
 
-- [当前研究主线、路线比较与下一轮推导](codes/research_notes/multipose_rigid_fixture_design.md)
-- [最新决定与设计历史](codes/algorithm_design_notes.md#current-research-direction)
-- [当前参数与坐标约定](slides/params/README.md)
-- [Baseline 代码梳理与新算法衔接](codes/research_notes/baseline_to_shared_fixture.md)
-- [一体支撑概念图与机器人流程](slides/reuse/README.md)
-- [图目与既有 baseline 模型约定](slides/README.md)
-- [当前 baseline 算法：Step1–6、停止规则与现有结果](slides/baseline_algo/baseline_algo.md)
-- [value 引导选头方案：保留为候选工具，待实现](codes/research_notes/value_guided_contact_search.md)
+## 已完成的七组实验
 
-新流程由单个机械臂执行：先取出物体并在地面放稳、释放，再单独翻转和放下支撑，最后将物体换姿态并重新插入。初次装载先放支撑，再装物体；任务中物体也接触地面。物体与支撑不锁紧、不粘接、不共同搬运。装入最后一段水平推入，退出先水平拔出；各姿态可使用不同接触区域和接地段。
+`stable_gradient_xyz_force_v3` 在七组 8–10-pose 上新搜索 **7/7 通过**：6 组初次通过，1 组追加自身状态梯度通过。三个新 pose 实例离地。49 项相关检查及保存记录核对通过。
 
-主收益假设是通过跨姿态共享结构，减少整组任务所需的工装资源与重复材料。“通过几何设计简化机器人装夹”保留为总体动机，但不预设免重装、更快或策略直接迁移。共同求解须与各姿态独立支撑、专用结构拼成的一体件比较，区分一体化与有效材料共享；旧模块＋dock 保留为历史方案和对照。
+七项新方案名义材料合计 **721.55 cm³**，旧逐组最小答案 **713.01 cm³**（+1.20%）。最终择优采用三个更小的新方案、保留四个旧方案，**655.74 cm³（−8.03%）**。旧答案不作为冷启动。三进程整批含出图 **21.38 分钟**，搜索中位数 **403.6 秒／组**。
 
-收益验证比较整套材料与工装准备负担，并完整记录暂存、翻转、重新抓取、对准、插入和重试的执行代价。空支撑稳定、插入中抗滑、任务承载和装卸均待验证；概念图允许的局部穿插不能用于物理结论。目前未开展新方案收益实验。[验证记录](codes/research_notes/reuse_benefit_evidence.md)
+[逐组结果与来源](slides/Co-optimize/output/B/stable_gradient_xyz_force_v3_results.md) · [过程与最终图片](slides/Co-optimize/output/B/stable_gradient_xyz_force_v3_index.html) · [算法公式与预算](slides/Co-optimize/step4.2/fast_gradient_algorithm.md)
 
-## 既有单姿态 baseline
+Step5.1已接入七组最终布局：按实际世界质心将原绕质心需求换算成地面压力中心，复用全部32,768样本，包含XYZ平移和airborne带来的力臂变化。不重跑Step4承载检查。默认沿用不计支撑自重的objects模型，可给定支撑／物体质量比加入自重。[逐pose撒点图集](slides/Co-optimize/output/B/step5.1_index.html) · [公式与输出](slides/Co-optimize/step5.1/README.md)
 
-2026-09-26 新增 [双 pose baseline 入口](slides/baseline_algo/step3_scheculer/run_pairs.py)：随机选同一物体两个任务，用同一组工件表面接触头分别计算贡献，10 条独立 top5 sampling，止于 Step4 地面需求。它固定工件—头部关系，尚不求新一体支撑的独立摆放与连接。使用方式及结果见 [Step3 双 pose 说明](slides/baseline_algo/step3_scheculer/README.md#two-pose-baseline)。
-
-历史单 pose baseline 先采样载荷、生成接触头，再运行十条独立 top5 随机搜索，每条最多选择 3 个头并轮流优化全部已选头的尺寸；随后计算地面需求，构造带矩形接口的蓝色模块与独立固定底座，分别验证初始安装、组合对接及工件／蓝块／底座的共享反力平衡。所有头属于同一个蓝色刚体；蓝块和底座通过可拆接口接触。实际工作面必须避开，加工射线禁区目前关闭。当前双 pose 入口以页首固定面积规则为准，止于 Step4。
-
-现有 baseline 对每个 pose 分开求解，允许不同头组，以可靠获得合法接触组和诊断失败为目标，不要求全局最小接触面积。它仍使用初始 rest 安装接触模块、工件与模块整体 docking 的旧流程；组合抓持可行性作为假设，见 [baseline 问题定义](slides/README.md#要解决的问题)。初次安装读取 `objects/<object>/poses.json` 的 `rest` 姿态，接触须避开初始贴地部分。
-
-本次研究路线更新不修改 baseline 实现或结果；其三刚体接口、安装方向和承载证书不能直接用于新一体支撑。当前四组设计对象为逐任务的 A_obj^k、A_floor^k、d_k 和共享实体 V，k 遍历全部输入任务；参数图用两个 pose 举例，不限制任务数量。接触区域在 V 的表面实现，各 pose 均须无体积穿透，并允许物体沿对应方向装入固定的 V。支撑摆放的自由度、实体参数化与求解方法是下一步推导内容。
-
-代码位于 `slides/` 和 `codes/`，物体数据位于 `objects/`。Baseline 输出固定放在
-`slides/baseline_algo/output/<object>/pose_<number>/<stage>/`。
-Git 保存代码、Markdown、模板和固定测试样例；物体数据及生成的图片、视频、JSON/NPZ 输出保留在本地。新检出环境需要准备对应数据才能重跑案例。
-
-所有运行案例由 `objects/cases.json` 的 `active_objects` 选择，并读取 `objects/<name>/tasks.json` 与 `tasks/<pose>/setup.npz`；网格使用同目录的 `mesh.stl`。当前 21 个物体共 210 个目标。每个物体目录中的 `video.mp4` 是完整连续视频，`trajectories/` 保存从 rest 开始的十段轨迹及时间索引；碰撞模型集中存放在 `objects/_simulation_assets/`。新的 setup 为每个物体选择 `rest → pose_1 → … → pose_10`，把目标、连续搬运轨迹和随机工作面保存在物体目录中。姿态允许按搬运可行性筛选，不作为无偏测试集。各目标接地并由 KUKA 夹爪保持，转移阶段允许短暂抬起。旧 baseline 结果仍属历史输入，重新运行才产生对应新姿态的证书。[案例准备说明](codes/setup/README.md)
-
-换抓版本在每个目标间实际落座、松手，再换抓点和抓取方向；视频只有一个主画面，
-没有文字或画中画。各对象记录是否采用闭合后的理想刚性抓持；这种 demo 假设
-不代表夹持力或实机实验已经验证。具体抓法、控制参数和连续轨迹随数据保存。
+在仓库根目录运行一个新实验，显式选择 set 和新目录名：
 
 ```sh
-# 重绘当前 slides；不执行 baseline 搜索
-python slides/tools/render.py
-
-# 当前各 pose 独立选头
-python slides/baseline_algo/step3_scheculer/run_independent.py B --jobs 2
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
+  slides/Co-optimize/step4.2/run.py B \
+  --sets pose1+2+3+4+5+6+7+8+9+10 --jobs 1 --output-name my_whole_xyz \
+  --incumbent-summary slides/Co-optimize/output/B/data/stable_gradient_xyz_force_v3/pipeline.json \
+  slides/Co-optimize/output/B/data/stable_gradient_results.json
 ```
 
-使用已安装项目依赖的 `cadgrasp` Python 环境。运行完成、审计通过、设计通过是不同状态，具体以算法说明和当前案例报告为准。
+结果保存在 `slides/Co-optimize/output/B/{pose_set}/step4/step4.2/{output_name}/`，本轮新搜索与最终材料择优分开记录。
+
+## 数据与相关目录
+
+`objects/` 每个物体有原生姿态、工作面、需求和 Step2 接触候选。每个 pose 只保存 **15°／30°／60°圆锥半角** 的三组需求，每组32,768个配对力／力矩。下游复用原数据，不重新采样。代码和 Markdown 由 Git 管理，模型、图片、视频及 JSON／NPZ 结果保留在本地。
+
+- [数据格式与预处理](codes/precompute_objects/README.md)
+- [当前研究定义](slides/Co-optimize/algorithm.md)
+- [三个 operations 与演示](slides/Co-optimize/operation_demo/README.md)
+- [pose_set_search 的 whole／incremental 对照](slides/pose_set_search/README.md)
+- [baseline 接触与结构构造](slides/baseline_algo/baseline_algo.md)
+- [参数与坐标约定](slides/params/README.md)
+- [后续研究方向](slides/Co-optimize/research_extensions.md)

@@ -2,6 +2,8 @@
 
 这四项条件定义支撑设计的目标；[baseline Step3](../baseline_algo/step3_scheculer/README.md) 是搜索接触方案的基线方法，Step4 将接触面实现为完整实体并验证几何。各 pose 独立选头，不要求后续 pose 继承或共享任何旧头；共享的是最终的一件刚性支撑实体，接触区域可以不同。
 
+工件自身不接触地面时，见[不着地公式与新图](airborne_equations.md)：保留重力及同一绕质心的需求，由支撑接触独自承担，工件地面反力为零。三个角度、两种接地状态的逐pose预计算输入见 [preprocessing](../../codes/precompute_objects/README.md)。
+
 ## 1. 联合力与力矩平衡
 
 对每个任务 pose 和载荷，存在同一组接触反力，同时满足

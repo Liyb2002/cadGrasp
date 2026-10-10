@@ -1,21 +1,44 @@
-# Step4.2 采样与梯度混合算法
+# Step4.2：全组梯度与离散 Juxtapose
 
-确认算法为 **sampling 搜索大方向，物理反馈梯度局部调整**。主入口是 [run.py](run.py)，使用 [solver.py](solver.py)。算法细节见 [algorithm.md](algorithm.md)。
+从保存的Step4.1开始，所有pose共同优化。Direction调整退出方向，Translation调整已Juxtapose位置，Juxtapose在连续下降停滞时离散改变落座结构。可行后继续减少实体材料、恢复转动支撑复用。每个state可服务多个pose。
 
-Sampling 生成共同趋势并投影到各 pose 的合法退出半球；短梯度分支依据真实反力锥缺口，在方向切平面上用带约束的 SLSQP 调整方向。每次候选从 Step3.3 原始材料重新切除完整扫掠，允许恢复材料；真实实体和全部原始载荷决定最终验收。
+**Translation支持世界XYZ，允许airborne。** 三轴共用梯度、范数与步幅；只有地面边界施加最低点高度非负约束。离地后移除工件地面反力，保留重力、原质心需求和第七方程slack。[Translation](../helper_func/translation/README.md) · [物理模型](../../obj_supp/airborne_equations.md)
 
-B 的完整批次为 **28/30**，其中 2 组初始通过、26 组恢复。结果统一见 [output/B/README.md](../output/B/README.md)，每组位于 `step4/step4.2/`。每侧 1% 净空始终保留；连通、支撑接地覆盖与强度暂缓。
+## 流程与预算
 
-运行单组时传入 `--set`、Step4.1 的 `--directions` 及新的 `--out`。批次入口为 `run_batch.py`；默认新实验目录位于 `data/experiments/`。主结果不自动覆盖。
+入口为 `run.py` → `stable_pipeline.py`。初次全组搜索最多10轮结构跳步，每轮96个廉价落座候选、3个完整分支，各分支最多2轮Direction／XYZ Translation修复。局部下降和竞争分支固定同一需求求积点和权重。
 
-历史控制和其他物体测试在 `data/experiments/`，缓存在 `data/cache/`；均不属于 `output/`。原始结果迁移不构成对当前源码的新验收。
+仅对仍有原需求未满足的组，从其本轮布局追加最多8轮保持state落座和全组梯度修复。全部可行后运行两轮保持可行的Direction／XYZ材料下降。少量sampling跨过接触平台，接受日志区分gradient与sample。
 
-内部实现层位于 `helper_func/optimization/`；它们提供当前求解器使用的基类、采样和梯度方法，不是独立推荐算法。测试统一在 `tests/`，旧实验代码在 `data/code_history/`。
+PASS使用搜索接触模型上每pose全部32768原始需求。最终保存复用已有mask／供力列，不进入几何微扰或末尾重复需求求解；固定布局名义mesh导出失败也不撤销力／力矩PASS。无实体mesh的估计体积不能替换旧实体答案。最终材料择优分别记录新尝试与旧答案来源。
 
-最终展示文件在各组的 `step4/step4.2/final_results/`，只包含 `final_results.png` 和 `support.stl`（毫米）。使用保存的实体和退出方向生成，不重新优化或改变原验收结果；渲染及导出记录放在该组的 `data/final_results.json`。生成命令：
+[详细公式与实现](fast_gradient_algorithm.md) · [论文算法](paper_algorithm.md)
+
+## 已完成结果
+
+七组8–10-pose新搜索7/7通过：6组初次、1组自身状态梯度接续；3个新pose实例离地。七项新名义mesh721.55cm³，对旧713.01cm³大1.20%。最终采用3个更小的新方案、保留4个旧方案，655.74cm³（−8.03%）。三进程整批含出图21.38min，搜索中位403.6s／组，名义mesh导出中位4.5s。
+
+[新搜索与最终结果表](../output/B/stable_gradient_xyz_force_v3_results.md) · [图片浏览](../output/B/stable_gradient_xyz_force_v3_index.html) · [保存记录核对](../output/B/data/stable_gradient_xyz_force_v3/verification.json)
+
+49项相关检查通过；两阶段各65份执行源码／快照一致，七组冷启动与原Step4.1数组一致，原始需求mask通过。存档核对只读取文件、哈希和mesh体积。
+
+## 使用与输出
+
+在仓库根目录运行，选择已有set和新的输出名：
 
 ```sh
-.venv/bin/python slides/Co-optimize/vis_func/render_final_results.py
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
+  slides/Co-optimize/step4.2/run.py B \
+  --sets pose1+2+3+4+5+6+7+8+9+10 --jobs 1 --output-name my_xyz_gradient \
+  --incumbent-summary slides/Co-optimize/output/B/data/stable_gradient_xyz_force_v3/pipeline.json \
+  slides/Co-optimize/output/B/data/stable_gradient_results.json
 ```
 
-每组的 `process/` 保存过程图与演示；所有 NPZ、源模型和搜索记录集中在 `data/`。过程图生成入口：`vis_func/render_process.py`。验收报告位于该组 `data/report.json`。
+每组输出在 `output/B/{pose_set}/step4/step4.2/{output_name}/`：
+
+- `layout.npz`、`*_force.npz`、`data/report.json`：选定布局、完整需求mask和供力列。
+- `support.obj`、`process.png`、`final_result.png`：固定布局名义mesh与无文字等轴测图片，工作禁区只在Step3.2画。
+- `process.json`、`process_states/`、`mesh_states/`：已接受操作和布局过程。
+- `material_selection.json`：最终所选来源，可能保留旧答案。
+
+批次数据在 `output/B/data/{output_name}/`，保存预算、执行源码、阶段通过数、原输入保护和新／旧材料比较。Step5按最终位置处理系统—地面与base；整件连通和强度仍为后续工作。

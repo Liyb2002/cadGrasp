@@ -1,0 +1,13 @@
+"""New large sets; no changes to the saved object-task selection files."""
+CASES = {
+    'seven_chain': list(range(1, 8)),
+    'seven_hard': [1, 2, 4, 5, 6, 7, 11],
+    'seven_spread': [1, 4, 7, 12, 21, 23, 27],
+    'eight_chain': list(range(1, 9)),
+    'pose1-10': list(range(1, 11)),
+    'eight_hard': [1, 2, 4, 5, 6, 7, 10, 11],
+    'eight_spread': [1, 3, 7, 10, 14, 18, 23, 27],
+    'nine_chain': list(range(1, 10)),
+    'nine_spread': [1, 4, 7, 9, 12, 16, 21, 23, 27],
+    'ten_spread': [1, 3, 5, 7, 9, 12, 16, 21, 23, 27],
+}

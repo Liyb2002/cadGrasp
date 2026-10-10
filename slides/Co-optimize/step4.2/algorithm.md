@@ -1,17 +1,10 @@
-# Sampling with concurrent physics-guided gradient refinement
+# 当前 whole 算法
 
-`solver.py` uses the internal shared search layers to combine shared-trend global exploration with short gradient branches. It starts only from the selected group's Step4.1 native-up directions. All poses, work regions, original loads and the 1% exit-clearance rule remain fixed.
+当前实现是全组需求梯度、离散Juxtapose与世界XYZ Translation，允许airborne。
 
-The sampler covers common trends using deterministic Fibonacci banks of 160, 512 and 2,048 directions. The same trend is projected into each pose's legal exit hemisphere; the actual exits can differ. Each bank also includes up to 16 contact-normal directions selected by real equilibrium-deficit value. These proposals restore the useful physical directions present in the serial hybrid. Every 16 global candidates permit four local trials, split between common-trend and individual-pose perturbations. Global coverage continues while a gradient branch works.
+- [研究定义与物理模型](../algorithm.md)
+- [执行流程、公式与预算](fast_gradient_algorithm.md)
+- [论文算法](paper_algorithm.md)
+- [七组新搜索与最终材料择优](../output/B/stable_gradient_xyz_force_v3_results.md)
 
-An optimistic force cone prefilters candidates only when a valid separating plane proves a fixed original load unattainable even with all potentially available contacts. Primal force allocations and dual separation certificates are reused while their required/violating generators permit it. Numerical uncertainty permits exact construction rather than rejecting a candidate. The prefilter's working loads are bounded to recent critical loads; this does not reduce the final load set.
-
-A separate worker refines promising exact constructions for at most two steps per branch and eight branches. Branch eligibility uses selected actual cone-projection residuals, inherited coverage and direction diversity. A squared residual/target-norm ratio of 0.01 is a search heuristic; it is separate from the geometric 1% clearance requirement. Physical residuals value potentially useful contact generators, and a smooth nominal sweep model supplies direction sensitivities. This is a physical-feedback geometric gradient, not a proven exact derivative of the worst deficit over every original load. New constructions are evaluated with actual material/contact geometry. Real deficit reduction or frozen physical-value geometry progress can advance a branch; the best constructed force state is retained.
-
-The sampling budget is 1,200 unique proposals. Reports separately count sampling exact constructions, gradient exact constructions, and their sum. Full acceptance still requires every saved load for every pose, continuous full exits, legal native-floor hemispheres, endpoint separation, preserved compatible bearing cores, and 1% clearance outside those cores. No exported-model replay is performed.
-
-Connectivity is deferred. Final output retains the exact accepted aggregate instead of repeatedly solving every original load on each disconnected component. Connected-component pruning and complete fixture acceptance are not claimed. The nominal sweep check remains part of construction acceptance. Grounded installed support, final ground coverage and strength are separate requirements.
-
-The algorithm is implemented in the step entry and `helper_func/physics_guided_concurrent_search.py`; numerical witnesses live in `helper_func/physics_guided_proxy.py`. Earlier serial/parallel/adaptive runs remain separate comparisons. Their timing includes component pruning, whereas this version defers it. Concurrent batch wall times are observational, not a controlled timing benchmark.
-
-The public entries are `run.py` and `run_batch.py`; current runtime layers are in `../helper_func/optimization/`. The selected solver also uses the compiled distance field and conservative repair of collapsed padded sweep prisms. Earlier experiment code is archived under `../data/code_history/`.
+算法以原力／力矩需求全部通过为PASS，保存复用已有结果；Step5处理最终布局的系统—地面需求。

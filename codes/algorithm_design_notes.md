@@ -1,5 +1,9 @@
 <a id="current-research-direction"></a>
 
+2026-10-07 最新设计决定：**多次装卸的共享刚性支撑，采用 Direction、Juxtapose、Translation。**每次抓取物体、沿对应方向装入、执行任务并退出；支撑换摆放前先取出物体。一个支撑姿态可服务多个物体姿态，进一步可分别服务不同物体，同一实体支撑也可有多个摆放姿态。Direction 微调退出方向；Juxtapose 为难以局部改善的 pose 提出重叠位置并补材料，可能增加占地；Translation 在当前或重叠后的布局上继续微调位置。三者都计算新增材料、删旧墙和其他 pose 失去承载的代价，不切出重定位滑动通道。先实现单物体版本，再扩展一般多对多配置及跨物体共享。定义见 [Co-optimize](../slides/Co-optimize/algorithm.md) 与 [三个 operations](../slides/Co-optimize/step4.2/algorithm.md)。
+
+当前生产代码仍为旧 direction／translation 搜索，Juxtapose 尚未接入；独立几何演示提供 6 秒 Translation 和 8 秒 Combined，预设 1/3 身位与 30°，不是新的受力梯度求解。Step4.1／4.2 实际目录已恢复，抓取／几何锁 Step4 目录删除，历史实验保留。旧小步七组结果2/7通过、5/7未通过，没有接受平移，不是新操作的证据；不把旧分离保底结果计作紧凑复用成功。机器人保持、锁定共同搬运和锁强度不属于当前主线。
+
 ## 2026-10-02：固定腰带＋多 dock 作为替代方案
 
 最终展示采用 [dock 全景与接口特写](../slides/belt_test/dock_pressure_zoom.png)：左边是原 shared_base 的 Dock 1，右边用保存的原装置几何按同姿态、同视角重新渲染接口；已去掉红色标记，不作峰值压强展示。用户要求删除本次聊天生成的旧图，聊天前的图保留；计算数据和说明保留，后续不要自动恢复被删诊断图。

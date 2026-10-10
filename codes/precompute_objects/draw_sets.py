@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 import trimesh
 from codes.precompute_objects.registry import active_objects
+from codes.precompute_objects.dataset import read_sets
 from codes.precompute_objects.work_regions import digest
 from step2_local_support import render as R
 
@@ -23,6 +24,7 @@ MARGIN, GAP = 36, 24
 def render(name, folder=None):
     folder = Path(folder) if folder is not None else ROOT/'objects'/name
     data = json.loads((folder/'pose_sets.json').read_text())
+    if data.get('category')=='legal_with_common_direction':data=read_sets(name)
     if data['pose_manifest_sha256'] != digest(folder/'poses.json'):
         raise ValueError('Stale pose-set manifest')
     manifest = json.loads((folder/'poses.json').read_text())

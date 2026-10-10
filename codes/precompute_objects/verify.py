@@ -18,7 +18,8 @@ def verify(name):
     folder=ROOT/'objects'/name; data=read_sets(name)
     manifest=json.loads((folder/'poses.json').read_text())
     assert data['set_count']==20 and manifest['pose_count']==30
-    assert set(p.name for p in folder.iterdir())-{'sets.png'}=={'mesh.stl','meta.json','poses','poses.json','pose_sets.json'}
+    optional={'selected_pose_sets.json','sets.png','illegal_pose_sets.json','common_direction_audit.json','no_common_direction_pose_sets.json'}
+    assert set(p.name for p in folder.iterdir())-optional=={'mesh.stl','meta.json','poses','poses.json','pose_sets.json'}
     names=[f'pose_{i}' for i in range(1,31)]
     assert [r['pose_id'] for r in manifest['poses']]==names
     assert set(p.name for p in (folder/'poses').iterdir())==set(names)
@@ -26,7 +27,17 @@ def verify(name):
     assert digest(folder/'mesh.stl')==manifest['mesh_sha256']
     for pose,row in zip(names,manifest['poses']):
         target=verify_files(name,pose)
-        assert set(p.name for p in target.iterdir())-{'step2'}=={'setup.npz','setup.json','needs.json','samples.json','floor_contact.npz'}
+        optional_pose_entries={'step2'}
+        if (target/'load_variants.json').exists():
+            variants=json.loads((target/'load_variants.json').read_text())
+            expected={f'angle_{angle}' for angle in (15,30,60)}
+            assert variants['schema']=='cadgrasp_pose_load_angles_v2'
+            assert variants['complete'] and {row['folder'] for row in variants['variants']}==expected
+            assert all((target/name).is_dir() for name in expected)
+            for filename,expected_digest in variants['original_inputs'].items():
+                assert digest(target/filename)==expected_digest
+            optional_pose_entries |= expected | {'load_variants.json'}
+        assert set(p.name for p in target.iterdir())-optional_pose_entries=={'setup.npz','setup.json','needs.json','samples.json','floor_contact.npz'}
         meta=json.loads((target/'setup.json').read_text()); domain=json.loads((target/'needs.json').read_text())
         samples=json.loads((target/'samples.json').read_text())
         assert meta['source_snapshot_sha256']==digest(target/'setup.npz')

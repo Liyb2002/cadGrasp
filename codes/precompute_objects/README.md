@@ -1,3 +1,67 @@
+# 三个角度的逐 pose 需求输入（2026-10-10）
+
+每个 `objects/<name>/poses/pose_<i>/` 只保存三套角度输入：
+
+| 加工力圆锥半角 | 目录 | 配对力／力矩样本数 |
+| --- | --- | --- |
+| 15° | `angle_15/` | 32,768 |
+| 30° | `angle_30/` | 32,768 |
+| 60° | `angle_60/` | 32,768 |
+
+不再按 grounded／airborne 分需求。同一朝向下，工件、质心和载荷作用点一起平移时，绕质心的需求不变；是否着地改变的是**可用地面反力**。地面接触应按优化后的实际摆放判断，不由这些需求文件决定。
+
+每个角度目录包含 `needs.json`（连续需求域）、`setup.npz`（原生参考位姿，无接地状态字段）、`samples.npz`（原有配对载荷与完整采样参数）、`sample_metadata.json`（单位／种子／分布）和 `variant.json`（来源及指纹）。`need_wrench` 顺序是 `[Fx,Fy,Fz,tau_x,tau_y,tau_z]`，力矩绕工件质心，单位为 `mg` 与 `mg*m`。加工力大小仍为 `[0,0.5mg]`，重力保留；力和力矩共同产生，不独立采样。参考几何沿用原生 pose；它的参考高度不意味着优化时必须接地。
+
+每套仍采用原面积／立体角／均匀力大小采样及物体自遮挡拒绝，固定种子20260907。**这次整理直接复用已有三个角度的全部数组，不重新采样。**全开角分别30°、60°、120°。30°是当前工况参数，不是平衡方程推导出的常数；不同角度是不同连续域及有限样本，不假定样本逐行嵌套。
+
+角度目录不再保存固定高度的世界原点需求、地面压力中心或工件地面接触标记。Step5应按最终世界摆放重新计算系统—地面的力／力矩，必要时计入支撑自身重力；运行时的原点转换工具为 `wrench_at_world_origin`。物理推导见 [物体不着地](../../slides/obj_supp/airborne_equations.md)。
+
+原根级 `setup.npz`、`setup.json`、`needs.json`、`samples.json`、`floor_contact.npz` 逐字节保留；后三项已从旧目录的符号链接恢复为独立文件。根级 `floor_contact.npz` 是原生参考输入，保留供已有 reader／pose-set 分类使用，不能据此给抬高后的工件添加地面反力。Step2、原生姿态与已有集合保留。旧算法仍读取原30°默认输入；旧兼容分类不构成其他角度或新位置的验收。
+
+索引仍为逐 pose 的 `load_variants.json` 和总的 `objects/load_variants.json`，格式升级为 v2，只有三个角度，没有状态维度。旧六个数值目录删除；仅旧代码和元数据留档，避免另存重复样本。
+
+在仓库根目录运行：
+
+```sh
+# 将已有六套存档合并；已完成项校核后复用，无重新采样
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
+  -m codes.precompute_objects.collapse_load_variants --jobs 4
+# 重放全部六维平衡、角度边界、来源数组指纹及原始文件哈希
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
+  -m codes.precompute_objects.verify_load_variants --jobs 4
+# 以后为没有角度存档的新原生数据生成三套输入；已有项校核后复用
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
+  -m codes.precompute_objects.load_variants --jobs 4 --resume --run-name load_angles_v2
+```
+
+生成和整理支持 `--objects B`、`--poses 1 2`。不再提供 airborne 高度或 grounded 参数。整理记录位于 `data/load_angles_collapse_20261010/`，全量结果和校核分别为 `batch.json`、`verification.json`。此前六状态批次记录属于历史，不能作为当前目录清单。
+
+```python
+from codes.precompute_objects.load_variants import read_variant
+case = read_variant('B', 'pose_1', half_angle_deg=60)
+wrenches = case['arrays']['need_wrench']  # (32768, 6)，绕质心
+assert case['ground_state_independent']
+# 地面接触是否可用由实际布局决定，而不是需求文件决定。
+```
+
+# 当前 pose set 三分类（2026-10-06）
+
+每个 objects/<name>/ 保存三个互斥的集合 JSON：
+
+| 文件 | 含义 | 21 个对象合计 |
+| --- | --- | --- |
+| pose_sets.json | 合法且存在非零共同方向 | 217 |
+| no_common_direction_pose_sets.json | 合法且不存在非零共同方向 | 455 |
+| illegal_pose_sets.json | 地面载荷不兼容，不论有无共同方向 | 30 |
+
+合法指原固定 32768 个载荷的组内地面兼容矩阵无违反，不表示完整夹具通过。第二类合并原有 203 组与新增 252 组。所有 702 组互斥、无丢失、无重复，法向/共同方向见证及反例证书已复核。清单在 objects/pose_set_categories.json，复核在 objects/pose_set_category_verification.json。
+
+shared reader `dataset.read_pose_groups(name, category='legal')` 读取两类合法集合（每对象 32 组）；category 也支持三类名称、illegal、all。`dataset.read_sets(name)` 保留原每对象 20 组的顺序与成员，供已有算法/图片的兼容读取；include_supplemental=True 包含全部 32 个合法组。当前 Co-optimize 单组 solver 读取全部三类，批次和历史渲染读取原集合，避免把未构造的新组误认成已有输出。
+
+姿态、几何和载荷未改变，但集合文件哈希因重组改变；原集合 JSON 归档在 codes/precompute_objects/data/pose_sets_before_categories_20261006。重组不构成旧设计的重新求解或验收。
+
+以下记录生成数据集及此前审计的格式和历史统计；原先 pose_sets.json 的“20 组”语义现在由 reader 兼容层提供。
+
 # 对象数据集预计算
 
 当前 21 个物体各保存 **30 个 pose、20 个互不重复的组合**：2、3、4、5、6 个 pose 各 4 组。每个 pose 固定工作面和 **32,768 个载荷**；算法读取这些输入，不重新生成姿态或撒点。
@@ -96,3 +160,13 @@ OPENBLAS_NUM_THREADS=1 .venv/bin/python codes/precompute_objects/draw_heads.py -
 极细的等面积分割三角形可能让原 `closest_point` 算式产生非有限值；撒点现在确定性回退到同一叶三角形的重心。`finite_center_migration.json` 记录了修复前后逐点重放；仅中心和原始面编号完全相同的缓存复用旧几何与退出证明，发生变化的缓存重新计算。
 
 本次全量 Step2 验收见 `heads_verification.json`：21 个物体、630 个 pose、378,000 个候选头，187,320 个候选头通过各自 pose 下的单头检查；21 张 `sets.png` 和 630 张 `candidates.png` 的哈希、格式及输入一致性通过。原始 pose／组合／20,643,840 个载荷的独立复核仍见 `verification.json`。这里的单头通过不等于联合载荷或完整支撑体通过。
+
+## 共同退出方向检查与补充反例
+
+运行 `.venv/bin/python codes/precompute_objects/common_directions.py`，检查所有物体现有的 `pose_sets.json` 和 `illegal_pose_sets.json`，并写入每个物体的 `common_direction_audit.json`、`no_common_direction_pose_sets.json`。共同方向仅指所有 pose 的原生地面半球约束交集，不表示扫掠、承载或完整夹具可行。严格内部、仅边界和不存在非零方向分别记录；不能把 LP 得到零向量当作共同方向。
+
+2026-10-06：21 个物体 / 630 个 pose。正式 420 个集合中 217 有严格共同方向、203 无非零共同方向；另 30 个历史 illegal 集合中 25 有、5 无。未出现仅边界的现有集合。按正式集合大小：2 pose 84/84 有共同方向，3 pose 84/84，4 pose 40/84，5 pose 8/84，6 pose 1/84。
+
+每个物体新增 12 个反例：4、5、6 pose 各 4 组，总计 252 组。全部与原有集合不同，且保存的全部原始载荷地面兼容矩阵中，组内有向违反数均为零。反例附带正权重法向零和、法向矩阵满秩证书：如果所有法向与方向点积非负，正加权和又为零，则每个点积只能为零，满秩迫使方向为零，从而不存在非零共同方向。
+
+补充文件不改变原有 pose、载荷、20 个正式集合或其哈希。根目录总表：`objects/common_direction_audit.json`；独立复核记录：`objects/common_direction_verification.json`（630 个 setup 变换逐一匹配，702 个方向见证/反例证书通过）。补充集合需要显式读取，现有算法不自动把它们算成新的正式验收集合。
