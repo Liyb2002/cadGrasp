@@ -1,11 +1,11 @@
-# Ignore everything by default. Keep directories traversable for the allowlist.
+# Source-only repository: unknown file types stay local, including JSON, images,
+# videos, CAD/mesh files, NumPy arrays, model weights and archives.
+# Keep directories traversable so the source allowlist can reach nested files.
 *
 !*/
 
-# Project documentation.
+# Algorithm source, tests, documentation and viewer templates.
 !*.md
-
-# Source code and scripts.
 !*.py
 !*.pyi
 !*.sh
@@ -21,51 +21,100 @@
 !*.hxx
 !*.cu
 !*.cuh
-!*.rs
-!*.go
-!*.java
-!*.kt
-!*.kts
-!*.cs
 !*.js
 !*.mjs
 !*.cjs
-!*.jsx
 !*.ts
-!*.tsx
-!*.html
-!*.htm
+!*_viewer.html
+!**/templates/*.html
 !*.css
-!*.scss
-!*.sass
-!*.less
-!*.lua
-!*.rb
-!*.pl
-!*.r
-!*.R
-!*.jl
-!*.m
-!*.mm
-!*.swift
-!*.f
-!*.f90
-!*.f95
-!*.glsl
-!*.vert
-!*.frag
-!*.geom
-!*.comp
 
-# Keep this policy itself under version control.
+# Dependency/build manifests are source, not experiment results.
+!requirements*.txt
+!pyproject.toml
+!uv.lock
+!poetry.lock
+!setup.cfg
+!tox.ini
+!pytest.ini
+!Makefile
+!CMakeLists.txt
+!LICENSE
+!LICENSE.*
+
+# Limit version control to the two algorithms and their shared dependencies.
+# The actual baseline directory uses an underscore; Co-optimize is case-sensitive.
+/*
 !/.gitignore
+!/README.md
+!/AGENTS.md
+!/LICENSE
+!/LICENSE.*
+!/cadgrasp-sync.sh
+!/requirements*.txt
+!/pyproject.toml
+!/uv.lock
+!/poetry.lock
+!/setup.cfg
+!/Makefile
+!/slides/
+!/codes/
+!/objects/
+
+/slides/*
+!/slides/AGENTS.md
+!/slides/README.md
+!/slides/baseline_algo/
+!/slides/Co-optimize/
+
+# Shared input preparation, coordinate/cone utilities and R6 demand models.
+/codes/*
+!/codes/precompute_objects/
+!/slides/tools/
+!/slides/params/
+/objects/*
+!/objects/r6_demand.py
+!/objects/r6_quadratic.py
+!/objects/r6_quadratic.md
+!/objects/test_r6_demand.py
+!/objects/test_r6_quadratic.py
+
+# Head insertion and CPU rendering are imported by the retained algorithms.
+!/slides/obj_supp/
+/slides/obj_supp/*
+!/slides/obj_supp/insert_trajectory/
+!/slides/obj_supp/airborne_equations.md
+!/slides/obj_supp/equations_to_solve.md
+!/slides/reuse/
+/slides/reuse/*
+!/slides/reuse/code/
+/slides/reuse/code/*
+!/slides/reuse/code/render_cpu.py
+!/slides/reuse/code/raster.cpp
+
+# Generated directories must win over every source/documentation exception.
+# This also excludes copied .py/.md files and generated HTML in run snapshots.
+**/output/
+**/outputs/
+**/data/
+**/results/
+**/history/
+**/_history/
+**/*_history/
+**/archive/
+**/archives/
+**/snapshots/
+**/executed_sources/
+**/*_executed_sources/
+**/assets/
 
 # Dependencies, caches and local tooling are never project source.
 **/.git/
-**/.venv/
+**/.venv*/
 **/venv/
 **/env/
 **/node_modules/
+**/.cache/
 **/__pycache__/
 **/.pytest_cache/
 **/.mypy_cache/
@@ -73,6 +122,10 @@
 **/.tox/
 **/.nox/
 **/.ipynb_checkpoints/
+**/build/
+**/dist/
+**/*.egg-info/
+**/.rsync-partial/
 /.agents/
 /.codex/
 /.aws/

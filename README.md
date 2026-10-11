@@ -49,12 +49,13 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/pyt
 
 ## 数据与相关目录
 
-`objects/` 每个物体有原生姿态、工作面、需求和 Step2 接触候选。每个 pose 只保存 **15°／30°／60°圆锥半角** 的三组需求，每组32,768个配对力／力矩。下游复用原数据，不重新采样。代码和 Markdown 由 Git 管理，模型、图片、视频及 JSON／NPZ 结果保留在本地。
+`objects/` 每个物体有原生姿态、工作面、需求和 Step2 接触候选。每个 pose 只保存 **15°／30°／60°圆锥半角** 的三组需求，每组32,768个配对力／力矩。下游复用原数据，不重新采样。
+
+Git 只管理 `slides/baseline_algo/`、`slides/Co-optimize/` 的算法源码、测试、文档及必要的公共依赖；具体白名单见 [.gitignore](.gitignore)。模型、图片、视频、JSON／NPZ、实验输出和历史快照保留在本地。`output/`、`data/` 等生成目录中的代码副本与 Markdown 也不上传。克隆仓库后需另行准备数据；本文的实验结果、图集和原始数据链接指向本地文件。
 
 - [数据格式与预处理](codes/precompute_objects/README.md)
 - [当前研究定义](slides/Co-optimize/algorithm.md)
 - [三个 operations 与演示](slides/Co-optimize/operation_demo/README.md)
-- [pose_set_search 的 whole／incremental 对照](slides/pose_set_search/README.md)
 - [baseline 接触与结构构造](slides/baseline_algo/baseline_algo.md)
 - [参数与坐标约定](slides/params/README.md)
 - [后续研究方向](slides/Co-optimize/research_extensions.md)
