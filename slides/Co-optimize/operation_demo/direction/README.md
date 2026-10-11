@@ -2,9 +2,21 @@
 
 Direction 固定本次布局中的物体位置、支撑state与原始需求，只改变退出方向。现在的梯度针对所有pose的需求到反力锥的加权平方距离，包含释放接触的收益和新锁定接触的损失。梯度目标是全部需求的连续积分差距。
 
-vis里只保留一张数学图：[direction_math.png](vis/direction_math.png)。沿用原图的 dir、\(\mathcal G\)、\(\mathcal C\)、\(D\)、\(F\)、\(\tau\) 与步幅\(\eta\)，补充求积权重、固定尺度与球面切坐标来对应代码的实际计算。
+vis里保留原数学图 [direction_math.png](vis/direction_math.png)，新增 [direction_gradient.png](vis/direction_gradient.png)。沿用原图的 dir、\(\mathcal G\)、\(\mathcal C\)、\(D\)、\(F\)、\(\tau\) 与步幅\(\eta\)。
 
 ![全部需求的方向梯度](vis/direction_math.png)
+
+## 新图：R6 前向表达与实际梯度
+
+![连续 R6 与全组方向梯度](vis/direction_gradient.png)
+
+新图分成两段。第一段从工作三角形、加工力锥与原可见性条件正向表达连续的 \((F,\tau)\) 域，再写成精确提升式 \((F,\tau)=B_fz\)；表达式来自几何和重力，不用32768个载荷反推。新增的 \(z\)、\(B_f\) 只是 [objects 中 R6 公式](../../../../objects/r6_quadratic.md)的计算形式，需求仍叫 \(F,\tau\)。
+
+第二段保持原 \(D_{\mathrm{all}}\) 和正权求积，画出有效反力基底内的二次投影损失、基底复用条件，以及 Direction 的球面正反探针与更新。\(A_I\) 是当前有效的反力列，\(Q_I=I-A_IA_I^+\) 是残差投影算子。基底接触仍可用且全部反力列的对偶条件成立时复用投影；条件失效才更新该节点的 NNLS。不同需求可以落在不同基底区域，图中的二次式只在其有效区域成立。
+
+R6 的载荷参数导数与操作导数不同：绕 COM 的 \((F,\tau)\) 不依赖退出方向或刚体平移，操作通过接触 \(\mathcal G\) 改变反力锥 \(\mathcal C\)。因此实际梯度仍是跨接触事件的数值割线；新公式加速两端的全组损失评估。联合 Direction 更新取 \(\eta=\text{候选角步幅}/\sqrt{\sum_i\|g_i\|^2}\)，单 pose 更新取 \(\eta=\text{候选角步幅}/\|g_j\|\)，零梯度不更新。XYZ Translation 采用同一损失，着地时 Z 使用可行单边探针。
+
+整体 operation 选择见 [Step4.2 pipeline](../step4_2_pipeline.png)。
 
 ## 1．全部需求的积分目标
 
@@ -103,11 +115,18 @@ g_{j,a}\simeq
 
 ## 图与演示视频
 
-在仓库根目录只重画这一张数学图：
+在仓库根目录重画原数学图：
 
 ~~~sh
 MPLCONFIGDIR=/tmp/cadgrasp-direction-mpl PYTHONDONTWRITEBYTECODE=1 \
   .venv/bin/python slides/Co-optimize/operation_demo/direction/code/draw_math.py
+~~~
+
+重画新增 R6 / gradient 图：
+
+~~~sh
+MPLCONFIGDIR=/tmp/cadgrasp-r6-gradient-mpl PYTHONDONTWRITEBYTECODE=1 \
+  .venv/bin/python slides/Co-optimize/operation_demo/direction/code/draw_r6_gradient.py
 ~~~
 
 [原pose1+2+4+6视频](vis/pose1+2+4+6_exit_direction_changes.mp4)保留不变。它采用预设球面插值，展示方向改变对支撑几何的影响，不是新梯度算法的优化轨迹。来源见 [video_provenance.json](vis/video_provenance.json)。

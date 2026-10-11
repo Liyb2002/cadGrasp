@@ -15,6 +15,7 @@ from whole_search.reuse_first import registered,juxtaposed_count
 from whole_search.search import failed_count
 from whole_search.model import Model
 from whole_search.common import legal_direction
+from direction_choice.r6_gradient import forward_strata
 
 
 def demand_strata(targets,mask,passed_nodes=32,failed_nodes=64):
@@ -44,7 +45,7 @@ class AdaptiveGradientModel(GradientModel):
         for k,mask in current['masks'].items():
             signature=hashlib.sha256(mask.tobytes()).digest()
             if k in self.adaptive_demands and self.adaptive_demands[k][2]==signature:continue
-            targets,weights=demand_strata(C.U.target(self.tasks[k].targets),mask)
+            targets,weights=forward_strata(self,k,mask)
             self.adaptive_demands[k]=targets,weights,signature;changed=True
         self.quadrature_epoch+=int(changed)
 

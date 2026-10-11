@@ -8,4 +8,12 @@
 
 实现见 [fast_gradient.py](../continuous_support/fast_gradient.py)、[stable_gradient.py](../continuous_support/stable_gradient.py)。保存直接复用通过mask；反力锥按实际布局是否airborne包含或移除工件地面反力。
 
+梯度的内部损失评估现在使用 [r6_gradient.py](r6_gradient.py)。需求由
+[objects 的精确前向 R6 公式](../../../../objects/r6_quadratic.md)生成；积分节点、权重和尺度沿用原算法。
+同一个有效接触基底内，投影损失是解析二次式。微调后若基底接触仍可用，保留其原始可行系数和残差，只检查新增反力列的对偶条件；删除基底接触或违反新增列条件时才重新求解该节点。反力仍非负、无上界，保留第七方程。
+
+R6 的载荷参数导数不是退出方向导数：绕 COM 的需求不依赖退出方向。
+当前硬接触网格在接触事件之间有平台，因此方向操作继续使用原尺度的接触事件割线。
+这个修改加速割线两端的全组收益／损失评估，保留搜索顺序、步幅、sampling 和全部原需求 PASS 判断。
+
 [数学图与符号](../../operation_demo/direction/README.md) · [当前流程与公式](../../step4.2/fast_gradient_algorithm.md)

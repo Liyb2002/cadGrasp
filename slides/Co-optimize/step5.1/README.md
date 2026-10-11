@@ -56,9 +56,9 @@ T_world_object = T_world_fixture @ placements[k]
 
 输出在`output/B/{pose_set}/step5/step5.1/`：
 
-- `pose_<i>.png`：每个pose的实际世界摆放，一张等轴测图。蓝色是原最终支撑，灰色是物体，彩色点是该pose全部32,768个地面撒点。
+- `pose_<i>.png`：每个pose的实际世界摆放，一张等轴测图。蓝色是原最终支撑，灰色是物体，彩色点是该pose全部32,768个地面撒点，深色闭合折线是全部点的最小凸包边界。
 - `floor_demands.png`：逐pose图的无文字汇总，顺序见report中的poses。
-- `common_fixture_demands.png`：固定同一支撑，将每个pose的世界撒点通过其实际支撑变换的逆变换映射到共同支撑坐标，再用首个参考state显示。各pose的地面仍是不同平面，不合并、不投影到一个共同平面。
+- `common_fixture_demands.png`：固定同一支撑，将每个pose的世界撒点及凸包边界通过其实际支撑变换的逆变换映射到共同支撑坐标，再用首个参考state显示。各pose的地面仍是不同平面，不合并、不投影到一个共同平面。
 - `data/pose_<i>.npz`：全部撒点、绕世界原点需求、竖直反力、原生点云、凸包、实际变换和质心位置。
 - `data/report.json`：逐pose高度、来源、颜色、点数和计算记录；`index.html`在图片外标注pose与颜色。
 
@@ -74,6 +74,15 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/pyt
 ```
 
 可用`--selection-summary`指定另一份最终方案清单，`--sets`选择其中的组，`--fixture-weight-ratio`给出支撑／物体质量比。已有Step5.1输出受到保护，不会被默默覆盖。
+
+对当前已保存结果补画凸包，复用现有撒点数组和最终布局：
+
+```sh
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
+  slides/Co-optimize/step5.1/rerender_hulls.py B --batch-name step51_convex_hull_v1
+```
+
+重绘前将旧图片、页面及报告保存在各组`data/history/{batch_name}/`。数组不改写。凸包由每个pose全部32,768点确定，使用已保存凸包顶点连接为闭合多边形；共同视图沿用相同刚体变换，不重新拟合边界。绘图扩展位于本目录[hull_render.py](hull_render.py)，不修改前序步骤。
 
 入口[run.py](run.py)调用[system_floor.py](../helper_func/system_floor.py)计算和[step51_render.py](../vis_func/step51_render.py)绘图；后者复用现有透明物体／实体支撑CPU绘图轮子。运行存档在`output/B/data/step51_xyz_floor_v1/`，包含执行源码快照及上游指纹。
 

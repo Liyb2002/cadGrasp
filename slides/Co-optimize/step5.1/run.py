@@ -27,6 +27,7 @@ import trimesh
 
 import system_floor as F
 import step51_render as V
+import hull_render as H
 
 
 def digest(path):
@@ -117,7 +118,8 @@ def write_case_index(out, group, rows):
         '<style>body{font:16px system-ui;max-width:1300px;margin:24px auto;padding:0 20px;color:#294553}'
         'img{width:100%;height:auto}section{margin:24px 0}p{line-height:1.6}</style>'
         f'<h1>{html.escape(group)} · Step5.1</h1>'
-        '<p>Blue: unchanged final fixture. Grey: object. Colored points: system-floor pressure centers. '
+        '<p>Blue: unchanged final fixture. Grey: object. Colored points: system-floor pressure centers, '
+        'enclosed by their minimum convex polygon. '
         'All 32,768 original samples per task; no resampling. Default fixture self-weight is zero, '
         'as in the existing objects model. This is a ground-demand visualization, not a base acceptance.</p>'
         '<h2>All clouds around the same fixture</h2><p>Each cloud is mapped using its actual fixture state; '
@@ -153,7 +155,7 @@ def compute_case(name, case, base, reader, renderer, weight_ratio, batch_record)
     if not np.isclose(abs(fixture.volume)*1e6, case['volume_cm3'], rtol=0, atol=1e-6):
         raise ValueError('Support mesh is not the selected final material result')
     local_fixture_com = fixture.center_mass
-    rows, tiles, clouds, all_sources = [], [], [], []
+    rows, tiles, clouds, hulls, all_sources = [], [], [], [], []
     calculation_seconds = 0.
     for k, pose in enumerate(poses):
         task_started = time.perf_counter()
@@ -196,9 +198,11 @@ def compute_case(name, case, base, reader, renderer, weight_ratio, batch_record)
         calculation_seconds += time.perf_counter() - task_started
         color = V.COLORS[k % len(V.COLORS)]
         image_path = out / f'{pose}.png'
-        tile, camera = V.render_pose(renderer, posed_body, posed_fixture, cloud, color, image_path)
+        tile, camera = H.render_pose(renderer, posed_body, posed_fixture, cloud, color, image_path,
+                                     hull=cloud[hull.vertices])
         tiles.append(tile)
         clouds.append(F.transform_points(local_cloud, native[0]))
+        hulls.append(F.transform_points(local_cloud[hull.vertices], native[0]))
         all_sources.extend(task['sources'])
         row = dict(pose=pose, host_pose=poses[int(hosts[k])], sample_count=len(cloud),
             rendered_point_count=len(cloud), subsampled=False, color=color,
@@ -211,14 +215,15 @@ def compute_case(name, case, base, reader, renderer, weight_ratio, batch_record)
             maximum_floor_normal_mg=float(result['total_floor_normal_mg'].max()),
             point_bounds_world_m=[cloud.min(axis=0).tolist(), cloud.max(axis=0).tolist()],
             convex_hull_area_cm2=float(hull.volume*1e4),
+            convex_hull_vertex_count=len(hull.vertices), convex_hull_boundary_drawn=True,
             maximum_shift_from_native_mm=float(np.linalg.norm(result['floor_demands_xy_m'] - reference['floor_demands_xy_m'],axis=1).max()*1000),
             translation_formula_residual_m=formula_residual, camera=camera_record(camera),
             source_samples=task['sources'])
         rows.append(row)
         print('STEP5.1 POSE',case['id'],pose,len(cloud),'height_mm',round(height*1000,6),flush=True)
     V.sheet(tiles, out / 'floor_demands.png')
-    common_camera = V.render_common(renderer, moved_mesh(fixture, native[0]), clouds,
-        [r['color'] for r in rows], out / 'common_fixture_demands.png')
+    common_camera = H.render_common(renderer, moved_mesh(fixture, native[0]), clouds,
+        [r['color'] for r in rows], out / 'common_fixture_demands.png', hulls=hulls)
     write_case_index(out, case['id'], rows)
     protected_sources = {r['path']: r['sha256'] for r in all_sources}
     protected_sources.update(selected_source_hashes)
@@ -241,6 +246,7 @@ def compute_case(name, case, base, reader, renderer, weight_ratio, batch_record)
         common_view_camera=camera_record(common_camera),
         common_cloud_transform='native_world[0] @ inverse(T_world_fixture) @ [x_floor,y_floor,0,1]',
         common_floors_merged_or_projected=False, text_in_images=False,
+        convex_hull_boundaries_drawn=True, convex_hull_definition='convex hull of all saved points in each task floor plane',
         work_forbidden_overlay=False, exit_sweep_overlay=False,
         numerical_and_io_seconds=calculation_seconds,
         seconds=time.perf_counter()-began, per_pose=rows,
@@ -363,7 +369,7 @@ def main():
         'img{width:100%;height:auto}section{margin:35px 0}</style>'
         '<h1>Step5.1 · Final-position ground demands</h1>'
         '<p>Actual final XYZ placement, unchanged original demands, no resampling or force replay. '
-        'Blue fixture, grey object, colored system-floor pressure centers. '
+        'Blue fixture, grey object, colored system-floor pressure centers enclosed by convex polygons. '
         'Fixture self-weight ratio: '+str(args.fixture_weight_ratio)+'.</p>'+cards+'\n')
     print('STEP5.1 ALL COMPLETE',len(rows),'sets',result['pose_instance_count'],'poses',
           result['original_point_count'],'points','seconds',round(result['total_seconds'],2),flush=True)

@@ -1,5 +1,6 @@
 """World XYZ updates, projected to keep the workpiece above the floor."""
 import numpy as np
+from direction_choice.r6_gradient import gradient_loss
 
 
 def translation_frame(model, layout, owner):
@@ -27,7 +28,7 @@ def derivative(model, layout, owners, axis, delta, objective=None):
         vector = model.native[layout.hosts[k], :3, :3].T @ np.eye(3)[axis]
         minus = shift(model, minus, k, -negative*vector)
         plus = shift(model, plus, k, delta*vector)
-    objective = objective or (lambda q: model.proxy(q)['loss'])
+    objective = objective or (lambda q: gradient_loss(model,q))
     return (objective(plus)-objective(minus))/(delta+negative)
 
 

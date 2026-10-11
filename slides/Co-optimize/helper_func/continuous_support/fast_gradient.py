@@ -16,6 +16,7 @@ from .complete_grid import CompleteGrid
 from .boundary_projection import BoundaryDistance
 from juxtapose.reuse_search import JumpScreen
 from translation.proposals import translation_proposals
+from direction_choice.r6_gradient import gradient_loss
 
 
 class GradientModel(FastModel):
@@ -65,8 +66,8 @@ class GradientSearch(FastReuseSearch):
         for k in layout.active:
             frame = tangent_frame(layout.directions[k]); g = np.zeros(2)
             for axis in range(2):
-                minus = m.proxy(turn(m, layout, k, -h*frame[:, axis]))['loss']
-                plus = m.proxy(turn(m, layout, k, h*frame[:, axis]))['loss']
+                minus = gradient_loss(m, turn(m, layout, k, -h*frame[:, axis]))
+                plus = gradient_loss(m, turn(m, layout, k, h*frame[:, axis]))
                 g[axis] = (plus-minus)/(2*h)
                 measurements.append(dict(pose=m.poses[k], axis=axis,
                                          minus=minus, plus=plus, derivative=float(g[axis])))
@@ -93,7 +94,7 @@ class GradientSearch(FastReuseSearch):
             return trial
         for axis in range(3):
             unit = np.eye(3)[axis]
-            coherent[axis] = (m.proxy(rotate(unit,h))['loss']-m.proxy(rotate(unit,-h))['loss'])/(2*h)
+            coherent[axis] = (gradient_loss(m,rotate(unit,h))-gradient_loss(m,rotate(unit,-h)))/(2*h)
         length = np.linalg.norm(coherent)
         if length > 1e-28:
             for step in degrees:
