@@ -12,7 +12,9 @@ def export_nominal_mesh(model,layout,out):
     from whole_step4_render import NominalBuilder
     from whole_search.common import unpack_solid
     builder=NominalBuilder(model)
-    mesh=unpack_solid(builder.solid(layout))
+    cached=getattr(model,'material_nominal_export',None)
+    mesh=(cached[1] if cached is not None and cached[0]==layout.key()
+          else unpack_solid(builder.solid(layout)))
     C.D.export_exact_obj(mesh,out/'support.obj')
     model.force_display_builder=builder
     return abs(float(mesh.volume))*1e6
@@ -25,8 +27,7 @@ def save_force_result(search,current,mode,began,initialization,**extra):
     sampled=FastReuseSearch.save(search,current,mode,began,initialization,**extra)
     active=layout.active
     passed=len(active)==len(model.poses) and failed_count(current)==0
-    np.savez_compressed(out/'layout.npz',placements=layout.placements,directions=layout.directions,
-                        hosts=layout.hosts,active=np.array(active),native_world=model.native)
+    np.savez_compressed(out/'layout.npz', **layout.arrays(model.native))
     for k in active:
         np.savez_compressed(out/f'{model.poses[k]}_force.npz',mask=current['masks'][k],
                             supply_7d=current['supplies'][k])
@@ -39,6 +40,8 @@ def save_force_result(search,current,mode,began,initialization,**extra):
         volume_cm3=current['volume_cm3'],volume_measure='nominal_material_occupancy_estimate',
         translation_axes='world_xyz' if model.allow_z_translation else 'world_xy',
         translation_axis_priority='equal',
+        fixture_translation_axes='world_xyz',
+        fixture_state_offsets_world_m=layout.state_offsets.tolist(),
         workpiece_heights_m={model.poses[k]:model.workpiece_height(layout,k) for k in active},
         workpiece_floor_contact_allowed={model.poses[k]:model.floor_signature(layout,k) for k in active},
         rotating_reuse_pose_count=sum(registered(layout,k) for k in active),
@@ -48,6 +51,14 @@ def save_force_result(search,current,mode,began,initialization,**extra):
         provenance=C.provenance(model.inputs,[Path(__file__)]+C.code_sources()),
         executed_search_sources_sha256=model.startup_sources,
         mesh_exported=False,mesh_export_changed_layout=False)
+    if current.get('material_contact_certification_run'):
+        report.update(force_material_geometry_certified=current['force_material_geometry_certified'],
+            acceptance='all_original_demands_on_actual_constructed_material_contact_polygons',
+            force_contact_representation=current['force_contact_representation'],
+            force_acceptance_geometry='support_with_base.obj',
+            conservative_grid_unmet_demands=current['grid_failed_demands'],
+            original_force_laws_unchanged=True,
+            material_contact_regions={model.poses[k]:v for k,v in current['contacts'].items()})
     export_began=time.monotonic()
     if passed:
         try:
@@ -60,6 +71,6 @@ def save_force_result(search,current,mode,began,initialization,**extra):
     assert layout.key()==identity,'Presentation must never alter the accepted layout'
     report.update(mesh_export_seconds=time.monotonic()-export_began,seconds=time.monotonic()-began)
     report['artifacts']={p.name:C.I.sha256(p) for p in out.iterdir()
-                         if p.is_file() and p.name!='report.json'}
+                         if p.is_file() and (p.name in ['layout.npz', 'support.obj'] or p.name.endswith('_force.npz'))}
     C.save(out/'report.json',report)
     return report

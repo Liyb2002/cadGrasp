@@ -34,8 +34,7 @@ class Search:
 
     def checkpoint(self,current,label):
         layout=current['layout']
-        np.savez_compressed(self.out/'accepted_layout.npz',placements=layout.placements,
-            directions=layout.directions,hosts=layout.hosts,active=np.array(layout.active))
+        np.savez_compressed(self.out/'accepted_layout.npz', **layout.arrays(self.model.native))
         C.save(self.out/'accepted_layout.json',dict(label=label,counts=current['counts'],
             exact_serial=current['serial'],failed_load_count=failed_count(current)))
 

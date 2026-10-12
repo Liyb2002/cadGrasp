@@ -286,8 +286,7 @@ class FastReuseSearch(ReuseFirstSearch):
             directory = self.out/'process_states'
             directory.mkdir(exist_ok=True)
             path = directory/f'{index:03d}.npz'
-            np.savez_compressed(path, placements=layout.placements, directions=layout.directions,
-                hosts=layout.hosts, active=np.array(layout.active), native_world=self.model.native)
+            np.savez_compressed(path, **layout.arrays(self.model.native))
             changes = []
             if previous is not None:
                 for k in layout.active:
@@ -298,9 +297,12 @@ class FastReuseSearch(ReuseFirstSearch):
                         layout.directions[k] @ previous.directions[k], -1., 1.))))
                     shift = float(np.linalg.norm(layout.placements[k,:3,3]-previous.placements[k,:3,3])*1000)
                     rehost = int(layout.hosts[k]) != int(previous.hosts[k])
-                    if angle > 1e-5 or shift > 1e-6 or rehost:
+                    installation_shift = float(np.linalg.norm(layout.state_offsets[layout.hosts[k]]-
+                        previous.state_offsets[previous.hosts[k]])*1000)
+                    if angle > 1e-5 or shift > 1e-6 or installation_shift > 1e-6 or rehost:
                         changes.append(dict(pose=self.model.poses[k], direction_change_degrees=angle,
                             translation_change_mm=shift, old_host=self.model.poses[previous.hosts[k]],
+                            fixture_translation_change_mm=installation_shift,
                             host=self.model.poses[layout.hosts[k]], rehosted=rehost))
             row = dict(index=index, phase=phase, layout=str(path.relative_to(self.out)),
                 serial=current['serial'], active_poses=[self.model.poses[k] for k in layout.active],
@@ -356,8 +358,7 @@ class FastReuseSearch(ReuseFirstSearch):
         directory.mkdir(exist_ok=True)
         layout = current['layout']
         path = directory/f'{len(self.events):04d}_{current["serial"]:04d}'
-        np.savez_compressed(path.with_suffix('.npz'), placements=layout.placements,
-            directions=layout.directions, hosts=layout.hosts, active=np.array(layout.active))
+        np.savez_compressed(path.with_suffix('.npz'), **layout.arrays(getattr(self.model, 'native', None)))
         C.save(path.with_suffix('.json'), dict(label=label, counts=current['counts'],
             estimated_volume_cm3=current['volume_cm3'], geometry_verified=False,
             material_delta=current['material_delta']))
@@ -443,8 +444,7 @@ class FastReuseSearch(ReuseFirstSearch):
             sample_report['insertion_prefixes_exactly_verified'] = False
             sample_report['insertion_stage_evaluation'] = 'sampled_contacts'
         C.save(self.out/'search_report.json', sample_report)
-        np.savez_compressed(self.out/'sampled_layout.npz', placements=layout.placements,
-            directions=layout.directions, hosts=layout.hosts, active=np.array(layout.active))
+        np.savez_compressed(self.out/'sampled_layout.npz', **layout.arrays(getattr(self.model, 'native', None)))
         if getattr(self, 'search_only', False):
             return sample_report
         # Sampling can be optimistic. A failed or timed-out export never gets a

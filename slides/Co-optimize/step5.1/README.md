@@ -52,9 +52,9 @@ T_world_fixture = native_world[hosts[k]]
 T_world_object = T_world_fixture @ placements[k]
 ```
 
-使用实际object变换得到最终$c$，不会把Juxtapose或Translation后的pose重新居中。
+`native_world` 是包含支撑安装XYZ位移的实际最终变换；`native_world_original` 保留原任务变换。最终平移由 `T_world_object[:3,3] - native_world_original[k,:3,3]` 得到，包含座位与支撑安装两部分。使用实际object变换得到最终$c$，不会把Juxtapose或Translation后的pose重新居中；旧布局没有原任务字段时沿用其原始 `native_world`。
 
-输出在`output/B/{pose_set}/step5/step5.1/`：
+可视化在`output/B/{pose_set}/step5/step5.1/{experiment}/`，最终数值在同层级`data/results/B/`：
 
 - `pose_<i>.png`：每个pose的实际世界摆放，一张等轴测图。蓝色是原最终支撑，灰色是物体，彩色点是该pose全部32,768个地面撒点，深色闭合折线是全部点的最小凸包边界。
 - `floor_demands.png`：逐pose图的无文字汇总，顺序见report中的poses。
@@ -66,30 +66,23 @@ T_world_object = T_world_fixture @ placements[k]
 
 ## 运行
 
-默认读取已接受七组最终材料择优：
+默认读取动态 base Oracle 已通过的全部 52 个 B 集合，包含原 `illegal/` 的 10 组：
 
 ```sh
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
-  slides/Co-optimize/step5.1/run.py B
+  slides/Co-optimize/step5.1/run.py B --experiment my_final_base --batch-name step51_my_final_base
 ```
 
-可用`--selection-summary`指定另一份最终方案清单，`--sets`选择其中的组，`--fixture-weight-ratio`给出支撑／物体质量比。已有Step5.1输出受到保护，不会被默默覆盖。
+可用`--selection-summary`指定另一份最终方案清单，`--sets`选择其中的组，`--fixture-weight-ratio`给出支撑／物体质量比。新版整套流程默认沿用 Step4 Oracle 的质量比零。改变质量比应使用匹配的布局与 Oracle，不应沿用零质量比的可行性结论。已有Step5.1输出受到保护，不会被默默覆盖。
 
-对当前已保存结果补画凸包，复用现有撒点数组和最终布局：
+凸包由每个pose全部32,768点确定。绘图扩展位于本目录[hull_render.py](hull_render.py)，不修改前序步骤。当前直接画出全部凸包。
 
-```sh
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
-  slides/Co-optimize/step5.1/rerender_hulls.py B --batch-name step51_convex_hull_v1
-```
-
-重绘前将旧图片、页面及报告保存在各组`data/history/{batch_name}/`。数组不改写。凸包由每个pose全部32,768点确定，使用已保存凸包顶点连接为闭合多边形；共同视图沿用相同刚体变换，不重新拟合边界。绘图扩展位于本目录[hull_render.py](hull_render.py)，不修改前序步骤。
-
-入口[run.py](run.py)调用[system_floor.py](../helper_func/system_floor.py)计算和[step51_render.py](../vis_func/step51_render.py)绘图；后者复用现有透明物体／实体支撑CPU绘图轮子。运行存档在`output/B/data/step51_xyz_floor_v1/`，包含执行源码快照及上游指纹。
+入口[run.py](run.py)调用[system_floor.py](../helper_func/system_floor.py)计算和[step51_render.py](../vis_func/step51_render.py)绘图；后者复用现有透明物体／实体支撑CPU绘图轮子。当前最终计算记录在`data/results/B/data/step51_connected_base_v1/`，保留上游指纹和源码哈希；临时执行副本校验后删除。接下来由 [Step5.2](../step5.2/README.md) 在 Step4 合法空间中构造实体。
 
 [物理测试](../tests/test_system_floor.py)检验重力、XYZ平移、水平力高度力臂、支撑自重和共同支撑坐标的往返变换。
 
 ## 已完成结果
 
-七组全部完成：62个pose实例、18个不同pose，共2,031,616个原始撒点；其中最终选定的一项pose_16离地。计算和写数组共7.11s，全批含76张无文字PNG共22.06s。7项物理测试通过；114个上游输入和100个执行源码／快照指纹保持一致。
+全部52组完成：263个pose实例，共8,617,984个原始撒点和逐pose凸包；全批含绘图85.26s。Step4受力记录不重新求解，保存的上游和执行源码指纹核对通过。
 
-[全部图片](../output/B/step5.1_index.html) · [逐组记录](../output/B/data/step51_xyz_floor_v1/summary.json) · [文件核对](../output/B/data/step51_xyz_floor_v1/verification.json)
+[全部图片](../output/B/step5.1_connected_base_v1_index.html) · [逐组记录](../data/results/B/data/step51_connected_base_v1/summary.json) · [文件核对](../data/results/B/data/step51_connected_base_v1/verification.json)

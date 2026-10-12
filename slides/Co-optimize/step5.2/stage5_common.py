@@ -25,10 +25,11 @@ import trimesh
 import system_floor as F
 import step51_render as V
 import hull_render as H
+import artifact_store as A
 
 
 def digest(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    return A.digest(path)
 
 
 def relative(path):
@@ -68,20 +69,24 @@ def volume(bounds):
 
 
 class Inputs:
-    def __init__(self, name, selection=None):
+    def __init__(self, name, selection=None, experiment=None):
         self.name = name
-        self.base = COOPT/'output'/name
-        self.selection_path = (selection or self.base/'data/stable_gradient_xyz_force_v3/summary.json').resolve()
-        self.cases = json.loads(self.selection_path.read_text())['cases']
+        self.base = A.result_root(name)
+        self.selection_path = A.resolve_artifact(selection or self.base/'data/base_oracle_results/summary.json')
+        selection_record = json.loads(self.selection_path.read_text())
+        self.cases = selection_record.get('selected', selection_record.get('cases', selection_record.get('results', [])))
+        self.experiment = experiment
         self.mesh_path = ROOT/'objects'/name/'mesh.stl'
         self.mesh = trimesh.load(self.mesh_path, force='mesh', process=False)
         self.protected = {relative(p): digest(p) for p in [self.selection_path, self.mesh_path]}
 
     def load(self, case):
         out = self.base/case['id']/'step5/step5.1'
+        if self.experiment:
+            out = out/self.experiment
         report_path = out/'data/report.json'
         record = json.loads(report_path.read_text())
-        selected = ROOT/record['selected_step4_source']
+        selected = A.resolve_artifact(ROOT/record['selected_step4_source'])
         if not case['passed'] or not record['complete'] or case['experiment'] != record['selected_step4_experiment']:
             raise ValueError('Expected the current passed selection and saved Step5.1 results')
         self.protected.update(record['provenance']['inputs'])
@@ -141,7 +146,7 @@ def arguments(step, default_batch):
 
 
 def freeze(directory):
-    paths = {V.CPU_PATH.resolve(), ROOT/'slides/baseline_algo/step4_connect_support/translucent_raster.cpp'}
+    paths = {V.CPU_PATH.resolve(), V.BASELINE/'step4_connect_support/translucent_raster.cpp'}
     for module in list(sys.modules.values()):
         file = getattr(module, '__file__', None)
         if file:
@@ -175,3 +180,4 @@ def finish(directory, inputs, code, summary):
         source_and_execution_snapshot_hashes_match=True, protected_input_count=len(inputs.protected)))
     save(directory/'verification.json', dict(complete=True, protected_inputs=inputs.protected,
         executed_code=code, upstream_files_unchanged=True, source_and_snapshot_hashes_match=True))
+    A.finish_batch(directory)

@@ -6,7 +6,7 @@
 
 图片直接复用 `vis_func/step41_render.py` 的 `draw_pose`：灰色物体、蓝色不透明实体支撑、黑色实际退出方向、红色当前 pose 自己的名义 sweep 切除。透明 sweep 只显示前 100 mm，实际路径完整切除并检查末端分离。无图内文字。
 
-每组保存在 `output/B/{pose_set}/step4/step4.1/`：
+最终可视化在`output/B/{pose_set}/step4/step4.1/`，数值与模型在`data/results/B/`同层级：
 
 - `exit_directions.png`：各原生 pose 的实际世界退出方向。
 - `exit_sweeps.png`：当前 pose 的切除及路径。
@@ -21,10 +21,9 @@
 .venv/bin/python slides/Co-optimize/step4.1/run.py B --jobs 3
 # 从已有初始化运行当前 Step4.2，显式选组和新输出名
 .venv/bin/python slides/Co-optimize/step4.2/run.py B \
-  --sets pose1+2+3+4+5+6+7+8+9+10 --jobs 1 --output-name my_xyz_gradient \
-  --incumbent-summary slides/Co-optimize/output/B/data/stable_gradient_xyz_force_v3/pipeline.json
+  --sets pose1+2+3+4+5+6+7+8+9+10 --jobs 1 --output-name my_base_oracle
 ```
 
 真实初始化使用独立进程，单次构造 180 秒超时；在初始方向后，先尝试每个 pose 相对于各自地面法向的世界向上 0.25° 裕量，再按原定 0.25°／1° 协同微扰恢复。逐 pose 裕量可处理相反地面法向下共同水平 sweep 的近共面构造；不改变原注册布局。超时是数值未解决，不是无解证明。
 
-Step4.1保存原始位置的初始化；后续Step4.2允许已落座配置进行世界XYZ Translation和airborne，并复用已通过的原需求结果。Step5按最终位置处理系统—地面与base，整件连通及强度留到后续。实现顺序见 [pipeline.md](pipeline.md)。
+Step4.1保存原始位置的初始化；后续Step4.2允许已落座配置进行世界XYZ Translation和airborne，并复用已通过的原需求结果。Step4.2动态审查base合法性，Step5按最终位置构造地脚与连通实体；强度属于后续扩展。实现顺序见 [pipeline.md](pipeline.md)。

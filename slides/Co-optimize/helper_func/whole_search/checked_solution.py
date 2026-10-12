@@ -33,8 +33,9 @@ def check_solution(path):
         if C.I.sha256(path.parent/filename)!=digest:raise RuntimeError(f'Changed solution artifact: {filename}')
     out=path.parent.parent
     with np.load(out/'layout.npz') as saved:
+        original = saved['native_world_original'] if 'native_world_original' in saved else saved['native_world']
         heights={pose:float((saved['native_world'][saved['hosts'][k]]@saved['placements'][k])[2,3]
-                 -saved['native_world'][k,2,3]) for k,pose in enumerate(report['poses'])}
+                 -original[k,2,3]) for k,pose in enumerate(report['poses'])}
     for pose,height in heights.items():
         if height < -1e-9:raise ValueError('Saved object crosses the floor')
         if height>1e-9:

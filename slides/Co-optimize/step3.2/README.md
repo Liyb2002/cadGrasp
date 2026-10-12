@@ -6,7 +6,7 @@
 
 禁区与同一个显示球相交，形成圆弧外边界。球半径是显示范围，原始禁区仍向外无限延伸；不替代完整工作角度约束，不改变 Step3.1 支撑，不重新求解力／力矩。
 
-输出在 `output/B/<set>/step3/step3.2/`，只有图片 `overview.png`、`README.md` 和 `data/report.json`。报告保存支撑及初始化来源哈希、原禁区设定、显示截断参数和 8 个视角。
+最终图片`overview.png`在`output/B/<set>/step3/step3.2/`，`data/report.json`在`data/results/B/`同层级。报告保存支撑及初始化来源哈希、原禁区设定、显示截断参数和 8 个视角。
 
 在项目根目录运行：
 

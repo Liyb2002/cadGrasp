@@ -1,6 +1,6 @@
-"""Current cached whole-gradient entry; select B sets explicitly."""
+"""Whole-gradient search with layout-dependent base feasibility."""
 import sys
-from stable_pipeline import main
+from run_oracle import main
 
 if __name__ == '__main__':
     # Retain the established positional B spelling while keeping the new

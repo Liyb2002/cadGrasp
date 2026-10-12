@@ -4,9 +4,9 @@
 
 ![Step4.2 全组 operation 选择](step4_2_pipeline.png)
 
-从保存的Step4.1开始，全组先做Direction；显式Juxtapose落座的pose还可做世界XYZ Translation。每个局部块固定全部需求的积分节点、权重和尺度，按中等、小、大步幅依次比较梯度候选组，组内按全组损失排序，找到可提交的改善就继续；梯度步无进展才访问有界接触事件sampling。连续修复仍未解决时，Juxtapose同时考虑失败pose与有用的阻挡pose，最多96个廉价候选、3个分支，分支使用同一父测度再做Direction／XYZ微调，选择净收益更好的分支。
+从保存的Step4.1开始，默认持续保留4个完整布局，对每个布局生成Direction、物体座位／支撑安装世界XYZ Translation及sampling候选，周期性或停滞时扩展Juxtapose。同一轮全部父布局与子候选固定需求积分节点、权重和尺度，共享96个正式候选快筛额度。同时保留受力好的、Oracle包围好的，以及地脚极点／布局几何不同的分支；较差的受力分支可因保住关键base空间继续搜索。最多8个短名单候选执行全部原始需求检查，最多3个新受力／包围通过的候选进一步查共同连接。
 
-全部原需求通过后，尝试恢复转动复用并做保持可行的材料下降。候选期间通过接触／材料增删和有效反力基底复用加速评分；原32768需求用于入选的变化布局，通过mask用于最终保存。固定布局导出mesh报告实体材料体积，最终可与已保存的可行答案择小。
+全部原需求、合法地脚包围和共同连接均通过后，尝试恢复转动复用并做保持可行的材料下降。候选期间通过接触／材料增删和有效反力基底复用加速评分；原32768需求用于入选的变化布局，通过mask用于最终保存，连接见证必须与选中布局匹配。Oracle工作空间默认是原工作三角形沿自身外法向的单向棱柱并集；原加工力角度保持不变。
 
 图源：[draw_step42_pipeline.py](code/draw_step42_pipeline.py)。在仓库根目录重画：
 
@@ -15,7 +15,7 @@ MPLCONFIGDIR=/tmp/cadgrasp-step42-diagram-mpl PYTHONDONTWRITEBYTECODE=1 \
   .venv/bin/python slides/Co-optimize/operation_demo/code/draw_step42_pipeline.py
 ~~~
 
-- [Direction](direction/README.md)：保持当前相对布局，微调退出方向；保留原数学图，新增 [R6 与实际梯度图](direction/vis/direction_gradient.png)，展示连续需求前向表达、投影基底复用和全组球面差分。保留 `pose1+2+4+6` 既有视频。
+- [Direction](direction/README.md)：保持当前相对布局，微调退出方向；保留原数学图，新增 [R6 与实际梯度图](direction/vis/direction_gradient.png)，只写R6需求集合，沿用原全组积分与球面差分数学。保留 `pose1+2+4+6` 既有视频。
 - [Juxtapose](juxtapose/README.md)：用 Direction 同一个 B shape，固定支撑在 pose1 的摆放，展示 pose2 装入受阻、删冲突材料，再在所有不妨碍 sweep 的非工作面补同样的贴合支撑；含视频、一张最终 PNG 和真实几何记录。
 - [Translation](translation/README.md)：在 Juxtapose 之后继续微调相对位置，比较实际支撑损失、可增加的接触及占地；视频演示 1/3 身位，6 秒。
 - [Combined](combined/README.md)：8 秒展示 Juxtapose → Translation → Direction，三步使用同一个形状和连续的布局。

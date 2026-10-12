@@ -4,6 +4,7 @@ from collections import OrderedDict
 from co_common import *
 from whole_search.common import transform_mesh,transform_solid,unpack_solid,result_mesh
 from whole_search.model import Layout
+from fixture_state import installed_state
 from step41_render import draw_pose
 from work_access_render import Panel,render_scene,Image
 from PIL import ImageOps
@@ -48,7 +49,7 @@ def render_initialization(model,actual,out):
 
 def read_layout(path):
     with np.load(path) as z:
-        return Layout(z['placements'].copy(),z['directions'].copy(),z['hosts'].copy(),tuple(map(int,z['active'])))
+        return Layout.from_arrays(z)
 
 
 class NominalBuilder:
@@ -67,11 +68,17 @@ class NominalBuilder:
             seed=(self.model.registered_seed if all(np.allclose(layout.placements[k],np.eye(4),atol=1e-12,rtol=0) for k in layout.active)
                   else union([self.part(layout,k,'wrap') for k in layout.active]))
             self.shapes[layout.key()]=seed-union([self.part(layout,k,kind) for k in layout.active for kind in ['work','sweep']])
+            if getattr(self.model,'support_floor_clearance_m',None) is not None:
+                # No floor safety margin: apply only physical z>=0.
+                for host in sorted(set(int(layout.hosts[k]) for k in layout.active)):
+                    T=installed_state(self.model.native,layout,host)
+                    self.shapes[layout.key()]=self.shapes[layout.key()].trim_by_plane(
+                        tuple(T[2,:3]),float(-T[2,3]/S.SCALE))
         return self.shapes[layout.key()]
 
 
 def layers_for_pose(model,layout,support,k,display_transform=None):
-    q=layout.placements[k];T=model.native[layout.hosts[k]] if display_transform is None else display_transform
+    q=layout.placements[k];T=installed_state(model.native,layout,layout.hosts[k]) if display_transform is None else display_transform
     body=transform_mesh(model.mesh,q);body.apply_transform(T)
     fixture=transform_mesh(support,T)
     working=trimesh.Trimesh(model.mesh.vertices.copy(),model.mesh.faces[model.tasks[k].domain.work_ids].copy(),process=False)
@@ -134,7 +141,9 @@ def render_search(model,out,final_result):
         added_material_color='green',removed_material_color='red',
         work_forbidden_overlay=False,original_working_faces_colored=True,geometry_changed=False,
         last_tile_uses_verified_final_geometry=verified,
-        provenance=provenance(paths+[out/final_source],[Path(__file__),HERE/'vis_func/work_access_render.py']),
+        # Process inputs have now been consumed; their hashes are retained in
+        # metadata, while only the final model remains a persistent dependency.
+        provenance=provenance([out/final_source],[Path(__file__),HERE/'vis_func/work_access_render.py']),
         artifacts={'../'+file:I.sha256(out/file) for file in ['process.png','final_result.png']})
     save(out/'data/render.json',record);I.check_report(out/'data/render.json')
     print('WHOLE FIGURES',out.parent.parent.name,len(rows),'chosen states',flush=True)

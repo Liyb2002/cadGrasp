@@ -50,30 +50,10 @@ all-ray dual conditions fail. This preserves the physical unbounded cone:
 a positive soft weight on an unbounded contact ray cannot encode contact
 availability.
 
-## Controlled B experiment
+## Validation and current use
 
-The unchanged implementation and this unit change each ran all 42 current B
-sets from their saved Step4.1 layouts, with six jobs, three CPUs per worker,
-and the same 10-round initial / 8-round own-continuation budgets. Both fresh
-searches passed 42/42 sets. Entry points, Juxtapose, step pools, XYZ/floor
-physics and the original 32,768-demand-per-pose PASS criterion stayed fixed.
-
-Wall time was 22.33 → 19.04 minutes (14.75% less); sum of search time was
-67.81 → 60.90 minutes (10.19% less). Fresh exported material summed to
-3,829.50 → 3,757.05 cm³ (1.89% less). Thirty sets differed by less than
-0.01% in material; twelve differed more, ranging from −51.85% to +50.73%.
-The formula/loss equivalence does not imply identical iterative search
-branches or identical final shapes. The measured whole-run time also
-reflects those branch changes, rather than only projection speed.
-
-On 39 direction/XYZ perturbations of an eight-pose set, with BOTH geometric
-and JIT caches prewarmed, loss evaluation took 0.302 → 0.236 seconds;
-maximum loss difference was 6.94e-18. All 1,890 compiled expressions passed
-independent geometric forward/Jacobian checks (maximum errors 1.04e-17 and
-0). Forty-eight targeted tests passed. All original B object inputs and
-Step3/4.1 artifacts were preserved. The final audit reads saved masks and
-hashes; it does not run another force solve or geometric acceptance.
-
-[Per-set comparison](../slides/Co-optimize/output/B/r6_unit_comparison_v1_results.md)
-· [Mesh image comparison](../slides/Co-optimize/output/B/r6_unit_comparison_v1_index.html)
-· [Verification](../slides/Co-optimize/output/B/data/r6_unit_comparison_v1/verification.json)
+All 1,890 compiled expressions passed geometric forward/Jacobian checks.
+Direction and XYZ Translation use the same demand nodes, weights and physical
+reaction cone; this is a loss-evaluation acceleration, not a change to the
+original demand PASS criterion. Current system algorithm, results and complete
+process metrics are maintained in the [repository README](../README.md).

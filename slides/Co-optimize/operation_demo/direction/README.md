@@ -6,15 +6,17 @@ vis里保留原数学图 [direction_math.png](vis/direction_math.png)，新增 [
 
 ![全部需求的方向梯度](vis/direction_math.png)
 
-## 新图：R6 前向表达与实际梯度
+## 新图：R6 需求集合与方向梯度
 
 ![连续 R6 与全组方向梯度](vis/direction_gradient.png)
 
-新图分成两段。第一段从工作三角形、加工力锥与原可见性条件正向表达连续的 \((F,\tau)\) 域，再写成精确提升式 \((F,\tau)=B_fz\)；表达式来自几何和重力，不用32768个载荷反推。新增的 \(z\)、\(B_f\) 只是 [objects 中 R6 公式](../../../../objects/r6_quadratic.md)的计算形式，需求仍叫 \(F,\tau\)。
+新图第一部分只写每个 pose 的原始连续需求集合：
 
-第二段保持原 \(D_{\mathrm{all}}\) 和正权求积，画出有效反力基底内的二次投影损失、基底复用条件，以及 Direction 的球面正反探针与更新。\(A_I\) 是当前有效的反力列，\(Q_I=I-A_IA_I^+\) 是残差投影算子。基底接触仍可用且全部反力列的对偶条件成立时复用投影；条件失效才更新该节点的 NNLS。不同需求可以落在不同基底区域，图中的二次式只在其有效区域成立。
+\[
+\mathcal R_k=\{(F,\tau):\text{pose }k\text{ 的原始需求}\}\subset\mathbb R^6.
+\]
 
-R6 的载荷参数导数与操作导数不同：绕 COM 的 \((F,\tau)\) 不依赖退出方向或刚体平移，操作通过接触 \(\mathcal G\) 改变反力锥 \(\mathcal C\)。因此实际梯度仍是跨接触事件的数值割线；新公式加速两端的全组损失评估。联合 Direction 更新取 \(\eta=\text{候选角步幅}/\sqrt{\sum_i\|g_i\|^2}\)，单 pose 更新取 \(\eta=\text{候选角步幅}/\|g_j\|\)，零梯度不更新。XYZ Translation 采用同一损失，着地时 Z 使用可行单边探针。
+下面沿用 `direction_math` 的数学：需求到原七维反力锥的平方距离，在 \(\mathcal R_k\) 上积分并对全部 pose 求平均，再通过方向改变接触区域与反力锥。用球面正反探针计算全组目标的数值梯度，沿负梯度更新退出方向；求积点、权重与尺度在局部块内固定。
 
 整体 operation 选择见 [Step4.2 pipeline](../step4_2_pipeline.png)。
 
@@ -38,7 +40,7 @@ D_k(F,\tau;\mathrm{dir})=
 \boxed{
 D_{\mathrm{all}}(\mathrm{dir})=
 \frac{1}{2K}\sum_{k=1}^{K}\frac{1}{s_k^2}
-\int D_k(F,\tau;\mathrm{dir})\,d\mu_k(F,\tau)
+\int_{\mathcal R_k} D_k(F,\tau;\mathrm{dir})\,d\mu_k(F,\tau)
 }
 \]
 

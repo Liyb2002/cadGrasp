@@ -1,8 +1,10 @@
 # 快速 whole：全组梯度、Juxtapose、XYZ Translation
 
-入口为 `run.py` → `stable_pipeline.py`。从各组保存的Step4.1开始，所有pose同时参与。连续变量是退出方向和已Juxtapose位置，离散变量是落座关系／支撑state；目标是全组承载可行后减少共享实体材料。
+入口为 `run.py` → `run_oracle.py`；连续优化由原Direction／Translation helper实现。从各组保存的Step4.1开始，所有pose同时参与。连续变量是退出方向和已Juxtapose位置，离散变量是落座关系／支撑state；目标是全组承载可行后减少共享实体材料。
 
-**世界XYZ Translation与airborne已实现并完成七组8–10-pose实验。** 三轴共用梯度、归一化和步幅，地面只施加最低点高度非负的物理边界。
+当前入口默认在[layout_frontier.py](layout_frontier.py)中维持4个完整布局，共同固定每轮的需求测度，同时保留受力／base包围的取舍和不同地脚位置。原梯度与局部sampling生成器继续使用；候选不再在第一次受力改善后只留下一个。世界XYZ同时允许原位物体、已Juxtapose物体与最终支撑state移动。`--frontier-width 1`保留旧单布局控制，以下具体数值差分规则沿用原helper。
+
+**世界XYZ Translation与airborne已实现。** 三轴共用梯度、归一化和步幅，地面只施加最低点高度非负的物理边界。
 
 ## 需求与反力锥
 
@@ -64,23 +66,14 @@ blocker排序用当前投影残差衡量释放反力列的收益。只统计有�
 
 尚未全组可行时以 $L$ 的净下降提交，允许某些pose暂时退步；全部原需求可行的布局优先。零积分误差的求积盲区用原始需求计数处理。明显不满足接受条件的采样候选无需完整需求检查。
 
-## 执行顺序与预算
+## 当前执行顺序
 
-1. 从保存Step4.1初始化，最多先做3轮全组连续修复。
-2. 仍不可行时，触发上述有界Juxtapose分支；接受后再做2轮全组连续修复。初次搜索最多10轮结构跳步。
-3. 全部原需求可行后，尝试恢复原转动复用，并做2轮保持可行的Direction／XYZ材料下降。[volume_descent.py](../helper_func/translation/volume_descent.py) 固定共同体积积分框，只接受更小且原需求仍全通过的候选。
-4. 仅对仍有未满足需求的组，从自己的本轮布局追加最多8轮保持state落座和全组梯度修复。已经通过的组不进入接续。
-5. 选定布局后，[force_result.py](../helper_func/continuous_support/force_result.py) 复用已有32768需求mask／pose和供力列，全部通过即PASS。固定布局导出名义mesh与图片，不再求解同一结果。
-6. 最终材料择优只允许通过且导出实体材料更小的新答案替换旧答案；旧答案不作冷启动。mesh导出失败保留力／力矩PASS，但估计值不能替换有实体体积的旧答案。
+从保存Step4.1冷启动整组布局，调用原连续下降与有界Juxtapose搜索；候选同时询问动态base Oracle。局部结构停滞时也尝试共同host、重叠间距与XYZ位置，沿邻近高度区间查询更紧凑的可行位置，高度可行性不假设全局单调。
 
-普通图片是无文字等轴测mesh，工作禁区仅在Step3.2单独显示。支撑state分组按实际世界变换判定，容量不限。base、整体连通和强度是后续阶段。
+全部原需求与Oracle通过后恢复转动复用，继续保持Oracle可行性的材料下降；不能保持共同连通空间时回到上一通过布局。最终复用已有原始mask／反力，导出名义mesh与结果图，不重复需求求解或微扰补救。
 
-## 七组完成结果
+具体Oracle、预算与候选路由见[base_oracle.md](base_oracle.md)及[run_oracle.py](run_oracle.py)。Step5固定最终布局，在已保存的合法空间中构造成品实体。完整地面摩擦／yaw与强度不是当前已求解的条件。
 
-七组8–10-pose新搜索7/7通过：6组初次、1组追加自身状态梯度。3个新pose实例离地，最终择优中1个。原Step3／4.1、需求、历史结果与执行快照保留。
+内部损失评估使用[精确前向R6及投影基底复用](../helper_func/direction_choice/r6_gradient.py)。载荷公式来自[objects/r6_quadratic.md](../../../objects/r6_quadratic.md)，操作导数仍是接触事件割线。
 
-新名义材料721.55cm³，对旧713.01cm³大1.20%；3组更小、4组更大。最终采用3个新答案、保留4个旧答案，655.74cm³（−8.03%）。三进程整批含出图21.38min，搜索中位403.6s／组，mesh导出中位4.5s。旧流程搜索中位271.0s／组、整批42.8min；总耗时下降主要来自取消末尾几何验收，搜索本身未加速。
-
-49项相关检查与存档核对通过。各pose全部原始mask通过，两个阶段各65份源代码／快照一致，exact调用和末尾重复求解均为0；核对只读取记录和保存mesh体积。
-
-[结果与新／旧来源](../output/B/stable_gradient_xyz_force_v3_results.md) · [图集](../output/B/stable_gradient_xyz_force_v3_index.html) · [核对记录](../output/B/data/stable_gradient_xyz_force_v3/verification.json)
+最终数值保存在`data/results/B/`，图片在`output/B/`；过程候选与帧在渲染后删除，临时执行副本校验后删除。[当前完整流程、指标与结果](../../../README.md)

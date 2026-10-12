@@ -22,14 +22,19 @@ def shift(model, layout, owner, vector):
 def derivative(model, layout, owners, axis, delta, objective=None):
     """Resolved secant; one-sided at the nonpenetration boundary."""
     minus, plus = layout.copy(), layout.copy()
+    positive = delta
+    event_step = getattr(model,'translation_contact_step',None)
+    if event_step is not None:
+        positive = event_step(layout,owners,axis,1,delta)
+        delta = event_step(layout,owners,axis,-1,delta)
     negative = (min(delta,max(0.,min(model.workpiece_height(layout,k) for k in owners)))
                 if axis==2 else delta)
     for k in owners:
         vector = model.native[layout.hosts[k], :3, :3].T @ np.eye(3)[axis]
         minus = shift(model, minus, k, -negative*vector)
-        plus = shift(model, plus, k, delta*vector)
+        plus = shift(model, plus, k, positive*vector)
     objective = objective or (lambda q: gradient_loss(model,q))
-    return (objective(plus)-objective(minus))/(delta+negative)
+    return (objective(plus)-objective(minus))/(positive+negative)
 
 
 def translation_gradient(model, layout, owners, delta, objective=None):

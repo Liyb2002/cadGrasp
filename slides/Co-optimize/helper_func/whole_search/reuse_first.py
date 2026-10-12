@@ -210,8 +210,11 @@ class ReuseFirstSearch(Search):
             if registered(current['layout'], k):
                 continue
             layout = current['layout'].copy()
-            layout.hosts[k] = k
-            layout.placements[k] = np.eye(4)
+            if hasattr(self.model, 'restore_registered'):
+                layout = self.model.restore_registered(layout, k)
+            else:
+                layout.hosts[k] = k
+                layout.placements[k] = np.eye(4)
             candidates = [initial.directions[k]]
             kept = [j for j in layout.active if j != k and registered(layout, j)]
             if kept:
@@ -419,8 +422,7 @@ class ReuseFirstSearch(Search):
             from .model import Layout
             source = start_prefix.resolve()
             with np.load(source) as saved:
-                layout = Layout(saved['placements'].copy(), saved['directions'].copy(), saved['hosts'].copy(),
-                                tuple(map(int, saved['active'])))
+                layout = Layout.from_arrays(saved)
                 assert layout.active == tuple(range(len(layout.active)))
                 assert len(layout.placements) == len(self.model.poses)
             stages_path = source.parent.parent/'incremental/insertion_stages.json'
@@ -490,8 +492,7 @@ class ReuseFirstSearch(Search):
         assert all(C.I.sha256(ROOT/name) == expected for name, expected in old['provenance']['inputs'].items())
         with np.load(source/'layout.npz') as data:
             from .model import Layout
-            layout = Layout(data['placements'].copy(), data['directions'].copy(), data['hosts'].copy(),
-                            tuple(map(int, data['active'])))
+            layout = Layout.from_arrays(data)
         current = self.initialize_exact(layout, 'resumed_construction_regenerated')
         self.baseline(current)
         if not getattr(self, 'recheck_only', False):
@@ -516,8 +517,7 @@ class ReuseFirstSearch(Search):
         source = source.resolve()
         began = time.monotonic()
         with np.load(source) as data:
-            layout = Layout(data['placements'].copy(), data['directions'].copy(), data['hosts'].copy(),
-                            tuple(map(int, data['active'])))
+            layout = Layout.from_arrays(data)
         assert layout.active == tuple(range(len(self.model.poses)))
         _, initialization = self.model.initial()
         current = self.initialize_exact(layout, 'resumed_exact_layout')

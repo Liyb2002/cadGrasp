@@ -11,7 +11,7 @@ from work_access_render import Panel,render_scene,Image
 
 def render(name,group,base=None):
     began=time.monotonic()
-    base=Path(base) if base is not None else (HERE/'output'/name if name=='B' else HERE/'data/object_inputs'/name)/group['id']/'step3'
+    base=Path(base) if base is not None else (A.result_root(name) if name=='B' else HERE/'data/object_inputs'/name)/group['id']/'step3'
     out=base/'step3.2';(out/'data').mkdir(parents=True,exist_ok=True)
     source=base/'step3.1';report=json.loads((source/'data/report.json').read_text())
     if report.get('schema')!='whole_registered_work_cones_v1':
@@ -57,6 +57,7 @@ def render(name,group,base=None):
         '左到右、上到下，每次绕45°，共8个等轴测视角。灰色物体、蓝色真实支撑、橙色工作面、半透明琥珀色禁区。\n\n'
         '圆弧外侧来自同一个球形显示截断面；实际禁区为原工作面向外完整角度范围形成的半无限区域。'
         '本步骤只画图，不修改 Step3.1 的支撑，也不重新求力／力矩。\n')
+    A.publish_visuals(out)
     print('STEP3.2 WORK UNION',group['id'],len(access.ids),'working faces',flush=True)
     return record
 

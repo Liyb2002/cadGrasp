@@ -4,6 +4,7 @@ import argparse,contextlib,multiprocessing,shutil,subprocess,time,traceback
 from concurrent.futures import ProcessPoolExecutor,as_completed
 from co_common import *
 from run_all import saved_groups,output_root
+import artifact_store as A
 from whole_search.fast_search import FastModel,FastReuseSearch
 from whole_search.model import Model,Layout
 from whole_search.search import failed_count
@@ -16,7 +17,7 @@ SCHEMA='whole_step4_v1'
 
 def load_layout(path):
     with np.load(path) as z:
-        return Layout(z['placements'].copy(),z['directions'].copy(),z['hosts'].copy(),tuple(map(int,z['active'])))
+        return Layout.from_arrays(z)
 
 
 def prepare_case(name,group):
@@ -32,6 +33,7 @@ def prepare_case(name,group):
                 archived=backup/path.relative_to(stage)
                 if not archived.exists() or I.sha256(path)!=I.sha256(archived):raise RuntimeError('Old Step4 differs from archive: '+str(path))
         shutil.rmtree(stage)
+        shutil.rmtree(backup)
     (stage/'step4.1/data').mkdir(parents=True,exist_ok=True)
     save(marker,dict(schema=SCHEMA,pose_set=group['id']))
     return base
@@ -105,6 +107,8 @@ def initialize(name,group,base):
         '图内没有文字。`support.obj`是所有路径共同切除后的实际支撑。\n\n'
         f"材料 {report['volume_cm3']:.3f}cm³；当前原载荷诊断：{report['counts']}。"
         '初始化构造成功不等于承载通过，失败也保留给whole搜索。尚未做整件支撑接地、连通或强度验收。\n')
+    A.publish_visuals(out)
+    A.cleanup_stage(out)
     return model,layout,metadata,actual,report
 
 
@@ -256,16 +260,18 @@ def publish(name,rows,stage):
         '|---|---|---|---:|---:|---|---|']
     for row in rows:
         folder=row['id']+'/step4';name_html=html.escape(row['id']);links=f'[初始化]({folder}/step4.1/final_result.png)'
-        if (root/folder/'step4.2/final_result.png').exists():links+=f' · [过程]({folder}/step4.2/process.png) · [最终]({folder}/step4.2/final_result.png)'
+        if A.resolve_artifact(root/folder/'step4.2/final_result.png').exists():links+=f' · [过程]({folder}/step4.2/process.png) · [最终]({folder}/step4.2/final_result.png)'
         lines.append(f"| {row['id']} | {row['status']} | {row.get('step41_force_passed','—')} | {row.get('step41_volume_cm3',0):.3f} | {row.get('final_volume_cm3',0):.3f} | {row.get('rotating_poses','—')}/{row.get('juxtaposed_poses','—')} | {links} |")
         pictures=[]
         for file,label in [('step4.1/exit_directions.png','Step4.1退出方向'),('step4.1/exit_sweeps.png','Step4.1退出sweep'),('step4.1/final_result.png','Step4.1共享支撑'),('step4.2/process.png','Step4.2过程'),('step4.2/final_result.png','Step4.2最终复用')]:
-            if (root/folder/file).exists():pictures.append(f'<article><h3>{label}</h3><a href="{folder}/{file}"><img loading="lazy" src="{folder}/{file}"></a></article>')
+            if A.resolve_artifact(root/folder/file).exists():pictures.append(f'<article><h3>{label}</h3><a href="{folder}/{file}"><img loading="lazy" src="{folder}/{file}"></a></article>')
         summary=(f"{row['status']} · 材料 {row.get('step41_volume_cm3',0):.3f} → {row.get('final_volume_cm3',0):.3f} cm³"
                  f" · 转动复用 {row.get('rotating_poses','—')} · Juxtapose {row.get('juxtaposed_poses','—')}")
         cards.append(f'<section><h2>{name_html}</h2><p>{html.escape(summary)}</p>'+''.join(pictures)+'</section>')
     (root/'step4_results.md').write_text('\n'.join(lines)+'\n')
     (root/'step4_index.html').write_text('<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>B Step4 whole</title><style>body{max-width:1500px;margin:25px auto;padding:20px;font-family:system-ui;color:#253441}img{max-width:100%}article{border:1px solid #dde4e9;padding:10px;margin:15px 0}p{overflow-wrap:anywhere}</style><h1>B Step4 whole优化</h1><p>实体支撑体积优先；原载荷、完整工作禁区、合法退出约束。整件接地、连通和强度尚未验收。</p>'+''.join(cards)+'</html>')
+
+    A.publish_gallery(root/'step4_index.html')
 
 
 def main(stage='both'):
@@ -312,6 +318,10 @@ def main(stage='both'):
         passed=sum(r['passed'] for r in rows),unresolved=sum(not r['passed'] for r in rows),results=rows,
         options=options,seconds=time.monotonic()-began,full_fixture_accepted=False)
     save(root/'data/whole_step4_batch.json',batch);publish(args.object,rows,stage)
+    (root/'data/whole_step4_progress.json').unlink(missing_ok=True)
+    (root/'data/whole_step4_active_run.json').unlink(missing_ok=True)
+    for group in groups:
+        A.cleanup_stage(root/group['id']/'step4')
     print('TOTAL',batch['passed'],'/',batch['sets'],'passed',batch['unresolved'],'unresolved',flush=True)
     if batch['unresolved']:raise SystemExit(2)
 

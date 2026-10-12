@@ -6,10 +6,12 @@ import _bootstrap
 import argparse,contextlib,multiprocessing,shutil,time,traceback,html
 from concurrent.futures import ProcessPoolExecutor,as_completed
 from co_common import *
+import artifact_store as A
+A.install_legacy_io(I)
 import step31,step32,step31_render
 
 
-def output_root(name):return HERE/'output'/name if name=='B' else HERE/'data/object_inputs'/name
+def output_root(name):return A.result_root(name) if name=='B' else HERE/'data/object_inputs'/name
 
 
 def saved_groups(name,scope='existing'):
@@ -35,6 +37,7 @@ def prepare_existing(name,group):
                 if not archived.exists() or I.sha256(path)!=I.sha256(archived):
                     raise RuntimeError('Legacy stage differs from its archive: '+str(path))
         shutil.rmtree(out)
+        shutil.rmtree(backup)
     (out/'data').mkdir(parents=True,exist_ok=True)
     return out
 
@@ -64,8 +67,8 @@ def run_case(arguments):
             lines+=['','INITIALIZED 表示注册和完整禁区切除完成，不表示最终受力或可装卸支撑已求解。'
                 '受力失败仅针对当前重合布局，继续保留给后续 whole 的 Direction/Juxtapose 调整。'
                 '本轮没有生成接地环、没有挖退出路径、没有运行 Step4。', '',
-                '旧阶段结果保存在 B 根目录的 `_history/before_whole_initialize_20261008/`。'
-                '原 Step4 文件仍是旧初始化下的历史结果，其数值与图片未重算。']
+                '阶段更新的临时副本验证后删除。'
+                '后续 Step4 读取对应初始化的最终布局。']
             (out/'README.md').write_text('\n'.join(lines)+'\n')
             record=dict(complete=True,**row,object=name,schema=step31.SCHEMA,
                 full_fixture_accepted=False,downstream_requires_rebuild=True,
@@ -74,12 +77,15 @@ def run_case(arguments):
                 artifacts={'../step3.1/overview.png':I.sha256(out/'step3.1/overview.png'),
                            '../step3.2/overview.png':I.sha256(out/'step3.2/overview.png')})
             save(out/'data/report.json',record);I.check_report(out/'data/report.json')
+            A.publish_visuals(out)
             return row
         except Exception as error:
             traceback.print_exc()
             row=dict(id=group['id'],poses=group['poses'],status='unresolved',passed=False,step4_ready=False,
                      error=f'{type(error).__name__}: {error}',seconds=time.monotonic()-began)
             save(out/'data/failure.json',dict(complete=True,**row));return row
+        finally:
+            A.cleanup_stage(out)
 
 
 def publish(name,rows,batch):
@@ -148,6 +154,8 @@ def main():
         step4_run=False,full_fixture_accepted=False,results=rows,seconds=time.monotonic()-began,
         provenance=provenance([ROOT/'objects'/args.object/'pose_sets.json'],[Path(__file__),HERE/'step3.1/step31.py',HERE/'helper_func/work_access.py']))
     save(root/'data/batch.json',batch);publish(args.object,rows,batch)
+    A.publish_gallery(root/'index.html')
+    (root/'data/whole_initialization_progress.json').unlink(missing_ok=True)
     print('TOTAL',batch['initialized_sets'],'initialized',batch['unresolved_sets'],'unresolved',flush=True)
     if batch['unresolved_sets']:raise SystemExit(2)
 

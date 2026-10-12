@@ -16,6 +16,8 @@ from codes.precompute_objects.dataset import read_sets,read_pose_groups,read_sel
 from step3_scheculer.pair_scoring import J,C
 from step2_local_support import geometry as G
 from step4_connect_support import boxed_support as F,build_coupled_saddle as S,deterministic_space as D,working_surface as WORK
+import artifact_store as A
+A.install_legacy_io(I)
 
 
 def save(path,value):I.save(path,value)

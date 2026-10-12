@@ -12,6 +12,7 @@ from .common import _PRISM_FACES
 from .classify import classify
 from .projection import cone_projection
 from work_access import WorkAccess
+from fixture_state import installed_state, installed_states
 
 
 @dataclass
@@ -20,14 +21,39 @@ class Layout:
     directions: np.ndarray
     hosts: np.ndarray
     active: tuple
+    state_offsets: np.ndarray = None
+
+    def __post_init__(self):
+        if self.state_offsets is None:
+            self.state_offsets = np.zeros((len(self.hosts), 3))
+        else:
+            self.state_offsets = np.asarray(self.state_offsets, dtype=float).copy()
+        if self.state_offsets.shape != (len(self.hosts), 3) or not np.isfinite(self.state_offsets).all():
+            raise ValueError('Fixture installation offsets must be finite world XYZ vectors')
 
     def copy(self):
-        return Layout(self.placements.copy(), self.directions.copy(), self.hosts.copy(), self.active)
+        return Layout(self.placements.copy(), self.directions.copy(), self.hosts.copy(), self.active,
+                      self.state_offsets.copy())
+
+    @classmethod
+    def from_arrays(cls, arrays):
+        return cls(arrays['placements'].copy(), arrays['directions'].copy(), arrays['hosts'].copy(),
+                   tuple(map(int, arrays['active'])),
+                   arrays['state_offsets'].copy() if 'state_offsets' in arrays else None)
+
+    def arrays(self, native=None):
+        result = dict(placements=self.placements, directions=self.directions, hosts=self.hosts,
+                      active=np.array(self.active), state_offsets=self.state_offsets)
+        if native is not None:
+            result.update(native_world=installed_states(native, self), native_world_original=native)
+        return result
 
     def key(self):
-        return (self.active, tuple(self.hosts[list(self.active)]),
+        base = (self.active, tuple(self.hosts[list(self.active)]),
                 np.round(self.placements[list(self.active)], 11).tobytes(),
                 np.round(self.directions[list(self.active)], 11).tobytes())
+        offsets = np.round(self.state_offsets[np.unique(self.hosts[list(self.active)])], 11)
+        return base if not np.any(offsets) else base+(offsets.tobytes(),)
 
 
 class Model:
@@ -95,7 +121,7 @@ class Model:
         return self.native[layout.hosts[k], :3, :3].T @ np.array([0.,0.,1.])
 
     def workpiece_height(self, layout, k):
-        world = self.native[layout.hosts[k]] @ layout.placements[k]
+        world = installed_state(self.native, layout, layout.hosts[k]) @ layout.placements[k]
         return float(world[2,3]-self.native[k,2,3])
 
     def floor_signature(self, layout, k):
@@ -106,7 +132,7 @@ class Model:
         return self.floors[k] if self.floor_signature(layout,k) else self.floors[k][-1:]
 
     def validate_placement(self, layout, k):
-        world = self.native[layout.hosts[k]] @ layout.placements[k]
+        world = installed_state(self.native, layout, layout.hosts[k]) @ layout.placements[k]
         if not np.allclose(world[:3,:3],self.native[k,:3,:3],atol=1e-10):
             raise ValueError('Candidate changes original object orientation')
         height = self.workpiece_height(layout,k)
@@ -140,7 +166,8 @@ class Model:
         result = layout.copy()
         host_native = layout.hosts[host]
         result.hosts[guest] = host_native
-        result.placements[guest] = np.linalg.inv(self.native[host_native]) @ self.native[guest]
+        result.placements[guest] = (np.linalg.inv(installed_state(self.native, result, host_native)) @
+                                    installed_state(self.native, layout, guest))
         if translation is not None:
             result.placements[guest,:3,3] += translation
         result.directions[guest] = legal_direction(layout.directions[host], self.floor_normal(result,guest))
@@ -428,8 +455,7 @@ class Model:
         logs=self.checkpoint_dir.parent/'worker_logs';logs.mkdir(parents=True,exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='pose_set_exact_') as folder:
             folder=Path(folder);path=folder/'layout.npz'
-            np.savez_compressed(path,placements=layout.placements,directions=layout.directions,
-                                hosts=layout.hosts,active=np.array(layout.active))
+            np.savez_compressed(path, **layout.arrays(self.native))
             env=os.environ.copy();env['COOPT_REPO_ROOT']=str(ROOT)
             env['PYTHONPATH']=str(CO/'helper_func')+os.pathsep+env.get('PYTHONPATH','')
             arguments=[sys.executable,'-u','-X','faulthandler','-m','whole_search.exact_worker',
@@ -495,8 +521,7 @@ class Model:
         out.mkdir(parents=True,exist_ok=True)
         layout=result['layout'];active=layout.active
         C.D.export_exact_obj(result_mesh(result),out/'support.obj')
-        np.savez_compressed(out/'layout.npz',placements=layout.placements,directions=layout.directions,
-                            hosts=layout.hosts,active=np.array(active),native_world=self.native)
+        np.savez_compressed(out/'layout.npz', **layout.arrays(self.native))
         for k in active:
             np.savez_compressed(out/f'{self.poses[k]}_force.npz',mask=result['masks'][k],supply_7d=result['supplies'][k],
                                 triangles_fixture_m=result['contacts'][k]['triangles'],source_faces=result['contacts'][k]['sources'])

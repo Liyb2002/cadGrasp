@@ -185,6 +185,8 @@ class VolumeDelta(VolumeGuidance):
                 blocked += sweep
             parts[k] = wrap, body, work, sweep
         material = (count > 0) & (blocked == 0)
+        if hasattr(self.model, 'material_floor_allowed'):
+            material &= self.model.material_floor_allowed(layout, self.points)
         state = VolumeState(layout.copy(), parts, count, blocked, material,
                             float(material.mean()*self.box_cm3))
         if old is not None:

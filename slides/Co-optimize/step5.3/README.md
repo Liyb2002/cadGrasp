@@ -1,4 +1,6 @@
-# Step5.3：固定 BBX 优先、复用当前支撑的确定性生长
+# 历史 Step5.3：固定 BBX 优先的确定性生长
+
+本目录不参与当前流程。新版在 [Step5.2](../step5.2/README.md) 完成实际实体，再进入独立的 [Evaluation](../evaluation/README.md)。以下是加入动态base Oracle前的旧构造与失败记录。
 
 输入是 Step4 当前最终支撑 $\mathcal S_4$、固定支撑摆放 $T_i$、物体位置，以及 Step5.1 的最小需求凸包 $H_i$。先执行 [Step5.2](../step5.2/README.md) 得到固定占用盒 $B_0$。整个算法不调整原 pose、不重新采样、不重新计算 Step4 反力，也不修改原材料文件。
 
@@ -75,3 +77,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/pyt
 （$p_x,p_y$ 用米），自身工件的接地点也无法放宽这条界。需求顶点代入后是 $-0.04034150$ m：低于可达下界 40.34 mm，单位取另一摆放的 Z 高度尺度。增加盒子或多加地脚不能改变这条不等式。
 
 八项几何检查覆盖现有接地复用、盒内生长、单件连通、工件接地贡献、精确分离判据、候选耗尽和重复执行的确定性。真实批次另保存输入及执行源码指纹；不重跑原反力求解。
+# 历史实验
+
+本目录保留加入动态base Oracle前的固定布局构造与失败记录，不再参与当前流程。新版在 [Step5.2](../step5.2/README.md) 完成实际实体，之后进入独立的 [Evaluation](../evaluation/README.md)。
+

@@ -10,7 +10,11 @@ from PIL import Image
 import trimesh
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / 'slides/Co-optimize/helper_func'))
+import _bootstrap
 BASELINE = ROOT / 'slides/baseline_algo'
+if not BASELINE.exists():
+    BASELINE = ROOT / 'slides/Co-optimize/helper_func/legacy_kernel'
 if str(BASELINE) not in sys.path:
     sys.path.insert(0, str(BASELINE))
 from step4_connect_support.clean_render import Renderer

@@ -1,44 +1,38 @@
-# Step4.2：全组梯度与离散 Juxtapose
+# Step4.2：全组梯度、离散跳步与动态 base Oracle
 
-从保存的Step4.1开始，所有pose共同优化。Direction调整退出方向，Translation调整已Juxtapose位置，Juxtapose在连续下降停滞时离散改变落座结构。可行后继续减少实体材料、恢复转动支撑复用。每个state可服务多个pose。
+入口[run.py](run.py)调用[run_oracle.py](run_oracle.py)，搜索实现在[oracle_search.py](oracle_search.py)。所有pose从保存的Step4.1布局共同参与，原任务朝向与需求不变。完整算法与连续损失公式见[根README](../../../README.md#step4联合布局优化与动态-base-oracle)，Oracle细节见[base_oracle.md](base_oracle.md)。
 
-**Translation支持世界XYZ，允许airborne。** 三轴共用梯度、范数与步幅；只有地面边界施加最低点高度非负约束。离地后移除工件地面反力，保留重力、原质心需求和第七方程slack。[Translation](../helper_func/translation/README.md) · [物理模型](../../obj_supp/airborne_equations.md)
+[共享材料表示算法设计](../representation_algorithm.txt)定义了完整研究方案。[run_material.py](run_material.py)已接入第一版混合布局搜索：最多8个sample、原接触端口匹配、原位复用／换座组合、原地面需求的高度提案、完整连接与搜索内成品成本。[material_search.py](material_search.py)、[reuse_proposals.py](reuse_proposals.py)、[material_evaluator.py](material_evaluator.py)复用原物理和法向Oracle，并把已构造的成品交给Step5.2直接保存。一般的三维稀疏材料选择规划器尚未实现。
 
-## 流程与预算
+新实验可用 `run_material.py B --sets all --min-poses 5 --max-poses 8 --jobs 6 --iterations 8 --initialization-budget 256 --output-name <新名字>`。当前组合目标为2–4个原位复用pose及2–4个显式Juxtapose pose；成品通过和组合目标分别记录。初始化预览、局部割线探针和每轮正式提案分别计数，不把少量正式候选误报为全部评价次数。下文描述保留的旧 `run.py` 搜索入口。
 
-入口为 `run.py` → `stable_pipeline.py`。初次全组搜索最多10轮结构跳步，每轮96个廉价落座候选、3个完整分支，各分支最多2轮Direction／XYZ Translation修复。局部下降和竞争分支固定同一需求求积点和权重。
+混合搜索同时提出全部pose及重叠复用组的联合方向割线／接触事件。独立改变一个退出方向可能仍被重叠组的其他退出扫掠遮挡。Juxtapose的复用角色交换轮流探索失败的复用pose与其他复用pose；恢复原位时同步转换退出方向，保持世界方向。八个sample共用一轮需求测度，每轮最多8个新布局检查全部原需求；连接与成品构造分别限3个和2个新候选。
 
-仅对仍有原需求未满足的组，从其本轮布局追加最多8轮保持state落座和全组梯度修复。全部可行后运行两轮保持可行的Direction／XYZ材料下降。少量sampling跨过接触平台，接受日志区分gradient与sample。
+当前入口已合并确定性组件包含判断、座位／安装高度的共同线性提案、失败guest与阻挡guest的轮换，以及接触端口在全部安装state下的必要占用盒。种群保留一个物体着地的复用分支，避免所有sample都被抬进同一个受力死路。原始任务旋转、接触法则和32768需求保持。
 
-PASS使用搜索接触模型上每pose全部32768原始需求。最终保存复用已有mask／供力列，不进入几何微扰或末尾重复需求求解；固定布局名义mesh导出失败也不撤销力／力矩PASS。无实体mesh的估计体积不能替换旧实体答案。最终材料择优分别记录新尝试与旧答案来源。
+成品规划试验少量世界占用盒，将它们拉回共同材料坐标后与原合法见证相交，再调用原Builder。全部合法名义材料必须保留，实体仍通过原地脚包围、连通、闭合和空间检查。稀疏三维材料选择仍是后续工作。点求积少量未满足的候选可在真实成品接触三角形上重新生成原反力锥；只有全部原始需求通过才可接受，不把撒点失败直接改成PASS。`material_contact_certifications`单独记录这些实体接触检查。
 
-[详细公式与实现](fast_gradient_algorithm.md) · [论文算法](paper_algorithm.md)
+`--warm-checkpoint-experiment`冻结一轮的过程布局，若过程已清理则读取其最终布局。`--initialization-seeds`读取显式的按case排列的布局文件清单；所有种子重新接受当前完整检查，来源与副本哈希均保存。
 
-## 已完成结果
+全部26个5–8pose set的当前真实成品、组合数量、实际支撑state成员与完整BBX见[运行评估](../data/results/B/mixed_material_campaign_20261011_01_review.md)。各次重试单独保留批次、warm来源、执行代码和失败记录，不能把多次重试的最佳结果当成一次冷启动成功率。
 
-七组8–10-pose新搜索7/7通过：6组初次、1组自身状态梯度接续；3个新pose实例离地。七项新名义mesh721.55cm³，对旧713.01cm³大1.20%。最终采用3个更小的新方案、保留4个旧方案，655.74cm³（−8.03%）。三进程整批含出图21.38min，搜索中位403.6s／组，名义mesh导出中位4.5s。
+默认由[layout_frontier.py](layout_frontier.py)持续保留4个完整布局。父布局与新候选同时比较，分别保留受力好的、Oracle包围好的和地脚位置／布局不同的分支，防止退出方向改善受力却挤掉关键base空间。同一轮全部分支共用需求求积点、权重和尺度；96个正式候选快筛额度由各父布局分摊，最多8个短名单候选执行全部原始需求检查，最多3个新finalist查共同连接。已找到的整体可行布局优先保留，连接见证随正确布局保存。
 
-[新搜索与最终结果表](../output/B/stable_gradient_xyz_force_v3_results.md) · [图片浏览](../output/B/stable_gradient_xyz_force_v3_index.html) · [保存记录核对](../output/B/data/stable_gradient_xyz_force_v3/verification.json)
+Direction在单位球面的两个切方向求接触事件割线；Translation允许物体座位与最终支撑state的世界XYZ，使用多步幅并保持不穿地。sampling和周期性Juxtapose扩展离散host／重叠结构，再在后续轮次连续精修。每步都考虑全部pose接触的新增与损失，一个state可服务任意多个pose。Oracle未找到的中间布局可以探索，地脚面积不能代替承载包围。
 
-49项相关检查通过；两阶段各65份执行源码／快照一致，七组冷启动与原Step4.1数组一致，原始需求mask通过。存档核对只读取文件、哈希和mesh体积。
+Oracle已经默认使用每个原工作三角形沿外法向的单向棱柱并集：没有角度扩张、全局凸包或安全余量。快速地脚包围与完整连接查询使用同一法向工作空间；原加工力角度和接触／初始化模型保留。
 
-## 使用与输出
+每个pose原始32768需求全部通过即工件受力PASS；整体PASS还要求合法地脚包围与共同连接Oracle通过。XYZ位置改变时需求凸包动态更新。机器人拿起空支撑后的搬运转动不参与约束。可行后继续保持Oracle约束的材料下降及转动复用恢复。
 
-在仓库根目录运行，选择已有set和新的输出名：
+最终mask／反力直接复用，不做末尾重复需求求解或几何微扰。名义实体用于材料比较与显示；连接空间见证不是成品base。
 
 ```sh
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
-  slides/Co-optimize/step4.2/run.py B \
-  --sets pose1+2+3+4+5+6+7+8+9+10 --jobs 1 --output-name my_xyz_gradient \
-  --incumbent-summary slides/Co-optimize/output/B/data/stable_gradient_xyz_force_v3/pipeline.json \
-  slides/Co-optimize/output/B/data/stable_gradient_results.json
+  slides/Co-optimize/step4.2/run.py B --sets all --jobs 3 --output-name my_base_oracle
 ```
 
-每组输出在 `output/B/{pose_set}/step4/step4.2/{output_name}/`：
+`--frontier-width 4`为默认多布局搜索；`--frontier-width 1`是旧单布局对照。`--oracle-work-mode normal`为当前默认，`angular`只用于显式历史模式对照。新实验须使用新输出名字。
 
-- `layout.npz`、`*_force.npz`、`data/report.json`：选定布局、完整需求mask和供力列。
-- `support.obj`、`process.png`、`final_result.png`：固定布局名义mesh与无文字等轴测图片，工作禁区只在Step3.2画。
-- `process.json`、`process_states/`、`mesh_states/`：已接受操作和布局过程。
-- `material_selection.json`：最终所选来源，可能保留旧答案。
+最终数值在`data/results/B/{pose_set}/step4/step4.2/{experiment}/`：`layout.npz`、`*_force.npz`、`support.obj`、`base_oracle.json`、`oracle_connected_witness.obj`与报告。`process.png`、`final_result.png`自动发布到相同层级的`output/B/`。候选布局、过程帧和日志在出图完成后删除；批次执行副本在哈希校验后删除，保留哈希与最终统计。
 
-批次数据在 `output/B/data/{output_name}/`，保存预算、执行源码、阶段通过数、原输入保护和新／旧材料比较。Step5按最终位置处理系统—地面与base；整件连通和强度仍为后续工作。
+历史`base_oracle_v3`在其原有5mm／固定安装条件下52/52通过；该结果不代表当前法向工作空间、可移动安装及混合数量目标的成功率。[历史图集](../output/B/base_oracle_results_index.html) · [历史数值](../data/results/B/base_oracle_results.md)。

@@ -28,10 +28,11 @@ import trimesh
 import system_floor as F
 import step51_render as V
 import hull_render as H
+import artifact_store as A
 
 
 def digest(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    return A.digest(path)
 
 
 def relative(path):
@@ -129,10 +130,12 @@ def write_case_index(out, group, rows):
     (out / 'index.html').write_text(text + '\n')
 
 
-def compute_case(name, case, base, reader, renderer, weight_ratio, batch_record):
+def compute_case(name, case, base, reader, renderer, weight_ratio, batch_record, experiment=None):
     began = time.perf_counter()
     selected = base / case['id'] / 'step4/step4.2' / case['experiment']
     out = base / case['id'] / 'step5/step5.1'
+    if experiment:
+        out = out / experiment
     if out.exists() and any(out.iterdir()):
         raise FileExistsError(f'Preserve existing Step5.1 output; choose/archive explicitly: {out}')
     (out / 'data').mkdir(parents=True, exist_ok=True)
@@ -146,6 +149,7 @@ def compute_case(name, case, base, reader, renderer, weight_ratio, batch_record)
         raise ValueError('Selected source must be a completed passed Step4 layout')
     with np.load(layout_path) as z:
         native = z['native_world'].copy()
+        native_original = z['native_world_original'].copy() if 'native_world_original' in z else native.copy()
         placements = z['placements'].copy()
         hosts = z['hosts'].copy()
         active = z['active'].copy()
@@ -161,9 +165,10 @@ def compute_case(name, case, base, reader, renderer, weight_ratio, batch_record)
         task_started = time.perf_counter()
         task = reader.get(pose)
         setup = task['setup']
-        np.testing.assert_allclose(native[k], setup['T_world_mesh'], atol=1e-12, rtol=0)
+        np.testing.assert_allclose(native_original[k], setup['T_world_mesh'], atol=1e-12, rtol=0)
+        np.testing.assert_allclose(native[k,:3,:3],native_original[k,:3,:3],atol=1e-12,rtol=0)
         fixture_T, object_T = F.final_task_frame(native, placements, hosts, k)
-        translation = object_T[:3, 3] - native[k, :3, 3]
+        translation = object_T[:3, 3] - native_original[k, :3, 3]
         final_com = setup['com_m'] + translation
         final_fixture_com = F.transform_points(local_fixture_com, fixture_T)
         result = F.system_floor_demands(task['loads'], final_com,
@@ -256,6 +261,13 @@ def compute_case(name, case, base, reader, renderer, weight_ratio, batch_record)
     for p, expected in protected_sources.items():
         if digest(ROOT/p) != expected:
             raise ValueError(f'Upstream input changed during Step5.1: {p}')
+    A.publish_visuals(out)
+    # Publishing relocates the HTML's model/report links. Record the finished
+    # reader's bytes rather than its temporary, pre-publication content.
+    if 'index.html' in record['artifacts']:
+        record['artifacts']['index.html'] = digest(out/'index.html')
+        save(out/'data/report.json', record)
+    A.cleanup_stage(out)
     print('STEP5.1 SET COMPLETE',case['id'],'seconds',round(record['seconds'],2),flush=True)
     return dict(id=case['id'], pose_count=len(poses), sample_count=record['sample_count'],
         source_experiment=case['experiment'], seconds=record['seconds'],
@@ -287,7 +299,7 @@ def freeze_code(directory):
     return sources
 
 
-BASE_CPP = ROOT / 'slides/baseline_algo/step4_connect_support/translucent_raster.cpp'
+BASE_CPP = V.BASELINE / 'step4_connect_support/translucent_raster.cpp'
 
 
 def main():
@@ -295,15 +307,16 @@ def main():
     parser.add_argument('object', nargs='?', default='B')
     parser.add_argument('--selection-summary', type=Path)
     parser.add_argument('--sets', nargs='+')
-    parser.add_argument('--batch-name', default='step51_xyz_floor_v1')
+    parser.add_argument('--batch-name', default='step51_connected_base_v1')
+    parser.add_argument('--experiment', default='connected_base_v1')
     parser.add_argument('--fixture-weight-ratio', type=float, default=0.)
     args = parser.parse_args()
     if not np.isfinite(args.fixture_weight_ratio) or args.fixture_weight_ratio < 0:
         parser.error('fixture weight ratio must be finite and nonnegative')
-    base = COOPT / 'output' / args.object
-    selection_path = (args.selection_summary or base / 'data/stable_gradient_xyz_force_v3/summary.json').resolve()
+    base = A.result_root(args.object)
+    selection_path = A.resolve_artifact(args.selection_summary or base / 'data/base_oracle_results/summary.json')
     selection = json.loads(selection_path.read_text())
-    cases = selection['cases']
+    cases = selection.get('selected', selection.get('cases', selection.get('results', [])))
     if args.sets:
         missing = set(args.sets) - {r['id'] for r in cases}
         if missing:
@@ -312,7 +325,7 @@ def main():
     if not cases:
         parser.error('No selected sets')
     for case in cases:
-        out = base / case['id'] / 'step5/step5.1'
+        out = base / case['id'] / 'step5/step5.1' / args.experiment
         if out.exists() and any(out.iterdir()):
             parser.error(f'Existing Step5.1 result is protected: {out}')
     directory = base / 'data' / args.batch_name
@@ -334,7 +347,7 @@ def main():
     protected = {relative(selection_path): digest(selection_path), relative(mesh_path): digest(mesh_path),
         relative(ROOT/'objects'/args.object/'poses.json'): reader.poses_hash}
     for case in cases:
-        row = compute_case(args.object, case, base, reader, renderer, args.fixture_weight_ratio, batch)
+        row = compute_case(args.object, case, base, reader, renderer, args.fixture_weight_ratio, batch, args.experiment)
         rows.append(row)
         protected.update(row['provenance'])
         save(directory / 'progress.json', dict(complete=False, completed=len(rows), cases=rows))
@@ -359,11 +372,11 @@ def main():
     save(directory / 'summary.json', result)
     save(directory / 'verification.json', dict(complete=True, protected_inputs=protected,
         executed_code=executed_code, source_and_snapshot_hashes_match=True, all_upstream_hashes_match=True))
-    (directory/'progress.json').unlink()
+    A.finish_batch(directory)
     cards=''.join(f'<section><h2>{html.escape(r["id"])}</h2><p>{r["pose_count"]} poses, '
-        f'{r["sample_count"]:,} original points · <a href="{r["id"]}/step5/step5.1/index.html">Each pose</a></p>'
+        f'{r["sample_count"]:,} original points · <a href="{r["id"]}/step5/step5.1/{args.experiment}/index.html">Each pose</a></p>'
         f'<img src="{r["common_image"]}"><img src="{r["per_pose_image"]}"></section>' for r in rows)
-    gallery=base/'step5.1_index.html'
+    gallery=base/f'step5.1_{args.experiment}_index.html'
     gallery.write_text('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
         '<style>body{font:16px system-ui;max-width:1400px;margin:24px auto;padding:0 20px;color:#294553}'
         'img{width:100%;height:auto}section{margin:35px 0}</style>'
@@ -371,6 +384,7 @@ def main():
         '<p>Actual final XYZ placement, unchanged original demands, no resampling or force replay. '
         'Blue fixture, grey object, colored system-floor pressure centers enclosed by convex polygons. '
         'Fixture self-weight ratio: '+str(args.fixture_weight_ratio)+'.</p>'+cards+'\n')
+    A.publish_gallery(gallery)
     print('STEP5.1 ALL COMPLETE',len(rows),'sets',result['pose_instance_count'],'poses',
           result['original_point_count'],'points','seconds',round(result['total_seconds'],2),flush=True)
     print('GALLERY',relative(gallery),flush=True)

@@ -8,8 +8,7 @@ from .model import Model,Layout
 
 def write_result(result,path):
     layout=result['layout'];mesh=result_mesh(result)
-    arrays=dict(vertices=mesh.vertices,faces=mesh.faces,placements=layout.placements,
-                directions=layout.directions,hosts=layout.hosts,active=np.array(layout.active))
+    arrays=dict(vertices=mesh.vertices,faces=mesh.faces,**layout.arrays())
     for k in layout.active:
         arrays[f'mask_{k}']=result['masks'][k]
         arrays[f'supply_{k}']=result['supplies'][k]
@@ -37,7 +36,7 @@ def write_result(result,path):
 def read_result(path,serial):
     arrays=np.load(path.with_suffix('.npz'))
     metadata=json.loads(path.with_suffix('.json').read_text())
-    layout=Layout(arrays['placements'],arrays['directions'],arrays['hosts'],tuple(map(int,arrays['active'])))
+    layout=Layout.from_arrays(arrays)
     contacts={}
     for k in layout.active:
         tri=arrays[f'triangles_{k}']
@@ -82,7 +81,7 @@ def main():
     arrays=np.load(args.layout)
     model=Model(args.poses.split(','),args.object,initialization_report=args.initialization_report,
                 allow_z_translation=args.allow_z_translation)
-    layout=Layout(arrays['placements'],arrays['directions'],arrays['hosts'],tuple(map(int,arrays['active'])))
+    layout=Layout.from_arrays(arrays)
     write_result(model.exact(layout),args.out)
 
 

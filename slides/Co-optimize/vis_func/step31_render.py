@@ -82,7 +82,7 @@ def render_pose(name, group, pose, base):
 
 
 def render(name, group, base=None):
-    base = base or (HERE/'output'/name if name=='B' else HERE/'data/object_inputs'/name) / group['id'] / 'step3'
+    base = base or (A.result_root(name) if name=='B' else HERE/'data/object_inputs'/name) / group['id'] / 'step3'
     out = base / 'step3.1'
     panels = [render_pose(name, group, pose, base) for pose in group['poses']]
     columns = 2 if len(panels) == 4 else min(3, len(panels))
@@ -122,6 +122,7 @@ def render(name, group, base=None):
                                 if not path.startswith('../step3.1/')}
         summary['artifacts']['../step3.1/overview.png'] = I.sha256(image_path)
         save(summary_path, summary)
+    A.publish_visuals(out)
     print('STEP3.1 OVERVIEW', group['id'], len(records), 'poses', flush=True)
     return records
 
