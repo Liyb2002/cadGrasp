@@ -241,6 +241,36 @@ def differential_move(model, layout, population, slot, weights, rng, iteration, 
                    coordinate_frame='common_material', better_donors_required=False)
 
 
+def pso_move(model, layout, personal_best, social_best, velocity, rng, owner):
+    """PSO translation, using scored complete layouts as both exemplars.
+
+    The current role, host, native task rotation and all existing acceptance
+    rules remain unchanged. Exit-direction exploration retains its old rule.
+    """
+    c = np.asarray(model.mesh.center_mass)
+    def center(value):
+        Q = value.placements[owner]
+        return Q[:3, :3] @ c + Q[:3, 3]
+    current, personal, social = map(center, (layout, personal_best, social_best))
+    inertia = .25*velocity[owner]
+    cognitive = .25*rng.random(3)*(personal-current)
+    collective = .25*rng.random(3)*(social-current)
+    velocity[owner] = inertia+cognitive+collective
+    q = shift(model, layout, owner, velocity[owner])
+    if rng.random() < .35:
+        axis = rng.normal(size=3); axis /= max(float(np.linalg.norm(axis)), 1e-12)
+        q.directions[owner] = turn(model, q, owner, np.radians(12.)*axis).directions[owner]
+    for k in q.active:
+        model.validate_placement(q, k)
+    return q, dict(selected_pose=owner, poses=[owner], coordinate_frame='common_material',
+        personal_best_center_m=personal.tolist(), social_best_center_m=social.tolist(),
+        previous_center_m=current.tolist(), velocity_m=velocity[owner].tolist(),
+        inertia_component_m=inertia.tolist(), cognitive_component_m=cognitive.tolist(),
+        social_component_m=collective.tolist(), coefficients=dict(w=.25,c1=.25,c2=.25),
+        exemplars_selected_by_complete_layout_physical_rank=True,
+        translation_noise_added=False, role_and_host_changed=False)
+
+
 def preserves_poses(before, after, protected):
     for k in protected:
         if int(before.hosts[k]) != int(after.hosts[k]):
@@ -299,8 +329,19 @@ class PopulationSoftSearch(MaterialSearch):
         self.allow_native_sliding = bool(getattr(search, 'allow_native_sliding', False))
         self.allow_geometry_validation = bool(getattr(search, 'allow_geometry_validation', False))
         if self.allow_geometry_validation:self.evaluator.space_candidate=self.geometry_candidate
-        self.branch_counts = dict(discrete=0, differential=0, hold=0)
+        self.continuous_policy = getattr(search, 'population_continuous_policy', 'pso')
+        if self.continuous_policy not in ('pso', 'differential'):
+            raise ValueError('Unknown population continuous proposal policy')
+        self.pso_best = []
+        self.pso_velocity = np.zeros((self.population_size, len(self.model.native), 3))
+        self.pso_best_updates = 0
+        self.branch_counts = dict(discrete=0, differential=0, pso=0, hold=0)
         self.accepted = 0; self.exploration_accepted = 0
+
+    def update_pso_best(self, slot, item):
+        if physical_rank(item, slot) < physical_rank(self.pso_best[slot], slot):
+            self.pso_best[slot] = item
+            self.pso_best_updates += 1
 
     def goal_gap(self, layout):
         return 0
@@ -540,6 +581,7 @@ class PopulationSoftSearch(MaterialSearch):
             self.certify(self.slots); self.propagate_evidence()
         save(s.out/'initial_population_summary.json',[dict(slot=i,**self.describe(item))for i,item in enumerate(self.slots)])
         save(s.out/'population32_trace.json',self.audit)
+        self.pso_best = list(self.slots)
         for iteration in range(s.iterations):
             if self.stop_when_feasible and self.incumbent is not None:break
             reference = min(self.slots, key=lambda x: failed_count(x.result)).result
@@ -548,6 +590,15 @@ class PopulationSoftSearch(MaterialSearch):
                 for item in self.slots:
                     item.loss = float(m.proxy(item.layout)['loss'])
                 snapshot = [item.layout.copy() for item in self.slots]
+                if self.continuous_policy == 'pso':
+                    for item in self.pso_best:
+                        item.loss = float(m.proxy(item.layout)['loss'])
+                    for slot, item in enumerate(self.slots):
+                        self.update_pso_best(slot, item)
+                    personal_snapshot = [item.layout.copy() for item in self.pso_best]
+                    social_slots = [min(range(self.population_size),
+                        key=lambda index: physical_rank(self.pso_best[index], preference)) for preference in (0,1)]
+                    social_snapshot = [personal_snapshot[index] for index in social_slots]
                 events = []
                 for slot, parent in enumerate(list(self.slots)):
                     self.active_slot=slot
@@ -558,7 +609,7 @@ class PopulationSoftSearch(MaterialSearch):
                     probabilities = {str(k): weights[k]/total if total else 0. for k in weights}
                     owner = weighted_pose(parent.layout.active, weights, s.rng)
                     branch = ('hold' if owner is None else 'discrete' if registered(parent.layout, owner) or s.rng.random() < .5
-                              else 'differential')
+                              else self.continuous_policy)
                     self.branch_counts[branch] += 1
                     event = dict(slot=slot, branch=branch, accepted=False, adjustment_passes=0,
                         pose_probabilities=probabilities, weight_source=source,
@@ -574,6 +625,11 @@ class PopulationSoftSearch(MaterialSearch):
                                     native_family=self.allow_native_sliding and s.rng.random()<.5
                                     q,detail=joint_discrete_move(m,parent.layout,weights,s.rng,owner,native_family=native_family)
                                 else:q, detail = discrete_move(m, parent.layout, weights, s.rng, owner=owner,carry_group=self.allow_group_seating,allow_native_slide=self.allow_native_sliding)
+                            elif branch == 'pso':
+                                q, detail = pso_move(m, parent.layout, personal_snapshot[slot],
+                                    social_snapshot[slot % 2], self.pso_velocity[slot], s.rng, owner)
+                                detail.update(personal_best_slot=slot, social_best_slot=social_slots[slot % 2],
+                                    ranking_preference='oracle' if slot % 2 else 'force')
                             else:
                                 q, detail = differential_move(m, parent.layout, snapshot, slot, weights, s.rng, iteration, owner=owner)
                             if self.allow_height_repair:q=self.repair_height(q)
@@ -592,6 +648,13 @@ class PopulationSoftSearch(MaterialSearch):
                                 self.slots[slot] = trial; self.accepted += 1
                                 self.exploration_accepted += int(not better)
                                 event.update(accepted=True, reason='physical-rank' if better else 'structural-exploration')
+                                if self.continuous_policy == 'pso' and branch == 'discrete':
+                                    for k in parent.layout.active:
+                                        if (parent.layout.hosts[k] != trial.layout.hosts[k] or not np.array_equal(
+                                                parent.layout.placements[k], trial.layout.placements[k])):
+                                            self.pso_velocity[slot, k] = 0.
+                            if self.continuous_policy == 'pso':
+                                self.update_pso_best(slot, self.slots[slot])
                             event.update(move=detail,raw=self.describe(raw), trial=self.describe(trial),protected_pose_parameters_unchanged=True,
                                 successful_pose_parameters_unchanged=preserves_poses(parent.layout,trial.layout,
                                     [k for k in parent.layout.active if parent.result['masks'][k].all()]))
@@ -618,6 +681,12 @@ class PopulationSoftSearch(MaterialSearch):
                     self.snapshot_signature=signature
                 print('SOFT32 ROUND', s.out, iteration+1, self.describe(selected), flush=True)
         self.certify(self.slots); selected = self.best_checked(start)
+        if self.continuous_policy == 'pso':
+            for slot, item in enumerate(self.slots):
+                self.update_pso_best(slot, item)
+            np.savez_compressed(s.out/'pso_memory.npz', velocity=self.pso_velocity,
+                personal_best_placements=np.array([item.layout.placements for item in self.pso_best]),
+                personal_best_hosts=np.array([item.layout.hosts for item in self.pso_best]))
         s.frontier_witnesses = self.witnesses; s.frontier_states = [x.result for x in self.slots]
         s.frontier_statistics = dict(self.evaluator.stats, width=self.population_size, rounds=len(self.audit),configured_rounds=s.iterations,
             policy='failure_weighted_soft_count', maximum_retained=self.population_size, population_size=self.population_size,
@@ -631,6 +700,10 @@ class PopulationSoftSearch(MaterialSearch):
             height_repair_after_proposals=self.allow_height_repair,stop_when_feasible=self.stop_when_feasible,
             native_state_sliding_during_optimization=self.allow_native_sliding,
             actual_geometry_validation_beyond_point_screen=self.allow_geometry_validation,
+            continuous_proposal_policy=self.continuous_policy,
+            pso_coefficients=dict(w=.25,c1=.25,c2=.25) if self.continuous_policy=='pso' else None,
+            pso_personal_best_updates=self.pso_best_updates,
+            pso_social_rank_preserves_existing_even_force_odd_oracle_preferences=True,
             branch_counts=self.branch_counts, accepted_updates=self.accepted,
             structural_exploration_updates=self.exploration_accepted, errors=self.errors[-30:])
         s.material_selected = selected

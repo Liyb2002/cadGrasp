@@ -43,10 +43,12 @@ def population_plot(label,experiment):
     fig.colorbar(im,ax=ax,label='Juxtaposed object pose count')
     discrete=[sum(e['branch']=='discrete' for e in row['events'])for row in rows]
     differential=[sum(e['branch']=='differential' for e in row['events'])for row in rows]
+    pso=[sum(e['branch']=='pso' for e in row['events'])for row in rows]
     held=[sum(e['branch']=='hold' for e in row['events'])for row in rows];x=np.arange(1,len(rows)+1)
     bx.bar(x,discrete,label='Discrete',color='#319cd7')
-    bx.bar(x,differential,bottom=discrete,label='Differential',color='#e8aa42')
-    if any(held):bx.bar(x,held,bottom=np.array(discrete)+differential,label='Hold',color='#aaaaaa')
+    if any(differential):bx.bar(x,differential,bottom=discrete,label='Differential',color='#e8aa42')
+    if any(pso):bx.bar(x,pso,bottom=np.array(discrete)+differential,label='PSO',color='#59ab72')
+    if any(held):bx.bar(x,held,bottom=np.array(discrete)+differential+pso,label='Hold',color='#aaaaaa')
     bx.set_ylim(0,size+2);bx.set_xticks(x);bx.set_xlabel('Round');bx.set_ylabel('Slots taking each branch')
     bx.legend(loc='upper center');fig.tight_layout()
     destination=out/'population.png';fig.savefig(destination,dpi=150);plt.close(fig)
@@ -113,6 +115,7 @@ def main():
     oracle_aware=soft and batch['options'].get('allow_oracle_fallback',False)
     early_stop=soft and batch['options'].get('stop_when_feasible',False)
     connected=batch.get('options',{}).get('require_connected_core',False)
+    pso_policy=soft and batch['options'].get('population_continuous_policy')=='pso'
     results={r['id']:r for r in batch['results']}
     frozen=source_system/'frozen_sources/slides/Co-optimize'
     os.environ.setdefault('COOPT_REPO_ROOT',str(ROOT))
@@ -289,6 +292,10 @@ def main():
         lines[start]='[算法说明](../../../connected_core_algorithm.md)。每组 `final_result.png` 显示实际已认证的连通接触主体；`population.png` 显示该次执行的全部槽位。'
         start=next(i for i,line in enumerate(lines)if line.startswith('PASS要求'))
         lines[start]='PASS要求保留主体为一个真实材料连通分量，原向下合力模型、全部原始力/力矩需求、Oracle及长脚可行性参考通过。名义BBX对应接触主体；成品BBX对应搜索内长脚参考，最终Step5.3另见Evaluation报告。'
+    if pso_policy:
+        lines[0]='# PSO与动态换座：全52组Step4结果'
+        lines=[line.replace('离散或差分变异','离散或PSO变异').replace('离散换座或种群差分','离散换座或PSO平移')for line in lines]
+        lines.insert(3,'PSO连续分支使用历史最好完整布局与群体最好布局，w=c1=c2=0.25；原受力、Oracle、连通主体、离散换座和短调整保持。各中断尝试另存；原位重跑的额外计算不能省略为一次未中断批次。')
     for size in sizes:
         lines.append(f'| {size["object_pose_count"]} | {size["groups"]} | {size["completed"]} | {size["passed"]} | {size["failed"]} |')
     if largest:

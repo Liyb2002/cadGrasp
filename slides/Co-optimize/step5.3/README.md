@@ -1,5 +1,11 @@
 # Step5.3：将删减后的支撑构造成完整实体
 
+当前实心脚版本：全部52组重跑Step5.3、Evaluation及实际OBJ审计通过。保留已认证Step5.2主体，重新生成连续圆截面实心脚，拒绝带孔叶片；受阻时合法绕行，不用大盒桥接。整体BBX逐组保持，成品材料9616.340→4490.510 cm³（−53.30%），每组不增加。入口为[run_continuous_legs.py](../helper_func/run_continuous_legs.py)及独立恢复版本，旧`run.py`仍是历史扁脚后端。[算法](../continuous_legs_algorithm.md) · [52组Evaluation与图片](../continuous_legs_results_20261013.md)。各组`overview.png`／`all_poses.png`／`pose_N.png`／`comparison.png`／`detail.png`／`evaluation.png`全部更新；无HTML。下面是上一版及历史说明。
+
+最终进一步圆整结果：[全部52组成品、材料与图片](../sculpted_pruning_results_20261013.md)。52/52通过实际OBJ和全部原始需求审计，成品材料总量9616.340cm³，比上一版减少5.21%；整体成品BBX合计432.466717L，逐组保持至数值精度。29组脚采用连续自由表面圆整；其余接受局部圆角或保守保留，不声称所有边角消失。所有标准图、前后对比及放大图已更新。
+
+当前进一步圆整批次`sculpted_pruning_all52_20261013_01`已完成全部52组Step5.2／5.3。在新已认证主体上保留已有脚的位置与合法材料，对脚的自由侧面做真实表面圆整；必要主体、接触、地面和整体BBX固定，接受结果重新导出并检查全部原始需求。材料按组不增加。复杂模型关闭不稳定的局部布尔备用分支，回退仍保持原验收。[当前算法](../sculpted_pruning_algorithm.md)。`overview.png`为成品，`comparison.png`左旧右新，`detail.png`为同视角脚部放大。下面保持此前构造与固定脚重建的历史说明。
+
 2026-10-13当前圆整删减批次全部52组已重跑并通过。使用`--fixed-leg-reference`，在新已认证连通主体上[重建保存的合法脚](replay_legs.py)：脚的位置、路径、截面保持原值，实体重新导出并检查合法空间、物体排除、连通、真实地面包围和全部原始需求。每组整体成品BBX与上一版保持一致。没有重新搜索脚；未指定固定参考时仍使用下面的原长脚后端。[算法说明](../aesthetic_pruning_algorithm.md) · [52组BBX及前后图](../aesthetic_pruning_results_20261013.md)。图片直接在每组本阶段，`comparison.png`为同视角旧／新对比。
 
 本目录承接原Step5.2构造算法。入口[run.py](run.py)，原几何后端[deterministic_base.py](deterministic_base.py)保留。输入改为新[Step5.2](../step5.2/README.md)通过原需求检查的删减材料、Step5.1需求凸包与Step4保存的合法空间。

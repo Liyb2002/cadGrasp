@@ -57,6 +57,7 @@ def worker(job):
         search.stop_when_feasible=options.get('stop_when_feasible',False)
         search.allow_native_sliding=options.get('allow_native_sliding',False)
         search.allow_geometry_validation=options.get('allow_geometry_validation',False)
+        search.population_continuous_policy=options.get('population_continuous_policy','pso')
         search.warm_checkpoint_experiment=options.get('warm_checkpoint_experiment')
         search.initialization_seeds=options.get('initialization_seeds')
         search.material_warm_layouts=[]
@@ -80,7 +81,8 @@ def worker(job):
         if (search.search_policy not in ('material','population32','population_soft') and current['base_oracle'].get('connected_passed',False)
                 and current['base_oracle']['passed']):
             current=search.restore_reuse(current);current=search.polish_volume(current,1)
-        mode=('failure_weighted_soft_count32' if search.search_policy=='population_soft' else
+        mode=('failure_weighted_pso32' if search.search_policy=='population_soft' and search.population_continuous_policy=='pso' else
+              'failure_weighted_soft_count32' if search.search_policy=='population_soft' else
               'fixed_population32' if search.search_policy=='population32' else
               'shared_material_mixed_search' if search.search_policy=='material' else
               'multi_layout_force_base_frontier' if search.frontier_width>1 else 'whole_gradient_base_oracle')
@@ -138,6 +140,8 @@ def main():
     parser.add_argument('--allow-native-sliding',action='store_true')
     parser.add_argument('--allow-geometry-validation',action='store_true')
     parser.add_argument('--require-connected-core',action='store_true')
+    parser.add_argument('--population-continuous-policy',choices=['pso','differential'],default='pso',
+                        help='Continuous branch only; differential retains the original comparison')
     parser.add_argument('--initialization-budget',type=int,default=96)
     parser.add_argument('--warm-start-experiments',nargs='*',default=[])
     parser.add_argument('--warm-checkpoint-experiment')

@@ -1,5 +1,9 @@
 # Step5.2：删减物体—支撑材料
 
+最终进一步圆整结果：[全部52组表及图片](../sculpted_pruning_results_20261013.md)。两阶段52/52通过，原始需求、实际OBJ及源文件／图片审计通过；主体材料减少13.17%，整体BBX保持。当前结果包含34组连续主体圆整、33组进一步整块删减及明确的保守回退。各组来源见最终选择，不将部分／失败执行混称一次52/52。
+
+当前进一步圆整采用[新的整组入口](../helper_func/run_sculpted_postprocess.py)及其保守恢复／续跑版本，算法为[sculpted_pruning.py](sculpted_pruning.py)与[surface_flow.py](surface_flow.py)：先整块删冗余，再固定必要接触和整体BBX，对真实自由表面圆整。复杂模型使用[分批查询](surface_flow_bounded.py)及[连续表面保守分支](surface_only_pruner.py)，原验收保持。全部52组的两阶段执行已通过；[完整算法](../sculpted_pruning_algorithm.md)，最终来源在`data/results/B/data/sculpted_pruning_all52_20261013_01/resolved_batch.json`。每组图片直接在本阶段及Step5.3，成品的放大图为`step5.3/detail.png`。下面的默认`run.py`及6 mm保留区说明属于上一版对照。
+
 当前入口 [run.py](run.py)，默认算法 [rounded_pruning.py](rounded_pruning.py)。冻结 Step4 的座位、安装姿态与退出方向，读取保存的 Step5.1 需求。先整面裁去扩大BBX的原材料，再以较宽的圆整保留区删除大块冗余材料，避免网格逐格删减留下缺口和细连接。[算法说明](../aesthetic_pruning_algorithm.md) · [全部52组结果和前后图](../aesthetic_pruning_results_20261013.md)。完整长脚构造在 [Step5.3](../step5.3/README.md)。
 
 本轮以每组自己上一版已认证的删减主体作为`--shape-reference`：保留其真实接触材料，并在6 mm圆整范围内保留更多原Step4材料。圆整范围与原材料相交，不向Step4外添加材料，也不移动接触。全部52组Step5.2／5.3通过；51组采用6 mm，1组圆整候选被原验收拒绝而保留整块BBX裁边主体。两阶段每组整体BBX和全部pose角色与上一版一致。各安装state小盒是独立诊断，不能混作整体BBX。

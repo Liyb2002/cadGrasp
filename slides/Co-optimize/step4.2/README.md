@@ -1,6 +1,8 @@
 # Step4.2：全组梯度、离散跳步与动态 base Oracle
 
-最新算法为[动态换座的32候选V8](../population_soft_algorithm.md)，入口[run_population_soft.py](run_population_soft.py)。原位初始化不分配Juxtapose身份；每槽位每轮一次离散或差分变异，再一次调整。身份在优化中选择，N/3只影响新增/取消抽样。恢复旧close/up、translation及floor高度修复；raw与调整结果均接受完整检查后保留较好者。活动种群始终32，不读取历史优化布局。下文 `run_material.py` 等入口描述旧算法对照。
+当前搜索在[动态换座的32候选V8](../population_soft_algorithm.md)及连通主体检查上，只将连续位置提案换为PSO；入口[run_population_soft.py](run_population_soft.py)，默认`--population-continuous-policy pso`，显式`differential`保留旧差分对照。原位初始化不分配Juxtapose身份；每槽位每轮一次离散或PSO变异，再一次调整。身份在优化中选择，N/3只影响新增/取消抽样。旧close/up、translation及floor高度修复保持；raw与调整结果均接受完整检查后保留较好者。默认32活动槽位，不读取历史优化布局。下方V8的50/52统计属于旧差分批次；PSO全量结果另存，不能沿用这些数字。
+
+中断的ALL52实验可由[run_pso_campaign.py](../helper_func/run_pso_campaign.py)续跑到Step5与Evaluation：保留本批已经完成的组，单独归档中断组并从注册原位重跑。数值依赖冻结，原始物理输入及已接受结果保持；中断成本与重跑来源另列。
 
 V8全部52组／263个object pose已完成冷启动、最多8轮，50组完整通过、2组原受力失败，无运行错误。2–8pose全部48组通过，9pose1/2，10pose1/2；通过组244个object pose／131个实际支撑安装pose。[逐组Evaluation与PNG](../data/results/B/step4_population_soft_all52_20261012_final.md) · [结果说明](../population_soft_results_20261012.md)。共469张直接PNG；1664个初始化、2784个槽位事件、8617984个保存mask条目、5625个保护文件与412个冻结源码已核对。图中失败布局只用于诊断。本轮只跑Step4。[旧32候选冷启动33/52存档](../data/results/B/step4_population32_all52_20261012_combined.md)。
 

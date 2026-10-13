@@ -1,5 +1,23 @@
 # Co-optimize：多配置共享刚性支撑
 
+本轮连续实心脚已完成全部52组Step5.3、Evaluation及实际实体审计。Step4／5.1／5.2和全部角色冻结；新脚无贯穿孔，直路受阻时合法绕行，禁止大盒桥接。整体BBX逐组保持至原精度，成品材料9616.340→4490.510 cm³（−53.30%），逐组不增加。263个object pose、123个支撑安装pose、复用123／Juxtapose140不变。每组自己的`step5.3`标准图、对比、放大及Evaluation已更新，无HTML。[全部52组结果及图片](continuous_legs_results_20261013.md) · [算法和实际入口](continuous_legs_algorithm.md) · [总README](../../README.md)。以下保留此前确认及历史结果。
+
+2026-10-13用户已确认当前进一步圆整设计，主流程统一维护在[总README](../../README.md)：Step4保证接触主体连通，Step5.2优先BBX裁边、整块删减和自由表面圆整，Step5.3保留已有脚的位置并圆整其自由部分；失败操作保守回退。
+
+当前已接受批次`sculpted_pruning_all52_20261013_01`完成全部52组Step5.2／5.3、Evaluation及独立审计。整体BBX与上一版逐组一致至数值精度，材料逐组不增：主体减少13.17%、成品减少5.21%。34组主体／29组脚采用连续圆整，33组进一步整块删减；必要功能棱面可以保留。原263个object pose、123个支撑安装pose、复用123／Juxtapose140保持。1570张当前PNG已核对，每组`step5.3/overview.png`为成品、`comparison.png`为同视角旧／新、`detail.png`为放大；无HTML。
+
+| 当前入口 | 内容 |
+| --- | --- |
+| [总README](../../README.md) | 当前完整流程、物理边界、BBX指标与已接受结果 |
+| [圆整算法](sculpted_pruning_algorithm.md) | 整块删减、固定功能边界、真实表面圆整及回退 |
+| [全部52组结果和图片](sculpted_pruning_results_20261013.md) | 每组object／支撑pose、复用／Juxtapose、各阶段BBX及材料 |
+| [Step5.2](step5.2/README.md)／[Step5.3](step5.3/README.md) | 主体删减与脚部处理的实现导航 |
+| [连续表面保守入口](helper_func/run_sculpted_surface_only.py) | 有界几何查询，关闭局部布尔备用分支；使用独立批次 |
+
+## 历史版本与对照
+
+以下记录保留各自的数值身份、阶段编号与运行来源；旧入口和旧数量不代表当前已接受结果。
+
 最新Step5.2整块圆整删减已重跑全部52组Step5.2／5.3，均通过；Step4、Step5.1和全部pose角色冻结。删减及成品的整体BBX逐组与上一版一致，合计351.890791／432.466717L；最大差仅7.105e-15L。保留较宽的原材料带，替换逐格删减；51组采用6 mm圆整范围，1组保守保留整块裁边主体。每组`step5.2`／`step5.3`标准图已更新，新增同视角`comparison.png`，无HTML。[算法说明](aesthetic_pruning_algorithm.md) · [全部52组数量、BBX和前后图](aesthetic_pruning_results_20261013.md) · [本次BBX Evaluation](data/results/B/evaluation_aesthetic_pruning_all52_20261013_01_bbx.md)。下面的连通主体搜索与历史结果保留原数值身份。
 
 最新连通主体流程已完成全部52组／263个object pose：Step4与Step5.1／5.2／5.3均52/52通过，最终复用123／Juxtapose140，123个支撑安装pose。BBX合计：无支撑254.408 → Step4主体371.058 → 删减351.891 → 长脚成品432.467L；成品相对Step4净增加16.55%。51组删减缩小BBX，31组成品增加、21组减少；最大增幅仍需关注。1882张当前PNG已核对，每组在自己的step5.2／step5.3目录，无HTML。[算法与验收](connected_core_algorithm.md) · [全部52组BBX及图片](data/results/B/evaluation_connected_core_postprocess_all52_20261013_final_bbx.md) · [全部组图](output/B/all_bbx_connected_core_postprocess_all52_20261013_final.png) · [执行、重试与完整审计](connected_core_results_20261013.md)。包含独立冷启动重试与本轮候选精修，不声称第一轮52/52或相同计算量。以下数字保留此前独立历史批次。
