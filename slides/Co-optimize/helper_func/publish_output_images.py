@@ -1,4 +1,4 @@
-"""Publish completed B results directly in each set's step5.2 directory."""
+"""Publish completed supports directly in each set's step5.3 directory."""
 from pathlib import Path
 import argparse
 import csv
@@ -21,19 +21,25 @@ def digest(path):
 
 
 def image_sources(label, experiment, include_evaluation):
-    stage = RESULT / label / 'step5/step5.2' / experiment
+    stage = RESULT / label / 'step5/step5.3' / experiment
+    if not (stage/'data/report.json').exists():
+        stage = RESULT / label / 'step5/step5.2' / experiment
     result = json.loads((stage / 'data/report.json').read_text())
-    if not result['complete'] or not result['passed']:
-        raise ValueError('Unfinished Step5.2: ' + label)
-    source = VISUAL / label / 'step5/step5.2' / experiment
+    if (not result['complete'] or not result['passed'] or
+            result.get('stage_type')=='support_pruning'):
+        raise ValueError('A completed final support is required: ' + label)
+    source = (VISUAL / label / 'step5.3' if 'published_images' in result else
+              VISUAL / label / 'step5/step5.2' / experiment)
     names = ['overview.png', 'all_poses.png'] + [p + '.png' for p in result['poses']]
     images = {name: source / name for name in names}
     if include_evaluation:
         evaluation = RESULT / label / 'evaluation' / experiment / 'report.json'
         record = json.loads(evaluation.read_text())
-        if record['step52_source'] != str(stage.relative_to(ROOT)):
-            raise ValueError('Evaluation uses another Step5.2 result: ' + label)
-        images['evaluation.png'] = VISUAL / label / 'evaluation' / experiment / 'static_occupancy.png'
+        if record.get('step53_source',record.get('step52_source')) != str(stage.relative_to(ROOT)):
+            raise ValueError('Evaluation uses another final support: ' + label)
+        direct = VISUAL / label / 'evaluation/static_occupancy.png'
+        images['evaluation.png'] = (direct if record.get('step53_source') and direct.exists() else
+            VISUAL / label / 'evaluation' / experiment / 'static_occupancy.png')
     for path in images.values():
         if not path.is_file():
             raise FileNotFoundError(path)
@@ -42,7 +48,7 @@ def image_sources(label, experiment, include_evaluation):
 
 def publish_case_images(label, experiment, include_evaluation=False):
     images = image_sources(label, experiment, include_evaluation)
-    destination = VISUAL / label / 'step5.2'
+    destination = VISUAL / label / 'step5.3'
     destination.mkdir(parents=True, exist_ok=True)
     # Only this publisher's files are replaced; experiment archives remain intact.
     for old in destination.glob('pose_*.png'):
@@ -53,7 +59,8 @@ def publish_case_images(label, experiment, include_evaluation=False):
     records = []
     for name, source in images.items():
         target = destination / name
-        shutil.copy2(source, target)
+        if source.resolve()!=target.resolve():
+            shutil.copy2(source, target)
         expected = digest(source)
         if digest(target) != expected:
             raise ValueError('Image copy differs: ' + str(target))
@@ -95,10 +102,10 @@ def write_report(experiment, summary):
         f'批次 `{experiment}`：{len(rows)}/{len(rows)} 组完成，'
         f'{summary["pose_instance_count"]} 个 object pose 实例，'
         f'{totals["support_pose_count"]} 个支撑安装 pose。每组是一件共享支撑实体，任务依次执行。', '',
-        '每组图片直接放在 `slides/Co-optimize/output/B/[set]/step5.2/`，'
+        '每组图片直接放在 `slides/Co-optimize/output/B/[set]/step5.3/`，'
         '`illegal/` 集合保留其目录前缀。`overview.png` 是完整支撑，'
         '`all_poses.png` 汇总全部任务姿态，`pose_N.png` 是单个物体姿态，'
-        '`evaluation.png` 从左到右是无支撑、加 Step4、加完整 Step5.2；不使用 HTML。', '',
+        '`evaluation.png` 从左到右是无支撑、加 Step4、加完整 Step5.3；不使用 HTML。', '',
         f'独立集合的 BBX 统计和：**{sums["object_static"]:.2f} / '
         f'{sums["with_step4_support"]:.2f} / {sums["with_full_support"]:.2f} L**。'
         f'完整实体材料统计和 **{summary["material_full_sum_cm3"]:.2f} cm³**。'
@@ -109,18 +116,18 @@ def write_report(experiment, summary):
         'Evaluation 只计最终静态工作位置，不计退出、搬运和机器人运动。', '',
         '支撑 pose 按保存的实际世界位置和朝向分组。每个支撑 pose 服务的物体 pose 数量之和'
         '等于该集合的 object pose 数量；Juxtapose 与原位复用是物体落座分类，不是支撑 pose 数。', '',
-        '| Set（打开全部姿态图） | object pose | 支撑 pose | 每个支撑 pose 服务数量 | 无支撑 BBX (L) | Step4 BBX (L) | Step5.2 BBX (L) | 材料 (cm³) | Evaluation 图 |',
+        '| Set（打开全部姿态图） | object pose | 支撑 pose | 每个支撑 pose 服务数量 | 无支撑 BBX (L) | Step4 BBX (L) | Step5.3 BBX (L) | 材料 (cm³) | Evaluation 图 |',
         '|---|---:|---:|---|---:|---:|---:|---:|---|',
     ]
     fields = ['set', 'object_pose_count', 'support_pose_count', 'object_pose_counts_per_support_pose',
-              'object_pose_membership', 'no_support_bbx_l', 'step4_bbx_l', 'step52_bbx_l',
+              'object_pose_membership', 'no_support_bbx_l', 'step4_bbx_l', 'step53_bbx_l',
               'material_cm3', 'juxtaposed_pose_count', 'rotating_reuse_pose_count',
               'all_poses_png', 'evaluation_png']
     with csv_path.open('w', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=fields)
         writer.writeheader()
         for row in rows:
-            folder = VISUAL / row['id'] / 'step5.2'
+            folder = VISUAL / row['id'] / 'step5.3'
             all_url = os.path.relpath(folder / 'all_poses.png', RESULT)
             eval_url = os.path.relpath(folder / 'evaluation.png', RESULT)
             counts = ', '.join(map(str, row['object_pose_counts_per_support_pose']))
@@ -134,7 +141,7 @@ def write_report(experiment, summary):
             writer.writerow(dict(set=row['id'], object_pose_count=row['pose_count'],
                                  support_pose_count=row['support_pose_count'],
                                  object_pose_counts_per_support_pose=counts, object_pose_membership=membership,
-                                 no_support_bbx_l=values[0], step4_bbx_l=values[1], step52_bbx_l=values[2],
+                                 no_support_bbx_l=values[0], step4_bbx_l=values[1], step53_bbx_l=values[2],
                                  material_cm3=row['material_full_cm3'],
                                  juxtaposed_pose_count=row['juxtaposed_pose_count'],
                                  rotating_reuse_pose_count=row['rotating_reuse_pose_count'],
@@ -169,7 +176,7 @@ def contact_sheet(experiment, rows):
         title = '\n'.join(textwrap.wrap(row['id'], width=46))
         title += f'\nObject poses: {row["pose_count"]} | Support poses: {row["support_pose_count"]}'
         draw.multiline_text((x + 10, y + 5), title, font=font, fill='#253b49', spacing=2)
-        with Image.open(VISUAL / row['id'] / 'step5.2/overview.png') as im:
+        with Image.open(VISUAL / row['id'] / 'step5.3/overview.png') as im:
             tile = ImageOps.contain(im.convert('RGB'), (width - 12, height - 85), Image.Resampling.LANCZOS)
         poster.paste(tile, (x + (width - tile.width) // 2, y + 80 + (height - 85 - tile.height) // 2))
     poster_path = VISUAL / ('all_supports_' + experiment + '.png')

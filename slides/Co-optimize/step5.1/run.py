@@ -265,7 +265,11 @@ def compute_case(name, case, base, reader, renderer, weight_ratio, batch_record,
     # Publishing relocates the HTML's model/report links. Record the finished
     # reader's bytes rather than its temporary, pre-publication content.
     if 'index.html' in record['artifacts']:
-        record['artifacts']['index.html'] = digest(out/'index.html')
+        if A.resolve_artifact(out/'index.html').exists():
+            record['artifacts']['index.html'] = digest(out/'index.html')
+        else:
+            # B deliberately suppresses HTML during publication.
+            record['artifacts'].pop('index.html')
         save(out/'data/report.json', record)
     A.cleanup_stage(out)
     print('STEP5.1 SET COMPLETE',case['id'],'seconds',round(record['seconds'],2),flush=True)

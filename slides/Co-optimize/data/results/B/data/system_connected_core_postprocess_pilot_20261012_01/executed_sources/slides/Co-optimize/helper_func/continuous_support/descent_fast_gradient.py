@@ -1,0 +1,164 @@
+"""Loss-aware plateau repair on shared contact geometry.
+
+The original all-load count remains the first feasibility ranking, but an
+equal count now chooses the lower all-demand distance before material. Thus
+progress toward a currently uncovered region is retained before its last
+original demand becomes feasible. Material descent starts after feasibility.
+"""
+import time
+import numpy as np
+from whole_search.common import legal_direction
+from whole_search.model import Model
+from whole_search.fast_search import FastReuseSearch
+from whole_search.reuse_first import registered,juxtaposed_count
+from whole_search.search import failed_count
+from .cached_fast_gradient import CachedGradientModel,CachedGradientSearch
+
+
+class DescentGradientSearch(CachedGradientSearch):
+    def score(self,result,anchor=None):
+        score=list(super().score(result,anchor))
+        score.insert(2,self.model.proxy(result['layout'])['loss'] if failed_count(result) else 0.)
+        return tuple(score)
+
+    def solve_frontier(self,current,anchor=None,insertion_guest=None):
+        movable=lambda q:[k for k in q['layout'].active if not registered(q['layout'],k)]
+        current=self.refine(current,3,translation_guests=movable(current),phase='rotate_reuse_direction')
+        for iteration in range(self.iterations):
+            if failed_count(current)==0:break
+            if failed_count(current)<=512:
+                current=self.fine_refine(current,rounds=2)
+                if failed_count(current)==0:break
+            before=current;worst=self.targets(current)[1]
+            guests=sorted([k for k,mask in current['masks'].items() if not mask.all()],
+                          key=lambda k:(k!=worst['pose_index'],int(current['masks'][k].sum())))
+            current=self.rescue(current,guests[:3],anchor=None)
+            if current is before:
+                blockers=self.blocking_poses(current)
+                if blockers:
+                    chosen=[k for _,k,_ in blockers[:3]]
+                    current=self.rescue(current,chosen,anchor=None,blocking_guests=chosen)
+            if current is before:break
+            current=self.refine(current,2,translation_guests=movable(current),phase='all_movable_gradient_repair')
+        if failed_count(current):
+            current=self.refine(current,3,translation_guests=movable(current),phase='final_joint_gradient_repair')
+        if 0<failed_count(current)<=512:current=self.fine_refine(current,rounds=3)
+        return current
+
+    def refine(self,current,rounds,anchor=None,translation_guests=(),phase='direction'):
+        # Infeasible equal-count steps must improve demand distance. Material
+        # alone cannot justify spending another round on a flat error plateau.
+        from whole_search.search import lost_protected
+        for iteration in range(rounds):
+            if failed_count(current)==0:break
+            targets,worst,scan=self.targets(current)
+            proposals,base=self.local_proposals(current,targets,worst,translation_guests)
+            selected,screened=self.shortlist(proposals,targets)
+            row=dict(phase=phase,iteration=iteration+1,before_counts=current['counts'],
+                     hardest=worst,hardest_scan=scan,proxy_before=base,screened_candidates=screened,trials=[])
+            best=current;before_failed=failed_count(current)
+            for _,_,_,kind,layout,detail,proxy in selected:
+                record=dict(operation=kind,detail=detail,proxy=proxy,accepted=False)
+                try:
+                    trial=self.model.evaluate(layout);count=failed_count(trial)
+                    loss_progress=proxy['loss']<base['loss']-max(1e-30,base['loss']*1e-8)
+                    eligible=count<before_failed or (count==before_failed and loss_progress)
+                    record.update(counts=trial['counts'],rank=self.score(trial,anchor),serial=trial['serial'],
+                                  lost_protected_loads=lost_protected(anchor,trial),loss_progress=loss_progress)
+                    if eligible and self.score(trial,anchor)<self.score(best,anchor):best=trial;record['eligible']=True
+                except (RuntimeError,ValueError,AssertionError) as error:record['error']=str(error)
+                row['trials'].append(record)
+                if failed_count(best)==0 and lost_protected(anchor,best)==0:break
+            accepted=best is not current
+            if accepted:
+                current=best;self.checkpoint(current,phase)
+                for record in row['trials']:record['accepted']=record.get('serial')==best['serial']
+            row.update(accepted=accepted,after_counts=current['counts']);self.record(row)
+            print('GRADIENT REFINE',phase,iteration+1,'accepted',accepted,'failed',failed_count(current),flush=True)
+            if not accepted:break
+        self.model.commit(current)
+        return current
+
+    def rescue(self,current,guests,anchor=None,secondary=False,uncommitted_guests=(),blocking_guests=()):
+        # Repair the WHOLE branch even when the newly seated guest already
+        # passes: its cuts may be the reason another task remains uncovered.
+        from whole_search.search import lost_protected
+        guests=[k for k in guests if not current['masks'][k].all() or k in blocking_guests or k in uncommitted_guests]
+        targets,worst,scan=self.targets(current)
+        selected,screened=self.shortlist(self.juxtapose_proposals(current,guests,targets),targets)
+        phase='blocking_pose_juxtapose' if blocking_guests else 'selective_juxtapose'
+        row=dict(phase=phase,guests=[self.model.poses[k] for k in guests],
+                 explicitly_selected_blockers=[self.model.poses[k] for k in blocking_guests],
+                 hardest=worst,hardest_scan=scan,before_counts=current['counts'],screened_candidates=screened,trials=[])
+        best=current
+        for _,_,_,kind,layout,detail,proxy in selected:
+            record=dict(operation=kind,detail=detail,proxy=proxy,accepted=False)
+            try:
+                branch=self.model.evaluate(layout);record['juxtapose_counts']=branch['counts']
+                if failed_count(branch):
+                    movable=[k for k in layout.active if not registered(layout,k)]
+                    branch=self.refine(branch,self.branch_rounds,translation_guests=movable,phase='post_selective_juxtapose')
+                record.update(counts=branch['counts'],rank=self.score(branch,anchor),serial=branch['serial'],
+                              lost_protected_loads=lost_protected(anchor,branch))
+                if lost_protected(anchor,branch)==0 and self.score(branch,anchor)<self.score(best,anchor):
+                    best=branch;record['eligible']=True
+            except (RuntimeError,ValueError,AssertionError) as error:record['error']=str(error)
+            row['trials'].append(record)
+            if failed_count(best)==0 and lost_protected(anchor,best)==0:break
+        if best is not current:
+            self.checkpoint(best,phase)
+            for record in row['trials']:record['accepted']=record.get('serial')==best['serial']
+        row.update(accepted=best is not current,after_counts=best['counts']);self.record(row)
+        self.model.commit(best)
+        print('WHOLE JUXTAPOSE','accepted',best is not current,'failed',failed_count(best),flush=True)
+        return best
+
+    def save(self,current,mode,began,initialization,**extra):
+        # Save the complete cheap trace first. Final checks change neither
+        # physical sources nor tolerances. Small legal upward direction
+        # candidates avoid exact tangencies in exported geometry.
+        from co_common import save
+        m=self.model;self.search_only=True
+        sampled=FastReuseSearch.save(self,current,mode,began,initialization,**extra)
+        candidates=[];screen=[]
+        for degrees in [.03125,.125,.5]:
+            layout=current['layout'].copy()
+            for k in layout.active:
+                layout.directions[k]=legal_direction(layout.directions[k]+np.tan(np.radians(degrees))*m.floor_normal(layout,k),m.floor_normal(layout,k))
+            trial=m.evaluate(layout)
+            screen.append(dict(degrees=degrees,counts=trial['counts']))
+            if failed_count(trial)<=max(128,failed_count(current)):
+                candidates.append((trial,dict(operation='direction-numerical-separation',degrees=degrees)))
+        candidates.sort(key=lambda row:(failed_count(row[0]),row[0]['volume_cm3']))
+        candidates=[(current,dict(operation='unperturbed'))]+candidates[:2]
+        for state in reversed(list(m.complete_sampled_states.values())):
+            if not any(state['layout'].key()==r[0]['layout'].key() for r in candidates):
+                candidates.append((state,dict(operation='earlier_feasible_state')))
+        save(self.out/'final_direction_screen.json',screen)
+        attempts=[];actual=None;selected=None;start=time.monotonic()
+        for candidate,detail in candidates[:4]:
+            record=dict(sampled_serial=candidate['serial'],passed=False,detail=detail);clock=time.monotonic()
+            try:
+                checked=m.exact(candidate['layout']);work=checked.get('actual_work_surface_checks',[])
+                record.update(counts=checked['counts'],volume_cm3=checked['volume_cm3'])
+                if failed_count(checked)==0 and len(work)==len(candidate['layout'].active) and all(r['passed'] for r in work):
+                    actual=checked;selected=candidate;record['passed']=True
+            except (RuntimeError,ValueError,AssertionError) as error:record['error']=str(error)
+            record['seconds']=time.monotonic()-clock;attempts.append(record)
+            save(self.out/'final_validation_attempts.json',attempts)
+            if actual is not None:break
+        if actual is None:raise RuntimeError('Final gradient candidates unresolved; original acceptance unchanged')
+        self.process_snapshot(actual,'final_verified_direction',attempts[-1])
+        if getattr(self,'capture_process',False):
+            self.process_rows[-1]['geometry_verified']=True
+            self.process_rows[-1]['actual_counts_verified']=actual['counts']
+            save(self.out/'process.json',self.process_rows)
+        extra=dict(extra);extra['passed']=True
+        return Model.save(m,actual,self.out,dict(strategy=mode,policy='all-demand-gradient-delta-final-original-checks',
+            initialization=initialization,search_seconds=sampled['search_seconds'],validation_seconds=time.monotonic()-start,
+            seconds=time.monotonic()-began,sample_evaluations=m.sample_calls,exact_evaluations_during_search=0,
+            timing=m.timing,events=self.events,final_validation_attempts=attempts,
+            rotating_reuse_pose_count=sum(registered(actual['layout'],k) for k in actual['layout'].active),
+            juxtaposed_pose_count=juxtaposed_count(actual['layout']),
+            conservative_contact_grid_unmet_loads=failed_count(selected),
+            final_acceptance_run=True,**extra))

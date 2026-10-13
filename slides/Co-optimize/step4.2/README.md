@@ -1,5 +1,11 @@
 # Step4.2：全组梯度、离散跳步与动态 base Oracle
 
+最新算法为[动态换座的32候选V8](../population_soft_algorithm.md)，入口[run_population_soft.py](run_population_soft.py)。原位初始化不分配Juxtapose身份；每槽位每轮一次离散或差分变异，再一次调整。身份在优化中选择，N/3只影响新增/取消抽样。恢复旧close/up、translation及floor高度修复；raw与调整结果均接受完整检查后保留较好者。活动种群始终32，不读取历史优化布局。下文 `run_material.py` 等入口描述旧算法对照。
+
+V8全部52组／263个object pose已完成冷启动、最多8轮，50组完整通过、2组原受力失败，无运行错误。2–8pose全部48组通过，9pose1/2，10pose1/2；通过组244个object pose／131个实际支撑安装pose。[逐组Evaluation与PNG](../data/results/B/step4_population_soft_all52_20261012_final.md) · [结果说明](../population_soft_results_20261012.md)。共469张直接PNG；1664个初始化、2784个槽位事件、8617984个保存mask条目、5625个保护文件与412个冻结源码已核对。图中失败布局只用于诊断。本轮只跑Step4。[旧32候选冷启动33/52存档](../data/results/B/step4_population32_all52_20261012_combined.md)。
+
+后处理现已拆为Step5.2材料删减与Step5.3完整构造。原搜索内Builder仍采用同一确定性内核，源码位置移到step5.3；删减暂不回灌Step4搜索。新流程会重新检查删减后的真实接触，不能把旧成品的mask直接用于已删接触。
+
 入口[run.py](run.py)调用[run_oracle.py](run_oracle.py)，搜索实现在[oracle_search.py](oracle_search.py)。所有pose从保存的Step4.1布局共同参与，原任务朝向与需求不变。完整算法与连续损失公式见[根README](../../../README.md#step4联合布局优化与动态-base-oracle)，Oracle细节见[base_oracle.md](base_oracle.md)。
 
 [共享材料表示算法设计](../representation_algorithm.txt)定义了完整研究方案。[run_material.py](run_material.py)已接入第一版混合布局搜索：最多8个sample、原接触端口匹配、原位复用／换座组合、原地面需求的高度提案、完整连接与搜索内成品成本。[material_search.py](material_search.py)、[reuse_proposals.py](reuse_proposals.py)、[material_evaluator.py](material_evaluator.py)复用原物理和法向Oracle，并把已构造的成品交给Step5.2直接保存。一般的三维稀疏材料选择规划器尚未实现。

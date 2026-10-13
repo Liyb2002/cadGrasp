@@ -1,28 +1,30 @@
-# Step5.2：确定性连接为实体支撑
+# Step5.2：删减物体—支撑材料
 
-入口 [run.py](run.py)，构造算法 [deterministic_base.py](deterministic_base.py)。输入是 Step5.1 的各需求凸包、Step4 的固定布局与名义支撑、保存的合法连通空间 `oracle_connected_witness.obj`。空间见证只用于裁剪，绝不把整块最大合法空间作为成品输出。
+当前入口 [run.py](run.py)，默认算法 [rounded_pruning.py](rounded_pruning.py)。冻结 Step4 的座位、安装姿态与退出方向，读取保存的 Step5.1 需求。先整面裁去扩大BBX的原材料，再以较宽的圆整保留区删除大块冗余材料，避免网格逐格删减留下缺口和细连接。[算法说明](../aesthetic_pruning_algorithm.md) · [全部52组结果和前后图](../aesthetic_pruning_results_20261013.md)。完整长脚构造在 [Step5.3](../step5.3/README.md)。
 
-1. 将名义支撑限制在已经保存的共同合法空间中。保留其中的原材料，删除名义包裹中原本处于禁区／地下的部分；删除量单独记录，不改任何pose或退出方向。已经合法时直接保留，避免沿重合边界重复Boolean裁切产生碎片；材料保留检查复用实际起始合法实体。
-2. 从支撑与需求凸包的局部范围取各最终地面之上的 5 mm 薄层；进一步按该state在自己的地面XY轴上的实际需求凸包限定选脚范围，初始向外余量5mm。检查其实际地面接触能否包围所有需求，不足时才按固定倍数扩展。避免共同坐标盒转到任务地面时产生远处选脚角点。
-3. 在地面接触凸包的顶点中按固定次序删除冗余点，保留满足全部任务的少量点位。在这些点位做 5 mm 小地脚，并裁进共同合法空间；5mm 是模板尺寸，裁后允许更细的部位，没有额外安全余量或最小宽度要求。不填充虚拟凸包内部。若有限小地脚不能覆盖需求，则保留合法薄层构造。
-4. 对当前各实体组件计算最近点，依次尝试短连接体。连接体同样裁进合法空间，只有真正减少组件数才加入。直连受阻时扩大局部连接盒，使其绕开被扣除的禁区；优先选择这一层尝试中新增材料最少的连接。
-5. 输出一件连通、封闭的实体，以及地脚包围、合法空间包含、原合法材料保留的构造记录。
+本轮以每组自己上一版已认证的删减主体作为`--shape-reference`：保留其真实接触材料，并在6 mm圆整范围内保留更多原Step4材料。圆整范围与原材料相交，不向Step4外添加材料，也不移动接触。全部52组Step5.2／5.3通过；51组采用6 mm，1组圆整候选被原验收拒绝而保留整块BBX裁边主体。两阶段每组整体BBX和全部pose角色与上一版一致。各安装state小盒是独立诊断，不能混作整体BBX。
 
-这是固定布局的确定性几何构造，有限的连接宽度序列不是 Direction／Translation sampling。它复用 Step4 的障碍几何，不重新造工作锥或退出 sweep，不做工件需求求解或 pose 微扰补救。
+每次候选与导出OBJ都检查实际剩余接触、每pose全部32,768个原始需求、合法空间、物体排除、封闭及单一连通材料。6 mm为候选范围半径，不是全模型最小厚度保证。未提供形状参考时默认只进行BBX裁边、保留整块主体；`--pruning-style legacy`保留[旧Pruner](prune_support.py)用于历史对照。以下网格及独立块处理为旧分支说明，当前连通主体批次不依赖外部桥连接。
 
-所有最终安装地面的半空间、物体、完整工作锥和退出路径都已包含在空间见证中，因此新增材料的裁剪同时约束所有任务。机器人拿起空支撑后的搬运转动不参与约束。这里完成的是原模型的法向地面压力包围和实体连通，不是新增一套地面摩擦／yaw／强度求解。
+## 历史网格分支
+
+先尝试删除多余独立块，再用固定粗、细空间分区删减接触材料。每次重建实际剩余接触三角形的原七维非负反力锥；接受的删减必须通过每个pose全部32,768个原始需求。遇到一个原始反例即可拒绝候选，拒绝记录中的计数标明为下界。相同反力列集合复用检查结果，原基底只在全部对应反力列仍存在时复用。
+
+已经连通的主体不接受留下必需孤岛的切割；多余孤岛随被切区域一起删除。输入本身的必需独立块不能假装为多余块删除，报告明确标记并交给Step5.3连接。有界贪心删减不宣称全局最少材料。
+
+优先使用名义支撑；若保存搜索依赖真实成品接触面才满足全部需求，则从该已认证实体开始删减。不会把名义网格的一条未满足需求直接改成PASS。
+
+必要时从保存的完整成品进行有界重试，记录具体来源。实际物体内部材料按原摆放删除；导出后重新检查真实OBJ的接触、合法空间与封闭边界。数值清理同样必须保留全部原始需求，失败时保留此前已认证的材料。单一实体的真实内腔保留，避免重复重裁相同边界制造碎片。
+
+模型、force certificate和报告在`data/results/B/[set]/step5/step5.2/[experiment]/`。图直接放在`output/B/[set]/step5.2/`：`overview.png`、`removed_material.png`、`all_poses.png`和各`pose_N.png`。本轮另有左旧右新的同视角`comparison.png`。蓝色为保留材料，红色为删除材料；无实验子文件夹、无HTML。
 
 ```sh
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
-  slides/Co-optimize/step5.2/run.py B --experiment my_final_base --batch-name step52_my_final_base --jobs 3
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python slides/Co-optimize/step5.2/run.py B \
+  --sets pose1+2+4+6 --experiment my_pruning --candidate-budget 64
 ```
 
-每组最终数值与模型在`data/results/B/{pose_set}/step5/step5.2/{experiment}/`，包括`support_with_base.obj`和`data/report.json`；`overview.png`、`all_poses.png`、逐pose图与`index.html`自动发布到`output/B/`同层级。图中蓝色为实体、灰色为物体、彩色轮廓为需求凸包，无文字和工作禁区叠加。
+本步骤允许删除接触材料，所以改变接触后重新检查原需求；原物理输入与布局保持不变。
+# 历史运行记录（2026-10-12）
 
-静态空间评估在同级 [evaluation/](../evaluation/README.md)。临时执行副本与进度在校验完成后删除。
+最新V8布局的50组中，49组删减材料取得实际全需求证书；`pose1+2+4+5+6+7`的真实接触复查失败，图中明确标记。[每组数量、体积与来源](../data/results/B/evaluation_dynamic_postprocess_all52_20261012_01.md)。新选择可用`--reference-stage step4`，读取该case自己保存的`preconstructed_base.json`与实体；不读取另一布局的暖启动参考。布局、退出和32768个原始需求保持不变。下文保留历史入口及示例。
 
-当前完成版为`clearance_compact_v1`，复用同布局同名Step5.1和`base_oracle_compact_clearance_v1`的合法空间。全部52/52通过，包含全部10个≥7-pose集合；成品连通、封闭，地脚接触凸包覆盖各任务需求。OBJ用16位小数导出，不改变布局，不重跑工件受力。[成品图集](../output/B/step5.2_clearance_compact_v1_index.html) · [构造完成清单](../data/results/B/data/step52_clearance_compact_v1_completed/summary.json)。
-
-完整材料总量20817.49cm³，相对Step4净增3.71%。全批新增746.32cm³，裁去已非法名义材料0.78cm³，新增量中位11.63cm³／组；全部使用小地脚，没有退回整块薄层。第一次批次41.57s完成51件，pose3+15因重复裁切产生数值碎片；通用修正后仅续算此组1.17s。完成清单保留两个执行批次的来源，其余51件不重算。静态空间代价见Evaluation，不能用材料增幅替代。
-
-旧`connected_base_v2`从较大的合法薄层外缘挑选地脚，pose1–10的4个脚离整组需求凸包约9–25cm；静态空间由Step4的54.09L增至118.51L。新构造先限制到各最终地面上的需求范围，仍按固定顺序选脚与连接，不修改物体布局或重跑工件受力。彩色环仅显示需求，不是实体底环；有限构造不是全局占地最优证明。

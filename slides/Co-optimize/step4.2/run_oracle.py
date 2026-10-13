@@ -36,9 +36,11 @@ def worker(job):
     began=time.monotonic();result=dict(id=label,passed=False,force_passed=False,base_oracle_passed=False)
     try:
         source=base/'step4/step4.1';original=read_upstream(source/'data/report.json')
+        result['pose_count']=len(original['poses'])
         initialized=base/'step3/step3.1';read_upstream(initialized/'data/report.json')
         model=OracleModel(original['poses'],'B',demand_nodes=32,
                          oracle_work_mode=options.get('oracle_work_mode','normal'))
+        model.require_connected_core=options.get('require_connected_core',False)
         seed=initialized/'wrapped_support.obj'
         model.registered_seed=S.solid(trimesh.load(seed,force='mesh',process=False))
         model.inputs += [seed,initialized/'data/report.json',source/'layout.npz']
@@ -46,6 +48,15 @@ def worker(job):
                            frontier_width=options.get('frontier_width',4),
                            search_policy=options.get('search_policy','frontier'))
         search.initialization_budget=options.get('initialization_budget',96)
+        search.allow_oracle_fallback=options.get('allow_oracle_fallback',False)
+        search.allow_coupled_adjustment=options.get('allow_coupled_adjustment',False)
+        search.allow_group_seating=options.get('allow_group_seating',False)
+        search.allow_joint_reseating=options.get('allow_joint_reseating',False)
+        search.allow_placement_guidance=options.get('allow_placement_guidance',False)
+        search.allow_height_repair=options.get('allow_height_repair',False)
+        search.stop_when_feasible=options.get('stop_when_feasible',False)
+        search.allow_native_sliding=options.get('allow_native_sliding',False)
+        search.allow_geometry_validation=options.get('allow_geometry_validation',False)
         search.warm_checkpoint_experiment=options.get('warm_checkpoint_experiment')
         search.initialization_seeds=options.get('initialization_seeds')
         search.material_warm_layouts=[]
@@ -58,16 +69,20 @@ def worker(job):
                 model.inputs.append(path)
         search.screen_budget=96;search.capture_process=True;search.volume_rounds=2
         layout=load_layout(source/'layout.npz')
-        current=search.initialize_exact(layout,'saved_step4.1_registered_initial');search.baseline(current)
+        current=(model.evaluate(layout) if model.require_connected_core else
+            search.initialize_exact(layout,'saved_step4.1_registered_initial'))
+        search.baseline(current)
         initial=current['counts']
         if options.get('resume'):
             current=model.evaluate(load_layout(base/'step4/step4.2'/options['resume']/'layout.npz'))
             model.commit(current)
         current=search.solve_frontier(current)
-        if (search.search_policy!='material' and current['base_oracle'].get('connected_passed',False)
+        if (search.search_policy not in ('material','population32','population_soft') and current['base_oracle'].get('connected_passed',False)
                 and current['base_oracle']['passed']):
             current=search.restore_reuse(current);current=search.polish_volume(current,1)
-        mode=('shared_material_mixed_search' if search.search_policy=='material' else
+        mode=('failure_weighted_soft_count32' if search.search_policy=='population_soft' else
+              'fixed_population32' if search.search_policy=='population32' else
+              'shared_material_mixed_search' if search.search_policy=='material' else
               'multi_layout_force_base_frontier' if search.frontier_width>1 else 'whole_gradient_base_oracle')
         report=search.save(current,mode,began,dict(source='saved Step4.1',
             old_answers_used_as_start=bool(search.material_warm_layouts),
@@ -87,7 +102,7 @@ def worker(job):
             state_count=len(set(current['layout'].hosts.tolist())),experiment=options['output_name'])
         result.update(frontier_width=search.frontier_width,frontier_search=report['frontier_search'],
                       oracle_work_access_mode=model.base_oracle.work_mode)
-        if search.search_policy=='material':
+        if search.search_policy in ('material','population32','population_soft'):
             result.update(mixed_target_satisfied=report['mixed_target_satisfied'],
                 mixed_target_applicable=report['mixed_target_applicable'],
                 rotating_reuse_pose_count=report['rotating_reuse_pose_count'],
@@ -112,7 +127,17 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sets',nargs='+',default=['all']);parser.add_argument('--jobs',type=int,default=3)
     parser.add_argument('--iterations',type=int,default=6);parser.add_argument('--resume')
-    parser.add_argument('--search-policy',choices=['frontier','material'],default='frontier')
+    parser.add_argument('--search-policy',choices=['frontier','material','population32','population_soft'],default='frontier')
+    parser.add_argument('--allow-oracle-fallback',action='store_true')
+    parser.add_argument('--allow-coupled-adjustment',action='store_true')
+    parser.add_argument('--allow-group-seating',action='store_true')
+    parser.add_argument('--allow-joint-reseating',action='store_true')
+    parser.add_argument('--allow-placement-guidance',action='store_true')
+    parser.add_argument('--allow-height-repair',action='store_true')
+    parser.add_argument('--stop-when-feasible',action='store_true')
+    parser.add_argument('--allow-native-sliding',action='store_true')
+    parser.add_argument('--allow-geometry-validation',action='store_true')
+    parser.add_argument('--require-connected-core',action='store_true')
     parser.add_argument('--initialization-budget',type=int,default=96)
     parser.add_argument('--warm-start-experiments',nargs='*',default=[])
     parser.add_argument('--warm-checkpoint-experiment')
@@ -125,6 +150,11 @@ def main():
     parser.add_argument('--output-name',default='base_oracle_v1');args=parser.parse_args()
     if args.frontier_width<1:
         parser.error('--frontier-width must be positive')
+    if args.search_policy in ('population32','population_soft'):
+        if (args.search_policy=='population32' and args.frontier_width!=32) or args.frontier_width<3:
+            parser.error('population32 requires 32 slots; population_soft requires at least 3')
+        if args.resume or args.initialization_seeds or args.warm_start_experiments or args.warm_checkpoint_experiment:
+            parser.error('population32 starts from registered inputs; warm/resume layouts are not allowed')
     base=A.result_root('B')
     sets=args.sets
     if sets==['all']:
@@ -137,7 +167,7 @@ def main():
         parser.error('No saved pose sets in the requested range')
     directory=base/'data'/args.output_name;directory.mkdir(parents=True,exist_ok=False)
     sources=list((COOPT/'helper_func').rglob('*.py'))+list((COOPT/'vis_func').glob('*.py'))+list((COOPT/'step4.2').glob('*.py'))
-    sources.append(COOPT/'step5.2/deterministic_base.py')
+    sources.append(COOPT/'step5.3/deterministic_base.py')
     hashes=I.hashes(sources)
     for relative in hashes:
         target=directory/'executed_sources'/relative;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/relative,target)

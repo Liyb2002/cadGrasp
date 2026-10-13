@@ -86,3 +86,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/pyt
 全部52组完成：263个pose实例，共8,617,984个原始撒点和逐pose凸包；全批含绘图85.26s。Step4受力记录不重新求解，保存的上游和执行源码指纹核对通过。
 
 [全部图片](../output/B/step5.1_connected_base_v1_index.html) · [逐组记录](../data/results/B/data/step51_connected_base_v1/summary.json) · [文件核对](../data/results/B/data/step51_connected_base_v1/verification.json)
+# 最新运行记录（2026-10-12）
+
+最新V8的50个通过布局已完成全部244个pose的7995392个原始地面需求点。输出批次`dynamic_postprocess_all52_20261012_01_floor02`；输入选择为`data/results/B/data/system_dynamic_postprocess_all52_20261012_01/selection.json`，每个case保留自己的Step4实验来源。直接PNG在各组`output/B/[set]/step5.1/`，无HTML。[后处理与Evaluation](../dynamic_postprocess_results_20261012.md)。下文保留历史批次记录。
+

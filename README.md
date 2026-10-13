@@ -1,10 +1,14 @@
 # cadGrasp
 
+2026-10-13最新Step5.2整块圆整删减已执行全部52组的Step5.2／5.3，均通过原始全需求及实际实体检查。保留更多原Step4材料，改善逐格删减留下的细连接和缺口；整体BBX逐组保持上一版结果：删减351.890791L、成品432.466717L合计。Step4、Step5.1、263个object pose及复用123／Juxtapose140／支撑安装123保持原样。51组采用6 mm圆整范围，1组保守保留整块裁边主体。[算法](slides/Co-optimize/aesthetic_pruning_algorithm.md) · [全部52组BBX、pose数量及同视角前后图](slides/Co-optimize/aesthetic_pruning_results_20261013.md)。每组`step5.2`／`step5.3`图已更新，无HTML。下方保留原连通布局搜索及历史实验说明。
+
 共同设计一件刚性支撑，在多个最终摆放 state 下支持多个 object pose，满足任务的力／力矩需求，并尽量减少实体材料。每次装入一个物体、执行任务、沿退出方向取出，再由机器人抓起空支撑换到下一 state。一个 state 可以服务多个 pose；空支撑搬运、转动途中的姿态不参与设计约束。
 
 当前主线采用 **whole 联合优化**：所有 pose 从初始化开始共同参与，每个操作同时计算对其他 pose 的收益和损失。工件原任务朝向不变，允许世界 XYZ Translation 和 airborne。airborne 使用同一套绕质心的需求，只移除工件自身地面反力；最低点仍不得穿地。
 
 ## 流程与坐标
+
+最新实现按[连通主体与 BBX 优先删减](slides/Co-optimize/connected_core_algorithm.md)运行：Step4 在原有限包覆范围内保留一个连通材料主体，删除的孤块不参与受力；真实剩余接触必须通过全部原始需求及 Oracle。Step5.2 只删，先尝试缩小 BBX，再删其它冗余材料；Step5.3 保留长脚。新流程全部52组／263个object pose已通过Step4与完整Step5，复用123／Juxtapose140，123个支撑安装pose。最终Evaluation的BBX合计为无支撑254.408 → Step4主体371.058 → 删减351.891 → 成品432.467L；成品较Step4净增加16.55%。[全部组BBX、pose数量与图片](slides/Co-optimize/data/results/B/evaluation_connected_core_postprocess_all52_20261013_final_bbx.md) · [执行与审计](slides/Co-optimize/connected_core_results_20261013.md)。以下V8及其后处理数值属于此前独立对照。
 
 共同支撑坐标中的材料点记为 $q$，第 $i$ 个任务的最终支撑变换为 $T_i=(R_i,t_i)$，物体相对支撑变换为 $Q_i$，物体世界变换为 $U_i=T_iQ_i$。退出方向 $d_i$ 在支撑坐标中表达，满足 $\|d_i\|=1$；世界退出方向是 $R_id_i$。
 
@@ -15,10 +19,15 @@
 | Step4.1 | 初始化共同／相近的合法退出方向，扣除完整装卸路径 |
 | Step4.2 | Direction、XYZ Translation、离散 Juxtapose 联合优化，动态 base Oracle 审查，保持可行后减材料 |
 | Step5.1 | 冻结最终布局，计算每个 pose 全部系统—地面需求点与凸包 |
-| Step5.2 | 在已审查的合法空间内选择小地脚，并确定性连接成一件实体 |
-| Evaluation | 比较无支撑 pose 叠放、真实 Step4／Step5.2 布局的静态 BBX，另列 state 分组诊断 |
+| Step5.2 | 从连通主体开始，只删材料，优先缩小 BBX，并保持连通及全部原始需求 |
+| Step5.3 | 保留已连通主体，在合法空间内长出支撑脚，完成实际触地与受力验收 |
+| Evaluation | 比较无支撑 pose 叠放、真实 Step4／Step5.3 布局的静态 BBX，另列 state 分组诊断 |
 
 ## Step4：联合布局优化与动态 base Oracle
+
+最新V8布局的后处理已完成Step5.1／5.2／5.3与Evaluation：最终49/52组实际实体通过（50组进入后处理，1组真实接触复查失败，2组原Step4失败）。最终238个object pose、129个支撑安装pose，复用129／Juxtapose109。材料相对Step4名义模型+58.64%，静态BBX+27.52%；相对搜索内已构造参考，材料+6.59%，BBX+0.24%。[逐组数量、材料／BBX增量与PNG](slides/Co-optimize/data/results/B/evaluation_dynamic_postprocess_all52_20261012_01.md) · [执行与失败说明](slides/Co-optimize/dynamic_postprocess_results_20261012.md)。原Step4搜索统计及历史成品保留其各自证据身份。
+
+2026-10-12最新实验采用[动态换座的32槽位算法V8](slides/Co-optimize/population_soft_algorithm.md)：32个注册原位候选，初始化不指定谁Juxtapose；每轮各自做一次离散或差分变异，再一次调整。换座从世界XY质心对齐开始，优化中恢复旧方向、translation及高度修复能力；N/3只控制抽样倾向。入口为[run_population_soft.py](slides/Co-optimize/step4.2/run_population_soft.py)。全部52组／263个object pose已完成最多8轮冷启动，**50组完整通过、2组原受力失败**，无运行错误。通过组为244个object pose、131个实际支撑安装pose。[逐组Evaluation与469张PNG](slides/Co-optimize/data/results/B/step4_population_soft_all52_20261012_final.md) · [调整与结果说明](slides/Co-optimize/population_soft_results_20261012.md)。上一轮固定32候选冷启动33/52与此前已接受的暖启动52/52分别保留。以下物理公式与验收沿用；frontier搜索描述为保留的旧入口对照，最新入口使用固定32槽位。
 
 ### Step4.1：退出初始化
 
@@ -113,9 +122,15 @@ $$H_i\subseteq\operatorname{conv}(G_i\cup O_i),$$
 
 计算只有数组叉乘、除法和凸包，不做方向／平移搜索、需求重采样或工件受力求解。保存逐 pose 点云、实际变换，以及共同支撑视图。默认支撑自重为零，与原需求模型一致。
 
-### Step5.2：选地脚并连成实体
+### Step5.2：删减接触材料与多余独立块
 
-使用 Step4 已保存的共同合法连通分量 $W$ 与名义支撑 $N$，按固定顺序构造：
+冻结布局，先尝试删除多余独立块，再按固定空间分区删减接触材料。每次从剩余真实接触三角形重建原七维反力锥，检查每pose全部32,768个原始需求。已经连通的主体不切成受力必需的孤岛；多余孤岛与切除区域一起删除。必要输入独立块如无法删除则明确记录，由下一步连接。当前为有预算的贪心删减，不宣称全局最少材料。
+
+输出`pruned_support.obj`与新的原需求检查记录；原布局、载荷与工作/退出禁区保持不变。历史数值批次继续保留原Step5.2构造身份。
+
+### Step5.3：选地脚并连成实体
+
+使用Step4已保存的合法连通分量$W$与新Step5.2通过的删减支撑$N$，按固定顺序构造：
 
 1. 保留 $N\cap W$ 的全部合法原材料；裁去原名义模型中已经处于禁区／地下的部分，并单独记录删除量。
 2. 在局部范围内取各地面上方的 5 mm 合法薄层，并按该state在任务地面XY轴上的需求凸包限定选脚范围，初始向外余量5mm；不足时才按固定倍数扩大。由合法接地顶点选择少量地脚，逆向删除冗余点，只保留仍能包围所有需求凸包的点位。

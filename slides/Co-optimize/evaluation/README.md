@@ -1,5 +1,7 @@
 # Evaluation：静态工作空间
 
+当前完整实体读取新Step5.3；新Step5.2仅为删减材料，不能作为成品评价。旧批次的Step5.2数值仍作为历史完整实体兼容读取。新图片直接位于每组step5.3/与evaluation/，没有实验子目录。
+
 最新批次 `material_output_all52_20261012_final` 已完成52/52组：263个 object pose、112个支撑安装pose。每组当前结果直接放在 `../output/B/[set]/step5.2/`，`evaluation.png` 从左到右为无支撑／加 Step4／加完整 Step5.2，不使用 HTML。[全部52组的数值、pose数量和成员](../data/results/B/evaluation_material_output_all52_20261012_final.md) · [CSV](../data/results/B/evaluation_material_output_all52_20261012_final.csv)。独立集合BBX统计和为254.41／389.14／433.19 L，完整实体材料统计和12,527.10 cm³。
 
 本目录与 Step4、Step5 同级，入口 [run.py](run.py)，公式实现 [metrics.py](metrics.py)。不进行优化、实体 Boolean 或受力求解。
@@ -50,3 +52,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/pyt
 52组独立集合BBX统计和：无支撑叠放254.41L，实际布局加Step4为769.27L，加完整支撑为834.76L。pose1–10三列为5.27／32.80／35.67L。叠放基线是一个共同盒；跨集合统计和不代表同一工作站。相对旧`connected_base_v2`，完整BBX统计和减少61.46%，50组减少、2组增加；[全部新旧对比](../data/results/B/data/system_clearance_compact_v1/comparison.md)。旧批次早于5mm接触余量，不能作为新条件下的可行性证书。
 
 [verify_outputs.py](verify_outputs.py)保留旧`connected_base_v2`的只读核对入口及`data/results/B/data/system_connected_base_v2/`记录。新链的构造验收、上游指纹与Evaluation记录在`data/results/B/data/system_clearance_compact_v1/`及各阶段清单中；正常完成链不重复原受力验收。
+# 最新Evaluation（2026-10-12）
+
+批次`dynamic_postprocess_all52_20261012_01`报告全部52组与263个object pose。最终49组通过：238个object pose、129个支撑安装pose，复用129／Juxtapose109。相同49组的材料6835.005→10842.841cm³（+58.64%），静态BBX324.424→413.720L（+27.52%），均相对Step4名义模型。[每组角色、材料／BBX增量和图](../data/results/B/evaluation_dynamic_postprocess_all52_20261012_01.md) · [全部263个pose的角色CSV](../data/results/B/evaluation_dynamic_postprocess_all52_20261012_01_poses.csv)。失败组的成品体积留空；Stage4已有完整参考是另一比较基准，详见[结果说明](../dynamic_postprocess_results_20261012.md)。下文保存历史指标定义与批次。
+

@@ -5,7 +5,7 @@ import numpy as np
 import trimesh
 
 COOPT=Path(__file__).resolve().parents[1]
-sys.path.insert(0,str(COOPT/'step5.2'))
+sys.path.insert(0,str(COOPT/'step5.3'))
 sys.path.insert(0,str(COOPT/'evaluation'))
 from deterministic_base import Builder,solid,unpack,box,volume
 from metrics import static_bounds, unsupported_transforms, transformed

@@ -118,6 +118,21 @@ class MaterialSearch:
     def preview(self, layout, operation='parent', parent='', detail=None, result=None):
         return self.evaluator.preview(layout, operation, parent, detail, result)
 
+    def goal_gap(self, layout):
+        return target_gap(layout)
+
+    def choose_pool(self, items, width):
+        return select_pool(items, width)
+
+    def adjustable_poses(self, parent):
+        return list(parent.layout.active)
+
+    def adjustable_hosts(self, parent):
+        return sorted(set(int(parent.layout.hosts[k]) for k in parent.layout.active))
+
+    def certification_rank(self,item):
+        return (self.goal_gap(item.layout),item.lower_litres,item.result['volume_cm3'])
+
     def repair_height(self, layout):
         answer = self.model.base_oracle.query(layout)
         if answer.get('status') != 'certified_floor_incompatible':
@@ -126,7 +141,7 @@ class MaterialSearch:
         return trial if trial is not None else layout
 
     def classify(self, items, budget=8):
-        selected = select_pool(items, budget) if len(items)>budget else items
+        selected = self.choose_pool(items, budget) if len(items)>budget else items
         checked = []
         for item in selected:
             try:
@@ -145,8 +160,7 @@ class MaterialSearch:
     def certify(self, items, connections=3, constructions=2):
         pending = [x for x in items if self.evaluator.space_candidate(x)
                    and x.oracle.get('enclosure_passed')]
-        pending.sort(key=lambda x: (target_gap(x.layout), x.lower_litres,
-                                   x.result['volume_cm3']))
+        pending.sort(key=self.certification_rank)
         fresh = [x for x in pending if x.layout.key() not in self.evaluator.connection_attempts]
         chosen=fresh[:connections]
         opening=[x for x in fresh if x.operation.startswith('base-opening')]
@@ -165,8 +179,8 @@ class MaterialSearch:
             item=self.evaluator.construct(item)
             if item.witness is not None:self.witnesses[item.layout.key()]=item.witness
             if item.completed and (self.incumbent is None or
-                    (target_gap(item.layout), *item.cost) <
-                    (target_gap(self.incumbent.layout), *self.incumbent.cost)):
+                    (self.goal_gap(item.layout), *item.cost) <
+                    (self.goal_gap(self.incumbent.layout), *self.incumbent.cost)):
                 self.incumbent = item
 
     def continuation_rows(self, parent, round_index):
@@ -178,9 +192,13 @@ class MaterialSearch:
             m.commit(parent.result)
         else:
             m.contact_delta.commit(q); m.volume_guidance([q]).commit(q)
-        base = m.proxy(q); active = list(q.active)
-        order = sorted(active, key=lambda k: -base['residual_loss'][active.index(k)])
+        base = m.proxy(q); all_active = list(q.active)
+        active = self.adjustable_poses(parent)
+        if not active:
+            return []
+        order = sorted(active, key=lambda k: -base['residual_loss'][all_active.index(k)])
         critical,_=m.useful_coordinates({'layout':q})
+        critical = [k for k in critical if k in active] or order
         failing=[k for k in order if parent.result is not None and not parent.result['masks'][k].all()]
         owners = list(dict.fromkeys([(failing or order)[0],critical[round_index%min(2,len(critical))]]))[:2]
         if not parent.oracle.get('enclosure_passed'):
@@ -248,33 +266,34 @@ class MaterialSearch:
             if length > 1e-28:
                 for fraction in [1/64, 1/16, 1/4]:
                     trial = shift(m, q, k, -m.extent*fraction*translation_frame(m, q, k)@gradient/length)
-                    if not target_gap(trial):
+                    if not self.goal_gap(trial):
                         rows.append(('seat-gradient', trial, dict(pose=k, fraction=fraction)))
             else:
                 axis = round_index%3
                 for sign in [-1., 1.]:
                     trial = shift(m, q, k, sign*m.extent/32*translation_frame(m, q, k)[:, axis])
-                    if not target_gap(trial):
+                    if not self.goal_gap(trial):
                         rows.append(('seat-event', trial, dict(pose=k, axis=axis)))
-        hosts = sorted(set(int(q.hosts[k]) for k in q.active))
-        host = hosts[round_index%len(hosts)]
-        gradient = installation_gradient(m, q, (host,), delta, objective)
-        length = np.linalg.norm(gradient)
-        if length > 1e-28:
-            for fraction in [1/64, 1/8]:
-                trial = shift_installation(m, q, (host,), -m.extent*fraction*gradient/length)
-                rows.append(('installation-gradient', trial, dict(host=host, fraction=fraction)))
+        hosts = self.adjustable_hosts(parent)
+        if hosts:
+            host = hosts[round_index%len(hosts)]
+            gradient = installation_gradient(m, q, (host,), delta, objective)
+            length = np.linalg.norm(gradient)
+            if length > 1e-28:
+                for fraction in [1/64, 1/8]:
+                    trial = shift_installation(m, q, (host,), -m.extent*fraction*gradient/length)
+                    rows.append(('installation-gradient', trial, dict(host=host, fraction=fraction)))
         trial = floor_height_proposal(m, q)
         if trial is not None and trial.key() != q.key():
             rows.append(('installation-floor-program', trial, dict(original_demands=True)))
-        reuse=[k for k in q.active if registered(q,k)]
+        reuse=[k for k in active if registered(q,k)]
         for fixed in [(),(reuse[round_index%len(reuse)],)] if reuse else [()]:
             trial=project_floor_layout(m,q,fixed_ground=fixed)
             if trial is not None and trial.key()!=q.key():
                 rows.append(('material-floor-projection',trial,
                     dict(ground_hosts=list(fixed),original_pressure_demands=True)))
         if parent.result is not None and not failed_count(parent.result):
-            guests=[k for k in q.active if not registered(q,k)]
+            guests=[k for k in active if not registered(q,k)]
             trial=project_floor_layout(m,q,protect_ports=True,fixed_seats=guests)
             if trial is not None and trial.key()!=q.key():
                 rows.append(('material-floor-projection',trial,
@@ -293,7 +312,7 @@ class MaterialSearch:
             for axis in np.eye(3):
                 for sign in [-1.,1.]:
                     trial=q.copy()
-                    for k in q.active:
+                    for k in active:
                         trial.directions[k]=turn(m,q,k,sign*np.radians(12.)*np.cross(axis,q.directions[k])).directions[k]
                     opening.append(('base-opening-direction',trial,dict(axis=axis.tolist(),sign=sign)))
             rows=opening+rows[:7]
@@ -306,14 +325,14 @@ class MaterialSearch:
             options = [current]
             try:
                 for kind, q, detail in self.continuation_rows(current, round_index+step):
-                    if target_gap(q) > target_gap(current.layout):
+                    if self.goal_gap(q) > self.goal_gap(current.layout):
                         continue
                     options.append(self.preview(q, kind, sample_id(current.layout), detail))
             except (ValueError, RuntimeError, AssertionError) as error:
                 self.errors.append(dict(stage='refine', error=str(error)))
             # Force and base tradeoffs remain in the outer pool; each local
             # continuation uses one coherent feasibility ordering.
-            best = min(options, key=lambda x: (target_gap(x.layout),
+            best = min(options, key=lambda x: (self.goal_gap(x.layout),
                 not x.oracle.get('enclosure_passed'), x.loss, x.metrics[3], x.lower_litres))
             opening=[x for x in options if x.operation.startswith('base-opening')
                      and x.loss<=1e-28 and x.oracle.get('enclosure_passed')]

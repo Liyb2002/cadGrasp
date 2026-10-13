@@ -82,7 +82,7 @@ def strict_witness(full,target):
     raise RuntimeError('Original equilibrium unresolved after strictly verified LP retries') from original_error
 
 
-def classify(full, targets, *, basis_cache=None, column_ids=None):
+def classify(full, targets, *, basis_cache=None, column_ids=None, stop_on_counterexample=False):
     targets=C.U.target(targets,full.shape[1])
     accepted=np.zeros(len(targets),bool);pending=np.ones(len(targets),bool)
     info=dict(method='original_equilibrium_LP_with_nonnegative_longdouble_batch_replay',
@@ -131,6 +131,10 @@ def classify(full, targets, *, basis_cache=None, column_ids=None):
                     del basis_cache[24:]
             replay_basis(basis,remaining)
         else:
+            if stop_on_counterexample:
+                info['stopped_on_original_counterexample']=True
+                info['counterexample_index']=index
+                break
             result=linprog(-targets[index],A_ub=full,b_ub=np.zeros(len(full)),
                            bounds=[(-1,1)]*full.shape[1],method='highs',
                            options=dict(primal_feasibility_tolerance=1e-9,dual_feasibility_tolerance=1e-9))

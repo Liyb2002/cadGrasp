@@ -288,7 +288,8 @@ class BaseOracle:
             if connected and enclosure:
                 result.update(self.components(layout, rows, low, high))
         result.update(constraint_schema=SCHEMA,work_constraints_pose_specific=True,
-            contact_anchor_policy=CONTACT_ANCHOR_POLICY,
+            contact_anchor_policy=('actual_connected_contact_core_containment'
+                if getattr(self.model,'require_connected_core',False)else CONTACT_ANCHOR_POLICY),
             work_access_mode=getattr(self,'work_mode','angular'),
             work_access_definition='outward normal-ray union' if getattr(self,'work_mode','angular')=='normal'
                                    else 'outward angular cones with certified self-occlusion clipping',
@@ -309,6 +310,7 @@ class BaseOracle:
         is not the optimized base volume and it is never a minimum claim.
         """
         self.component_queries += 1; start = time.monotonic(); m = self.model
+        self.core_clip_proposal=None
         stock_mesh = C.trimesh.creation.box(high-low)
         stock_mesh.apply_translation((high+low)/2)
         stock = C.S.solid(stock_mesh)
@@ -337,6 +339,11 @@ class BaseOracle:
             normals=m.point_normals[ids]@Q[:3,:3].T
             anchors.append(contact_probe_points(points,normals,floor_planes,1e-6))
         anchors = np.vstack(anchors) if anchors else np.empty((0,3))
+        contact_core=None
+        if getattr(m,'require_connected_core',False):
+            from connected_core import prepare
+            contact_core=C.S.solid(prepare(m,layout)[0])
+        repair_loss=float('inf')
         for part in free.decompose():
             if C.material_volume(part) < 1e-12: continue
             mesh = unpack_solid(part); per_pose = []
@@ -345,8 +352,16 @@ class BaseOracle:
                 contact = ground[np.abs(ground[:,2]) <= 1e-8,:2]
                 passed, gap, hull = cover(row['hull'], np.vstack([contact,row['own']]))
                 per_pose.append(dict(pose=row['pose'], passed=passed, gap_m=gap))
+            core_outside=C.material_volume(contact_core-part)if contact_core is not None else None
             connected_contacts = (all(r['passed'] for r in per_pose) and
-                (not len(anchors) or robust_contains(mesh,anchors).all()))
+                (core_outside<=1e-10 if contact_core is not None else
+                 (not len(anchors) or robust_contains(mesh,anchors).all())))
+            if (contact_core is not None and all(r['passed']for r in per_pose)and
+                    1e-10<core_outside<repair_loss and
+                    core_outside<=C.material_volume(contact_core)*.01):
+                self.core_clip_proposal=dict(layout_key=layout.key(),core=unpack_solid(contact_core^part),
+                    witness=mesh,per_pose=per_pose,outside_before_m3=core_outside)
+                repair_loss=core_outside
             if all(r['passed'] for r in per_pose) and connected_contacts:
                 winner = mesh; answers = per_pose; break
             if sum(r['passed'] for r in per_pose) > sum(r['passed'] for r in answers): answers = per_pose

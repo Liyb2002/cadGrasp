@@ -19,6 +19,17 @@ def save(p,data):
     p.write_text(json.dumps(data,ensure_ascii=False,indent=2,allow_nan=False)+'\n')
 
 
+def final_stage(root, experiment):
+    for stage in ['step5.3','step5.2']:
+        folder=root/'step5'/stage/experiment
+        if (folder/'data/report.json').exists():
+            record=json.loads((folder/'data/report.json').read_text())
+            if record.get('stage_type')=='support_pruning':
+                raise ValueError('Step5.2 is pruned material; construct Step5.3 before Evaluation')
+            return folder
+    raise FileNotFoundError('No completed final support for '+str(root))
+
+
 def corners(record):
     lo,hi=record['min_m'],record['max_m']
     return np.array([[x,y,z] for x in [lo[0],hi[0]] for y in [lo[1],hi[1]] for z in [lo[2],hi[2]]])
@@ -54,13 +65,18 @@ def main():
     parser.add_argument('--experiment',default='connected_base_v1')
     parser.add_argument('--selection-summary',type=Path)
     parser.add_argument('--batch-name',default='evaluation_connected_base_v1')
+    parser.add_argument('--sets',nargs='+')
     parser.add_argument('--replace',action='store_true',help='Replace only this evaluation batch and its visualizations')
     args=parser.parse_args()
     base=A.result_root(args.object)
     selection=A.resolve_artifact(args.selection_summary or base/'data/base_oracle_results/summary.json')
     protected={}
     def protect(p):protected[relative(p)]=sha(p);return p
-    cases=json.loads(protect(selection).read_text())['selected']
+    selected=json.loads(protect(selection).read_text())
+    cases=selected.get('selected',selected.get('results',selected.get('cases',[])))
+    if args.sets:
+        if set(args.sets)-{case['id'] for case in cases}:parser.error('Unknown set')
+        cases=[case for case in cases if case['id'] in args.sets]
     mesh_path=protect(ROOT/'objects'/args.object/'mesh.stl')
     body=trimesh.load(mesh_path,force='mesh',process=False)
     if any(Path(name).name!=name for name in [args.experiment,args.batch_name]):
@@ -68,7 +84,7 @@ def main():
     directory=base/'data'/args.batch_name
     # Validate all physical inputs before replacing the obsolete evaluation.
     for case in cases:
-        root=base/case['id'];s4=root/'step4/step4.2'/case['experiment'];s52=root/'step5/step5.2'/args.experiment
+        root=base/case['id'];s4=root/'step4/step4.2'/case['experiment'];s52=final_stage(root,args.experiment)
         final=json.loads(protect(s52/'data/report.json').read_text())
         if not final['complete'] or not final['passed'] or final['selected_step4_experiment']!=case['experiment']:
             raise ValueError(f'Incomplete or mismatched Step5.2: {case["id"]}')
@@ -94,7 +110,7 @@ def main():
         metric_version=METRIC_VERSION,support_pose_metric_version=SUPPORT_POSE_METRIC_VERSION))
     renderer=V.Renderer();rows=[];began=time.monotonic()
     for case in sorted(cases,key=lambda c:(-c['pose_count'],c['id'])):
-        root=base/case['id'];step4=root/'step4/step4.2'/case['experiment'];step52=root/'step5/step5.2'/args.experiment
+        root=base/case['id'];step4=root/'step4/step4.2'/case['experiment'];step52=final_stage(root,args.experiment)
         final=json.loads(protect(step52/'data/report.json').read_text())
         if not final['complete'] or not final['passed']:raise ValueError(f'Unfinished Step5.2: {case["id"]}')
         if final['selected_step4_experiment']!=case['experiment']:raise ValueError('Comparison layouts differ')
@@ -105,7 +121,7 @@ def main():
         result=static_bounds(body.vertices,layout,nominal.vertices,full.vertices,layout_report['poses'])
         for key in ['juxtaposed_pose_count','rotating_reuse_pose_count']:
             if result[key]!=layout_report[key]:raise ValueError(f'Layout membership differs from saved Step4: {case["id"]}')
-        result.update(id=case['id'],step4_source=relative(step4),step52_source=relative(step52),
+        result.update(id=case['id'],step4_source=relative(step4),step53_source=relative(step52),
             material_step4_cm3=float(abs(nominal.volume)*1e6),material_full_cm3=float(abs(full.volume)*1e6),
             material_added_cm3=final['construction']['added_material_cm3'],
             material_removed_illegal_nominal_cm3=final['construction']['removed_illegal_nominal_material_cm3'])
@@ -137,7 +153,11 @@ def main():
             f'<p>Final Juxtapose seats: {result["juxtaposed_pose_count"]}; unchanged rotating-reuse poses: {result["rotating_reuse_pose_count"]}. '
             f'Multi-object-pose states: {result["multi_pose_fixture_state_count"]}; single-object-pose states: {result["singleton_fixture_state_count"]}. These are different classifications.</p>'
             '<p><a href="report.json">Per-pose bounds, state membership and material volumes</a></p>\n')
-        A.publish_visuals(out)
+        visual=A.VISUALS/args.object/case['id']/'evaluation'
+        visual.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(out/'static_occupancy.png',visual/'static_occupancy.png')
+        (out/'index.html').unlink(missing_ok=True)
+        (out/'static_occupancy.png').unlink()
         if args.object=='B':
             from publish_output_images import publish_case_images
             publish_case_images(case['id'],args.experiment,include_evaluation=True)

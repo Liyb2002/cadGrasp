@@ -61,12 +61,58 @@ class OracleModel(StableGradientModel):
         return trial
 
     def evaluate(self,layout):
+        if getattr(self,'require_connected_core',False):
+            from connected_core import prepare
+            core,core_record=prepare(self,layout)
+            # The original full-demand sampled-contact screen is restricted
+            # to this retained component. Exact polygon certification follows
+            # on finalists; unresolved/failed screens are never final passes.
+            self.core_force_context=(layout.key(),core)
+            try:result=dict(super().evaluate(layout))
+            finally:self.core_force_context=None
+            result.update(remaining_mesh=core,connected_contact_core=core_record,
+                volume_cm3=abs(float(core.volume))*1e6,
+                material_contact_certification_run=False,force_material_geometry_certified=False,
+                force_contact_representation='retained_connected_core_contact_quadrature_guidance',
+                force_acceptance_geometry='support.obj')
+            result['base_oracle']=self.base_oracle.query(layout)
+            return result
         oracle=self.base_oracle.query(layout)
         if self.oracle_gate_active and not oracle['enclosure_passed']:
             raise ValueError('Base oracle rejected candidate: '+oracle['status'])
         result=super().evaluate(layout)
         result['base_oracle']=oracle
         return result
+
+    def contact_flags(self,layout):
+        flags=super().contact_flags(layout)
+        context=getattr(self,'core_force_context',None)
+        if context is None or context[0]!=layout.key():return flags
+        from collections import OrderedDict
+        cache=getattr(self,'connected_contact_flags',None)
+        if cache is None:cache=self.connected_contact_flags=OrderedDict()
+        if layout.key()in cache:return cache[layout.key()]
+        from whole_search.common import RayMeshIntersector
+        from system_floor import transform_points
+        ray=RayMeshIntersector(context[1]);retained={}
+        for k in layout.active:
+            Q=layout.placements[k]
+            points=transform_points(self.points,Q)
+            normals=self.point_normals@Q[:3,:3].T
+            # Interior probes only guide sampling; no geometric safety margin
+            # or contact-area guarantee is introduced by this screen.
+            retained[k]=flags[k]&ray.contains_points(points+1e-7*normals)
+        cache[layout.key()]=retained
+        while len(cache)>128:cache.popitem(last=False)
+        return retained
+
+    def proxy(self,layout,targets=()):
+        cache=getattr(self,'connected_contact_flags',{})
+        if getattr(self,'require_connected_core',False)and layout.key()in cache:
+            from connected_core import proxy
+            self.proxy_calls+=1
+            return proxy(self,layout,cache[layout.key()])
+        return super().proxy(layout,targets)
 
 
 class OracleSearch(StableGradientSearch):
@@ -75,7 +121,7 @@ class OracleSearch(StableGradientSearch):
             raise ValueError('Frontier width must be positive')
         super().__init__(*args,**kwargs)
         self.frontier_width=int(frontier_width)
-        if search_policy not in ('frontier','material'):
+        if search_policy not in ('frontier','material','population32','population_soft'):
             raise ValueError('Unknown search policy')
         self.search_policy=search_policy
 
@@ -256,6 +302,12 @@ class OracleSearch(StableGradientSearch):
         return rows
 
     def solve_frontier(self,current,anchor=None,insertion_guest=None):
+        if getattr(self,'search_policy','frontier')=='population_soft':
+            from population_soft import PopulationSoftSearch
+            return PopulationSoftSearch(self).solve(current)
+        if getattr(self,'search_policy','frontier')=='population32':
+            from population32 import Population32Search
+            return Population32Search(self).solve(current)
         if getattr(self,'search_policy','frontier')=='material':
             from material_search import MaterialSearch
             return MaterialSearch(self).solve(current)
@@ -329,6 +381,10 @@ class OracleSearch(StableGradientSearch):
         if selected is not None and selected.nominal is not None:
             self.model.material_nominal_export=(selected.layout.key(),selected.nominal)
         report=super().save(current,mode,began,initialization,**extra)
+        if getattr(self.model,'require_connected_core',False):
+            report.update(connected_contact_core=current['connected_contact_core'],
+                force_acceptance_geometry='support.obj',
+                step4_contact_core_connected=True,connection_material_added_to_core=False)
         report.update(passed=report['force_passed'] and oracle_passed,base_oracle_passed=oracle_passed,
             base_oracle=answer,acceptance='original_search_force_demands_AND_base_enclosure_AND_common_connection',
             base_oracle_seconds=self.model.base_oracle.seconds,base_oracle_queries=self.model.base_oracle.queries,
@@ -344,18 +400,23 @@ class OracleSearch(StableGradientSearch):
             frontier_search=getattr(self,'frontier_statistics',None),
             oracle_work_access_mode=self.model.base_oracle.work_mode)
         if oracle_passed and getattr(self.model.base_oracle,'witness',(None,None))[0]==current['layout'].key():
-            self.model.base_oracle.witness[1].export(self.out/'oracle_connected_witness.obj')
+            self.model.base_oracle.witness[1].export(self.out/'oracle_connected_witness.obj',digits=16)
         if selected is not None:
             from material_evaluator import membership,target_gap,mixed_target_applicable
             reuse,jux=membership(current['layout'])
             completed=bool(selected.completed and selected.layout.key()==current['layout'].key())
             applicable=mixed_target_applicable(current['layout'])
+            if self.search_policy=='population_soft':
+                applicable=False
             report.update(solid_constructed_during_search=completed,
                 mixed_target_applicable=applicable,
                 mixed_target_satisfied=not target_gap(current['layout']) if applicable else None,
                 target_rotating_reuse_range=[2,4] if applicable else None,
                 target_juxtaposed_range=[2,4] if applicable else None,
                 physical_force_space_passed=report['passed'])
+            if self.search_policy=='population_soft':
+                report.update(sampling_count_center=len(current['layout'].active)/3.,
+                    count_penalty_used=False,juxtaposed_fraction=jux/len(current['layout'].active))
             report['passed']=bool(report['passed'] and completed)
             if completed:
                 from co_common import D,I

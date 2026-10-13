@@ -162,7 +162,10 @@ class MaterialSample:
 
     @property
     def completed(self):
+        core=self.result.get('connected_contact_core')if self.result is not None else None
         return (self.result is not None and failed_count(self.result) == 0
+                and (core is None or (core.get('connected')and core.get('downward_resultant_passed')
+                    and self.result.get('force_material_geometry_certified')))
                 and bool(self.oracle.get('connected_passed'))
                 and bool(self.oracle.get('passed'))
                 and bool(self.construction and self.construction.get('passed')))
@@ -185,12 +188,18 @@ class MaterialEvaluator:
     def __init__(self, search):
         self.search = search; self.model = search.model
         self.connection_attempts = set(); self.build_attempts = set()
+        self.connection_results = {}
         self.builders = None
         self.stats = dict(previews=0, full_demands=0, connections=0, constructions=0,
                           material_contact_certifications=0)
 
     def space_candidate(self,item):
         if item.result is None:return False
+        if getattr(self.model,'require_connected_core',False):
+            core=item.result.get('connected_contact_core',{})
+            return (failed_count(item.result)==0 and core.get('connected',False)
+                and core.get('downward_resultant_passed',False)
+                and item.result.get('force_material_geometry_certified',False))
         failure=failed_count(item.result)
         return not failure or (failure<=512 and hasattr(self.model,'mesh') and
             len(item.layout.active)==len(self.model.poses) and all(
@@ -202,6 +211,7 @@ class MaterialEvaluator:
             m.validate_placement(layout, k)
         self.stats['previews'] += 1
         oracle = m.base_oracle.query(layout)
+        oracle = self.connection_results.get(layout.key(),oracle)
         loss = float(m.proxy(layout)['loss'])
         if loss < 1e-28:
             loss = 0.
@@ -214,6 +224,28 @@ class MaterialEvaluator:
         if item.result is None:
             self.stats['full_demands'] += 1
             item.result = self.model.evaluate(item.layout)
+        if (getattr(self.model,'require_connected_core',False)and
+                not item.result.get('material_contact_certification_run')and failed_count(item.result)<=512):
+            self.certify_core(item)
+        if getattr(self.model,'require_connected_core',False):
+            from connected_core import prepare
+            item.nominal=prepare(self.model,item.layout)[0]
+            item.loss=float(self.model.proxy(item.layout)['loss'])
+        return item
+
+    def certify_core(self,item):
+        """Measure all original demands on the core even if quadrature missed."""
+        if item.result.get('material_contact_certification_run'):return item
+        from connected_core import prepare
+        from material_force import certify_material_contacts
+        core,record=prepare(self.model,item.layout)
+        previous=failed_count(item.result)
+        proof=certify_material_contacts(self.model,item.layout,core)
+        item.nominal=core
+        item.result=dict(item.result,**proof,grid_failed_demands=previous,
+            material_contact_certification_run=True,
+            force_material_geometry_certified=all(v.all()for v in proof['masks'].values()))
+        self.stats['material_contact_certifications']+=1
         return item
 
     def connect(self, item):
@@ -224,6 +256,32 @@ class MaterialEvaluator:
             return item
         self.connection_attempts.add(key); self.stats['connections'] += 1
         item.oracle = self.model.base_oracle.query(item.layout, connected=True)
+        self.connection_results[key] = item.oracle
+        proposal=getattr(self.model.base_oracle,'core_clip_proposal',None)
+        if (getattr(self.model,'require_connected_core',False)and not item.oracle.get('connected_passed')
+                and proposal is not None and proposal['layout_key']==key):
+            from connected_core import legal_clip
+            from material_force import certify_material_contacts
+            core,record=legal_clip(self.model,item.layout,proposal)
+            proof=certify_material_contacts(self.model,item.layout,core)
+            record['oracle_boundary_cleanup']['actual_contacts_recertified']=True
+            item.nominal=core
+            item.result=dict(item.result,**proof,remaining_mesh=core,connected_contact_core=record,
+                volume_cm3=abs(float(core.volume))*1e6,material_contact_certification_run=True,
+                force_material_geometry_certified=all(v.all()for v in proof['masks'].values()))
+            if not hasattr(self.model,'connected_core_repairs'):self.model.connected_core_repairs={}
+            self.model.connected_core_repairs[key]=(core,record)
+            getattr(self.model,'connected_contact_flags',{}).pop(key,None)
+            self.model.core_force_context=(key,core)
+            try:self.model.contact_flags(item.layout)
+            finally:self.model.core_force_context=None
+            item.oracle=dict(item.oracle,passed=True,connected_passed=True,
+                status='common_connected_enclosure_witness',component_per_pose=proposal['per_pose'],
+                contact_core_boundary_cleanup=record['oracle_boundary_cleanup'])
+            self.connection_results[key]=item.oracle
+            self.model.base_oracle.cache[key,True]=item.oracle
+            self.model.base_oracle.witness=(key,proposal['witness'])
+            self.stats['material_contact_certifications']+=1
         item.result['base_oracle'] = item.oracle
         witness = getattr(self.model.base_oracle, 'witness', (None, None))
         if item.oracle.get('connected_passed') and witness[0] == key:
@@ -234,6 +292,12 @@ class MaterialEvaluator:
         key = item.layout.key()
         if key in self.build_attempts or item.witness is None:
             return item
+        if getattr(self.model,'require_connected_core',False):
+            core=item.result.get('connected_contact_core',{})if item.result is not None else{}
+            if (item.result is None or failed_count(item.result) or not core.get('connected')
+                    or not core.get('downward_resultant_passed')
+                    or not item.result.get('force_material_geometry_certified')):
+                return item
         self.build_attempts.add(key); self.stats['constructions'] += 1
         if self.builders is None:
             from whole_step4_render import NominalBuilder
@@ -241,7 +305,12 @@ class MaterialEvaluator:
             self.builders = NominalBuilder(self.model), backend
         nominal_builder, backend = self.builders
         from whole_search.common import unpack_solid
-        item.nominal = unpack_solid(nominal_builder.solid(item.layout))
+        if getattr(self.model,'require_connected_core',False):
+            from connected_core import prepare
+            item.nominal,core_record=prepare(self.model,item.layout)
+            if not self.space_candidate(item):return item
+        else:
+            item.nominal = unpack_solid(nominal_builder.solid(item.layout))
         rows = [dict(pose=r['pose'], fixture_transform=r['T'], object_ground=r['own'],
                      hull=np.c_[r['hull'], np.zeros(len(r['hull']))],
                      object_vertices=transform_points(self.model.mesh.vertices,r['U']))

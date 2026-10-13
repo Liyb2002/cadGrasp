@@ -98,6 +98,8 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 .venv/bin/pyt
 
 视频的蓝色部分取Step4.2名义壳与已经保存的Oracle合法分量的交集，和Step5加base之前保留的支撑一致。原始名义壳会因约5mm外扩而进入地面下方，不能直接作为合法支撑展示；本例去除5.010964cm³非法名义材料，不新增base，也不修改原布局、支撑文件或受力结果。
 
+[视频06：pose20地面包围机会](../seperate_base_support_proof/videos/06_pose20_ground_enclosure.mp4)接续视频05的最终pose20场景：紫色为全部32,768个原始地面压力需求的凸包，随后镜头转为地面俯视，绿色为显示范围内的合法地脚区域，粉色为非法区域。三个绿色标记均来自已保存的共同合法连通空间，它们的虚拟凸包以绿色虚线显示并包围需求凸包；标记和虚线不是实际脚或实体底环。地面切片同时计入全部任务拉回当前材料摆放后的法向工作禁区、完整退出路径及最终地面限制。复用视频05同一布局、原需求与连接见证，只派生展示几何，不运行受力、布局搜索或Oracle查询。[渲染与几何记录](../seperate_base_support_proof/videos/06_pose20_ground_enclosure.json)。
+
 被搬运的是约束的坐标表示，物理地面始终水平。旧工作锥不会被带到新任务中；只显示当前pose的工作锥。搬运过程仅作示意，不增加中间姿态的合法性要求。`oracle/`保留约束NPZ/OBJ及图例记录，视频统一放在`seperate_base_support_proof/videos/`。
 
 出图读取源实验保存的Oracle判定，不重新求解受力或重建连通见证。诊断报告明确标记`query_origin=saved_final_experiment`和`base_oracle_query_run=false`；若旧的独立有限窗口重建未找到分量，保留简短诊断记录，不把它当成源实体的新验收或改写源结果。
