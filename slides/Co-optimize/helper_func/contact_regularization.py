@@ -3,7 +3,7 @@ import numpy as np
 from deterministic_base import solid,unpack,moved,union,volume
 
 
-def remove_object_interiors(mesh,body,placements):
+def remove_object_interiors(mesh,body,placements,*,statistics=True):
     # STL duplicates identical vertices. Merge at 15 decimals, preserving
     # their coordinates, before building the exact closed workpiece solid.
     workpiece=body.copy()
@@ -24,7 +24,11 @@ def remove_object_interiors(mesh,body,placements):
         result=sequential^original
     if volume(result-original)>1e-10:
         raise ValueError('Object-interior deletion added above-tolerance material: '+str(volume(result-original)*1e6)+' cm3')
-    return unpack(result),dict(operation='remove_actual_object_interiors',
+    output=unpack(result)
+    if not statistics:
+        return output,dict(operation='remove_actual_object_interiors',statistics_computed=False,
+            original_object_coordinates_and_layout_unchanged=True)
+    return output,dict(operation='remove_actual_object_interiors',
         removed_cm3=volume(original-result)*1e6,
         input_intrusion_cm3=volume(original^excluded)*1e6,
         original_object_coordinates_and_layout_unchanged=True)

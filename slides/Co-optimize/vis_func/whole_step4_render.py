@@ -54,7 +54,13 @@ def read_layout(path):
 
 class NominalBuilder:
     """Same whole layout/raw material domains; no force claim for process tiles."""
-    def __init__(self,model):self.model=model;self.parts=OrderedDict();self.shapes={}
+    def __init__(self,model):
+        self.model=model
+        if getattr(model,'search_runtime',None) is not None:
+            from search_runtime import NativeLRU
+            self.parts=NativeLRU(96);self.shapes=NativeLRU(16)
+        else:
+            self.parts=OrderedDict();self.shapes={}
     def part(self,layout,k,kind):
         m=self.model;q=layout.placements[k];d=q[:3,:3].T@layout.directions[k]
         cap=m.work_length(layout,k) if kind=='work' else None

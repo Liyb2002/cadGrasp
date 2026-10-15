@@ -16,7 +16,7 @@ from step4_connect_support.video import mp4_writer
 from step4_connect_support.codesign_port.fixture_view import export_viewer
 from step4_connect_support.codesign_port import visual_details as V
 
-spec=importlib.util.spec_from_file_location('compact_cpu',I.ROOT/'slides/reuse/code/render_cpu.py')
+spec=importlib.util.spec_from_file_location('compact_cpu',Path(__file__).resolve().parents[3]/'vis_func/cpu_mesh.py')
 CPU=importlib.util.module_from_spec(spec);spec.loader.exec_module(CPU)
 BLUE,GRAY,ACTIVE,IDLE='#8fc9e8','#aeb8bf','#e6a13f','#9c76bd'
 

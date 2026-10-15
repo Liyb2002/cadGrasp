@@ -109,6 +109,9 @@ class MaterialSearch:
         self.width = search.frontier_width
         self.witnesses = {}; self.incumbent = None; self.errors = []
         self.evaluated = {}; self.seed_cursor = 0
+        if getattr(self.model,'search_runtime',None) is not None:
+            from search_runtime import EvidenceLRU
+            self.evaluated=EvidenceLRU(self.model.search_runtime,'evaluated_layout')
         from registered_floor import RegisteredFloorPrior
         if hasattr(self.model,'native') and hasattr(self.model,'tasks'):
             self.model.registered_floor_prior=RegisteredFloorPrior(self.model)

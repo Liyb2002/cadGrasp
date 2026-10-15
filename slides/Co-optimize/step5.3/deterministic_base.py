@@ -28,6 +28,25 @@ def unpack(value):
 
 def volume(value): return max(0.,float(value.volume())*SCALE**3)
 
+
+def added_material_statistics(material_m3,legal_nominal_m3,retained_loss_m3,outside_allowed_m3):
+    """Report added volume without constructing a redundant Boolean boundary.
+
+    N is the legal nominal material (or the full original when its illegal
+    volume is below the original tolerance). Thus N is a subset of original,
+    and original minus N lies outside allowed. For the constructed material A,
+    |A minus N| = |A| - |N| + |N minus A|. Subtracting its possible overlap
+    with original minus N gives the bounds below. These are statistics only;
+    all geometry, acceptance tests and total-material costs remain unchanged.
+    """
+    upper=max(0.,material_m3-legal_nominal_m3+retained_loss_m3)
+    lower=max(0.,upper-outside_allowed_m3)
+    return dict(added_material_cm3=upper*1e6,
+        added_material_bounds_cm3=[lower*1e6,upper*1e6],
+        added_material_measure=('set_volume_identity' if outside_allowed_m3==0.
+                                else 'set_volume_identity_upper_bound'),
+        added_material_statistics_only=True)
+
 def union(values):
     return md.Manifold.batch_boolean(values,md.OpType.Add) if values else md.Manifold()
 
@@ -69,6 +88,9 @@ def bridge(a,b,width):
     return solid(trimesh.Trimesh(cloud,h.simplices,process=True).convex_hull)
 
 class Builder:
+    def added_material_record(self,outside,retained):
+        return added_material_statistics(volume(self.body),volume(self.legal_nominal),retained,outside)
+
     def __init__(self,fixture,witness,rows,width=WIDTH):
         self.original=solid(fixture);self.allowed=solid(witness);self.rows=rows;self.width=width
         self.history=[];self.began=time.monotonic()
@@ -193,7 +215,7 @@ class Builder:
         passed=all(r['passed'] for r in cover) and len(components(self.body))==1 and outside<=1e-10 and retained_loss<=1e-10
         record=dict(passed=passed,connected=len(components(self.body))==1,
             per_pose=cover,material_cm3=volume(self.body)*1e6,
-            added_material_cm3=volume(self.body-self.original)*1e6,
+            **self.added_material_record(outside,retained_loss),
             removed_illegal_nominal_material_cm3=self.removed*1e6,
             discarded_zero_volume_shells_cm3=discarded*1e6,
             outside_saved_legal_component_cm3=outside*1e6,

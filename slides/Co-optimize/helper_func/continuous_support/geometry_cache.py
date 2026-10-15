@@ -28,6 +28,14 @@ class GeometryCache:
         key=blocker,sweep_key
         if key in self.results:
             self.results.move_to_end(key);return self.results[key]
+        from search_runtime import runtime,array_key,MISSING
+        store=runtime(m)
+        exact_key=(blocker,array_key(relative),array_key(direction)) if store else None
+        saved=store.get('pair_lock_predicate',exact_key) if store else MISSING
+        if saved is not MISSING:
+            self.results[key]=saved;self.bound(self.results,512)
+            self.seconds+=time.monotonic()-start
+            return saved
         if placement_key not in self.bodies:
             surface=C.transform_points(m.points,relative)
             origins=surface+m.epsilon*(m.point_normals@relative[:3,:3].T)
@@ -54,5 +62,6 @@ class GeometryCache:
             values[indices]=m.work_rays[blocker].contains_points(surface[indices]);known[indices]=True
             self.work_points+=len(indices)
         result=swept|values;self.results[key]=result;self.bound(self.results,512)
+        if store:store.put('pair_lock_predicate',exact_key,result)
         self.seconds+=time.monotonic()-start
         return result

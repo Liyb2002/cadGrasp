@@ -41,7 +41,7 @@ class Builder(ClippedBuilder):
             and mesh.is_watertight and outside<=1e-10 and retained<=1e-10,
             connected=connected,per_pose=cover,watertight=bool(mesh.is_watertight),
             material_cm3=backend.volume(self.body)*1e6,
-            added_material_cm3=backend.volume(self.body-self.original)*1e6,
+            **self.added_material_record(outside,retained),
             outside_saved_legal_component_cm3=outside*1e6,
             retained_legal_step4_material_loss_cm3=retained*1e6,
             floor_pressure_enclosure_passed=all(r['passed']for r in cover))

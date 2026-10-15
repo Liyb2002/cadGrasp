@@ -9,11 +9,11 @@ from scipy.optimize import linprog
 from scipy.linalg import qr
 
 
-def replay_coefficients(basis,targets):
-    """Solve small independent bases in extended precision, then replay all7."""
+def replay_inverse(basis):
+    """Original pivot selection and extended-precision inverse, once per batch."""
     count=len(basis)
     if count>basis.shape[1]:
-        return np.maximum(targets @ np.linalg.pinv(basis),0.).astype(np.longdouble)
+        return None,None
     coordinates=qr(basis,pivoting=True,mode='economic')[2][:count]
     matrix=np.asarray(basis[:,coordinates].T,np.longdouble)
     augmented=np.column_stack([matrix,np.eye(count,dtype=np.longdouble)])
@@ -22,12 +22,20 @@ def replay_coefficients(basis,targets):
         augmented[[column,pivot]]=augmented[[pivot,column]]
         divisor=augmented[column,column]
         if divisor==0:
-            return np.maximum(targets @ np.linalg.pinv(basis),0.).astype(np.longdouble)
+            return None,None
         augmented[column]/=divisor
         for row in range(count):
             if row!=column:
                 augmented[row]-=augmented[row,column]*augmented[column]
     inverse=augmented[:,count:]
+    return coordinates,inverse
+
+
+def replay_coefficients(basis,targets):
+    """Solve small independent bases in extended precision, then replay all7."""
+    coordinates,inverse=replay_inverse(basis)
+    if coordinates is None:
+        return np.maximum(targets @ np.linalg.pinv(basis),0.).astype(np.longdouble)
     return np.maximum(np.asarray(targets[:,coordinates],np.longdouble) @ inverse.T,0.)
 
 
@@ -91,16 +99,33 @@ def classify(full, targets, *, basis_cache=None, column_ids=None, stop_on_counte
     info['numerical_lp_retries']=0
     full_extended=np.asarray(full,np.longdouble)
     def replay_basis(basis, remaining):
-        coefficients=replay_coefficients(basis,targets[remaining])
-        extended_basis=np.asarray(basis,np.longdouble)
-        replay=coefficients @ extended_basis
-        residual=np.max(np.abs(replay-np.asarray(targets[remaining],np.longdouble)),axis=1)
-        roundoff=32*np.finfo(np.longdouble).eps*np.max(coefficients @ np.abs(extended_basis),axis=1)
-        certified=residual+roundoff<=2e-9
+        import gpu_replay
+        gpu=None
+        if gpu_replay._mode!='off' and len(remaining)>=gpu_replay.MINIMUM_BATCH:
+            coordinates,inverse=replay_inverse(basis)
+            gpu=gpu_replay.evaluate(basis,targets[remaining],coordinates,inverse)
+        if gpu is None:
+            ambiguous=np.arange(len(remaining));certified=np.zeros(len(remaining),bool)
+            scores=np.zeros(len(remaining),np.longdouble)
+        else:
+            certified=gpu['mask'];ambiguous=np.flatnonzero(gpu['ambiguous'])
+            scores=gpu['upper_bounds'].astype(np.longdouble)
+            info['gpu_definite_replays']=info.get('gpu_definite_replays',0)+len(remaining)-len(ambiguous)
+            info['gpu_ambiguous_cpu_replays']=info.get('gpu_ambiguous_cpu_replays',0)+len(ambiguous)
+            info['maximum_primal_replay_residual_is_conservative_bound']=True
+        if len(ambiguous):
+            rows=targets[remaining[ambiguous]]
+            coefficients=replay_coefficients(basis,rows)
+            extended_basis=np.asarray(basis,np.longdouble)
+            replay=coefficients @ extended_basis
+            residual=np.max(np.abs(replay-np.asarray(rows,np.longdouble)),axis=1)
+            roundoff=32*np.finfo(np.longdouble).eps*np.max(coefficients @ np.abs(extended_basis),axis=1)
+            scores[ambiguous]=residual+roundoff
+            certified[ambiguous]=scores[ambiguous]<=2e-9
         accepted[remaining[certified]]=True;pending[remaining[certified]]=False
         info['primal_batch_accepted']+=int(certified.sum())
         if certified.any():
-            info['maximum_primal_replay_residual']=max(info['maximum_primal_replay_residual'],float((residual+roundoff)[certified].max()))
+            info['maximum_primal_replay_residual']=max(info['maximum_primal_replay_residual'],float(scores[certified].max()))
         return int(certified.sum())
 
     # Stable column IDs are original floor rays / surface quadrature points.

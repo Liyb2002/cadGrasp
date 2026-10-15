@@ -76,3 +76,6 @@
 /.agents/
 /.codex/
 /.aws/
+
+# Local numerical runs and their execution snapshots.
+/slides/Co-optimize/baseline_no_pso/runs/

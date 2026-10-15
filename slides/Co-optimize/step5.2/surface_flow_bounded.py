@@ -18,20 +18,27 @@ def inside_points(mesh,points):
     return np.concatenate([mesh.contains(points[start:start+256])for start in range(0,len(points),256)])if len(points)else np.empty(0,bool)
 
 
-def flow(mesh,certificate,frames,object_cloud,mandatory=None,final_support=False,displacement=.0009):
-    dense=solid(mesh).refine_to_length(.003/SCALE)
-    if dense.num_tri()>240000:dense=solid(mesh).refine_to_length(.005/SCALE)
+def flow(mesh,certificate,frames,object_cloud,mandatory=None,final_support=False,displacement=.0009,
+         pin_contacts=True,pin_bounds=True,curvature_subdivisions=None):
+    base_surface=solid(mesh).simplify(0.)
+    if not pin_contacts:
+        # Remove redundant nearly planar tessellation before actual curvature
+        # construction. The proposed result is still clipped and recertified.
+        base_surface=base_surface.simplify(.00004/SCALE)
+    dense=base_surface.refine_to_length(.003/SCALE)
+    if dense.num_tri()>160000:dense=base_surface.refine_to_length(.005/SCALE)
     surface=unpack(dense);surface.merge_vertices(digits_vertex=12)
     original=surface.vertices.copy();vertices=original.copy();pinned=np.zeros(len(vertices),bool)
-    for k in certificate.layout.active:
+    for k in certificate.layout.active if pin_contacts else []:
         body=certificate.mesh.copy();body.apply_transform(certificate.layout.placements[k])
         distance=nearest_points(body,original);pinned|=distance<.0003
     cloud=np.vstack([object_cloud]+[original@T[:3,:3].T+T[:3,3]for T in frames])
     bounds=np.array([cloud.min(0),cloud.max(0)])
     for T in frames:
         world=original@T[:3,:3].T+T[:3,3]
-        for axis in range(3):
-            for side in [0,1]:pinned|=abs(world[:,axis]-bounds[side,axis])<1e-9
+        if pin_bounds:
+            for axis in range(3):
+                for side in [0,1]:pinned|=abs(world[:,axis]-bounds[side,axis])<1e-9
         if final_support:pinned|=abs(world[:,2])<.0004
     if mandatory is not None and not mandatory.is_empty():
         core=unpack(mandatory);distance=nearest_points(core,original)
@@ -56,11 +63,14 @@ def flow(mesh,certificate,frames,object_cloud,mandatory=None,final_support=False
     protected_edges|=~np.isfinite(tangents).all(axis=2)
     tangents[protected_edges]=linear[protected_edges]
     curved=md.Manifold(md.Mesh64(np.ascontiguousarray(positions),np.ascontiguousarray(faces),
-        halfedge_tangent=np.ascontiguousarray(tangents))).refine(2)
+        halfedge_tangent=np.ascontiguousarray(tangents)))
+    curved=(curved.refine(curvature_subdivisions)if curvature_subdivisions is not None and len(faces)<100000
+            else curved.refine_to_length(.0025/SCALE))
     curved=curved.simplify(.00002/SCALE)
     if mandatory is not None and not mandatory.is_empty():curved=curved+mandatory
-    return curved^solid(mesh),dict(actual_surface_flow=True,maximum_vertex_displacement_m=displacement,
+    return (curved^solid(mesh)).simplify(0.),dict(actual_surface_flow=True,maximum_vertex_displacement_m=displacement,
         contact_pin_distance_m=.0003,iterations=8,refinement_factor=2,pinned_vertices=int(pinned.sum()),
         input_vertices=len(original),protected_surface_edges=int(protected_edges.sum()),
         pinned_face_tangents_are_linear=True,nonfinite_tangents_replaced=True,
-        nearest_query_batch_size=256,geometry_edited=True,display_only=False)
+        nearest_query_batch_size=256,geometry_edited=True,display_only=False,
+        all_contact_surfaces_pinned=pin_contacts,bbx_extrema_pinned=pin_bounds)

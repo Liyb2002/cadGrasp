@@ -1,4 +1,4 @@
-"""Frozen demands -> contact pruning -> final support -> static Evaluation."""
+"""Default: outside-in contact pruning and rounded, thickness-checked geometry."""
 from pathlib import Path
 import argparse
 import hashlib
@@ -13,7 +13,7 @@ sys.path.insert(0,str(COOPT/'helper_func'))
 import artifact_store as A
 
 
-def main():
+def legacy_main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('object',nargs='?',default='B')
     parser.add_argument('--experiment',required=True)
@@ -66,6 +66,19 @@ def main():
         object=args.object,experiment=args.experiment,sets=args.sets,
         contact_pruning_uses_original_demands=True,step4_rerun=False,
         step51_rerun=False,stage_order=[record['stage'] for record in records]),indent=2)+'\n')
+
+
+def main():
+    if '--legacy' in sys.argv:
+        sys.argv.remove('--legacy')
+        return legacy_main()
+    elif '--legacy-feasible' in sys.argv:
+        sys.argv.remove('--legacy-feasible')
+        from feasible_pipeline import main as run_feasible
+        return run_feasible()
+    else:
+        from periphery_pipeline import main as run_periphery
+        return run_periphery()
 
 
 if __name__=='__main__':main()

@@ -548,7 +548,7 @@ class PopulationSoftSearch(MaterialSearch):
             failed_count(x.result) != 0, not x.oracle.get('enclosure_passed'),
             float(x.oracle.get('gap_m', 0.)), failed_count(x.result), x.loss, x.lower_litres))
 
-    def solve(self, current):
+    def initialize_population(self, current):
         from co_common import save
         s, m = self.search, self.model
         start = self.preview_cached(current['layout'], result=current)
@@ -582,7 +582,23 @@ class PopulationSoftSearch(MaterialSearch):
         save(s.out/'initial_population_summary.json',[dict(slot=i,**self.describe(item))for i,item in enumerate(self.slots)])
         save(s.out/'population32_trace.json',self.audit)
         self.pso_best = list(self.slots)
-        for iteration in range(s.iterations):
+        return start
+
+    def solve(self, current):
+        from co_common import save
+        from search_checkpoint import restore_checkpoint,save_checkpoint
+        s,m=self.search,self.model
+        resumed=restore_checkpoint(self)
+        if resumed is not None and resumed['phase']!='cold':
+            return resumed['extra']['cold_result']
+        if resumed is None:
+            start=self.initialize_population(current)
+            next_iteration=0
+            save_checkpoint(self,'cold',0,start=start,current=current)
+        else:
+            start=resumed['extra']['start'];current=resumed['extra']['current']
+            next_iteration=resumed['next_iteration']
+        for iteration in range(next_iteration,s.iterations):
             if self.stop_when_feasible and self.incumbent is not None:break
             reference = min(self.slots, key=lambda x: failed_count(x.result)).result
             with m.hold_measure(reference):
@@ -680,6 +696,7 @@ class PopulationSoftSearch(MaterialSearch):
                     s.process_snapshot(selected.result, 'population_soft', dict(iteration=iteration+1))
                     self.snapshot_signature=signature
                 print('SOFT32 ROUND', s.out, iteration+1, self.describe(selected), flush=True)
+            save_checkpoint(self,'cold',iteration+1,start=start,current=current)
         self.certify(self.slots); selected = self.best_checked(start)
         if self.continuous_policy == 'pso':
             for slot, item in enumerate(self.slots):
@@ -710,4 +727,5 @@ class PopulationSoftSearch(MaterialSearch):
         if selected.witness is not None:
             m.base_oracle.witness = selected.layout.key(), selected.witness
         selected.result['base_oracle'] = selected.oracle; m.commit(selected.result)
+        save_checkpoint(self,'cold_done',len(self.audit),cold_result=selected.result)
         return selected.result

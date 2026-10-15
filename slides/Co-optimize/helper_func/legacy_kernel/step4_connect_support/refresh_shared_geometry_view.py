@@ -36,7 +36,7 @@ def head_regions(report, bases, offsets, margin=.004):
 
 def write_viewer(out, data):
     template = Path(__file__).with_name('shared_geometry_viewer.html').read_text()
-    three = (ROOT/'slides/reuse/vendor/three.min.js').read_text()
+    three = (ROOT/'slides/Co-optimize/vis_func/vendor/three.min.js').read_text()
     html = template.replace('__THREE__', three).replace('__DATA__', json.dumps(data, separators=(',', ':')))
     (Path(out)/'index.html').write_text(html)
 

@@ -130,6 +130,8 @@ class BaseOracle:
         self.seconds = 0.; self.queries = 0; self.component_queries = 0
         self.last_geometry = None
         self.constraint_cache = OrderedDict()
+        self.slice_cache = OrderedDict()
+        self.slice_cache_hits=0;self.slice_cache_misses=0
         self.work_access=[normal_work_access(model.mesh, work) if work_mode=='normal' else
             shadow_clipped_access(model.mesh,work,
                 task.domain.data.get('reachability',{}).get('ray_offset_m',1e-5))
@@ -141,9 +143,15 @@ class BaseOracle:
             T = installed_state(self.model.native, layout, layout.hosts[k]); U = T @ layout.placements[k]
             key = k, np.round(U[:3, 3], 11).tobytes()
             if key not in self.hulls:
-                com = transform_points(self.model.mesh.center_mass, U)
-                xy = system_floor_demands(self.loads[k], com)['floor_demands_xy_m']
-                hull = xy[ConvexHull(xy).vertices]
+                from search_runtime import runtime,array_key,MISSING
+                store=runtime(self.model)
+                disk_key=(k,array_key(U)) if store else None
+                hull=store.get('floor_demand_hull',disk_key) if store else MISSING
+                if hull is MISSING:
+                    com = transform_points(self.model.mesh.center_mass, U)
+                    xy = system_floor_demands(self.loads[k], com)['floor_demands_xy_m']
+                    hull = xy[ConvexHull(xy).vertices]
+                    if store:store.put('floor_demand_hull',disk_key,hull)
                 self.hulls[key] = hull
                 while len(self.hulls) > 256: self.hulls.popitem(last=False)
             body = transform_points(self.model.mesh.vertices, U)
@@ -194,7 +202,62 @@ class BaseOracle:
             if not work_only:output.append(task['exit'])
         return output
 
+    def sliced_obstacle(self,family,inv,polygon,ground_key):
+        """Reuse unchanged prism/floor slices across direction and seat probes."""
+        from search_runtime import array_key
+        key=(ground_key,array_key(family))
+        if key in self.slice_cache:
+            self.slice_cache_hits+=1
+            self.slice_cache.move_to_end(key)
+            return self.slice_cache[key]
+        self.slice_cache_misses+=1
+        p=change_planes(family,inv)
+        b=foot_obstacle_offsets(p,self.foot_width)
+        cut=polygon.copy()
+        for a,offset in zip(p[:,:2],b):
+            cut=clip(cut,-a,-offset)
+            if len(cut)<3:break
+        shape=slice_polygon(cut) if len(cut)>=3 else None
+        self.slice_cache[key]=shape
+        while len(self.slice_cache)>8192:self.slice_cache.popitem(last=False)
+        return shape
+
     def query(self, layout, *, connected=False):
+        from search_runtime import runtime,layout_key,mesh_key,MISSING
+        store=runtime(self.model)
+        if store is None:return self._query(layout,connected=connected)
+        memory_key=layout.key(),connected
+        if memory_key in self.cache:
+            store._stats('oracle_query')['memory_hits']+=1
+            return self.cache[memory_key]
+        core=None
+        if connected and getattr(self.model,'require_connected_core',False):
+            from connected_core import prepare
+            core=mesh_key(prepare(self.model,layout)[0])
+        key=(layout_key(layout),connected,core,self.padding,self.foot_width,self.work_mode,
+             getattr(self.model,'require_connected_core',False))
+        saved=store.get('oracle_query',key)
+        if saved is not MISSING:
+            answer,effects=saved
+            for name,value in effects.items():setattr(self,name,value)
+            self.cache[memory_key]=answer
+            while len(self.cache)>256:self.cache.popitem(last=False)
+            return answer
+        components_before=store.timings.get('oracle_connected_geometry',0.)
+        began=time.monotonic()
+        answer=self._query(layout,connected=connected)
+        duration=time.monotonic()-began
+        components=store.timings.get('oracle_connected_geometry',0.)-components_before
+        store.timings['oracle_enclosure']=store.timings.get('oracle_enclosure',0.)+duration-components
+        effects={}
+        for name in ('witness','last_geometry'):
+            value=getattr(self,name,None)
+            if value is not None and value[0]==layout.key():effects[name]=value
+        if connected:effects['core_clip_proposal']=getattr(self,'core_clip_proposal',None)
+        store.put('oracle_query',key,(answer,effects))
+        return answer
+
+    def _query(self, layout, *, connected=False):
         key = layout.key(), connected
         if key in self.cache: return self.cache[key]
         began = time.monotonic(); self.queries += 1
@@ -252,16 +315,24 @@ class BaseOracle:
                     tagged = [(kind,family) for task in task_families
                               for kind,families in [('work',task['work']),('exit',[task['exit']])]
                               for family in families]
+                    store=getattr(self.model,'search_runtime',None)
+                    if store:
+                        from search_runtime import array_key
+                        ground_key=(self.foot_width,array_key(inv),array_key(polygon))
                     for kind,family in tagged:
-                        p = change_planes(family, inv)
-                        # Default width=0 leaves the original exclusions intact.
-                        b = foot_obstacle_offsets(p, self.foot_width)
-                        cut = polygon.copy()
-                        for a, offset in zip(p[:,:2], b):
-                            cut = clip(cut, -a, -offset)
-                            if len(cut) < 3: break
-                        if len(cut) >= 3:
-                            forbidden.append(slice_polygon(cut))
+                        if store:
+                            shape=self.sliced_obstacle(family,inv,polygon,ground_key)
+                        else:
+                            p = change_planes(family, inv)
+                            # Default width=0 leaves the original exclusions intact.
+                            b = foot_obstacle_offsets(p, self.foot_width)
+                            cut = polygon.copy()
+                            for a, offset in zip(p[:,:2], b):
+                                cut = clip(cut, -a, -offset)
+                                if len(cut) < 3: break
+                            shape=slice_polygon(cut) if len(cut)>=3 else None
+                        if shape is not None:
+                            forbidden.append(shape)
                             if kind=='work':work_forbidden.append(forbidden[-1])
                     work_legal=legal.difference(unary_union(work_forbidden))
                     legal = legal.difference(unary_union(forbidden))
@@ -286,7 +357,11 @@ class BaseOracle:
                 query_seconds=time.monotonic()-began)
             self.last_geometry = (layout.key(), geometry, low, high)
             if connected and enclosure:
+                component_began=time.monotonic()
                 result.update(self.components(layout, rows, low, high))
+                store=getattr(self.model,'search_runtime',None)
+                if store is not None:
+                    store.timings['oracle_connected_geometry']=store.timings.get('oracle_connected_geometry',0.)+time.monotonic()-component_began
         result.update(constraint_schema=SCHEMA,work_constraints_pose_specific=True,
             contact_anchor_policy=('actual_connected_contact_core_containment'
                 if getattr(self.model,'require_connected_core',False)else CONTACT_ANCHOR_POLICY),

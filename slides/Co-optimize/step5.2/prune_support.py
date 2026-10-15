@@ -42,10 +42,11 @@ def material_components(value):
 
 
 class ForceCertificate:
-    def __init__(self, poses, layout, body, rows, name='B'):
+    def __init__(self, poses, layout, body, rows, name='B', *, states=None, search_runtime=None):
         self.layout = layout
         self.mesh = body
-        self.states = [C.state(name, pose) for pose in poses]
+        self.states = [C.state(name, pose) for pose in poses] if states is None else states
+        self.search_runtime=search_runtime
         self.tasks = [row[0] for row in self.states]
         self.native = np.array([row[1] for row in self.states])
         self.allowed = [np.setdiff1d(np.arange(len(body.faces)), task.domain.work_ids)
@@ -84,9 +85,19 @@ class ForceCertificate:
                               for row in full]
                 if len(set(column_ids)) != len(column_ids):
                     raise ValueError('Reaction-column identity collision')
-                mask, _ = classify(full, self.tasks[k].targets,
-                    basis_cache=self.bases[k], column_ids=column_ids,
-                    stop_on_counterexample=reject_early)
+                from search_runtime import array_key,MISSING
+                store=self.search_runtime
+                key=(array_key(full),array_key(self.tasks[k].targets),reject_early,
+                     tuple(self.bases[k]),tuple(column_ids)) if store else None
+                proof=store.get('complete_force',key) if store else MISSING
+                if proof is MISSING:
+                    mask, _ = classify(full, self.tasks[k].targets,
+                        basis_cache=self.bases[k], column_ids=column_ids,
+                        stop_on_counterexample=reject_early)
+                    if store:store.put('complete_force',key,(mask,list(self.bases[k])))
+                else:
+                    mask,bases=proof
+                    self.bases[k][:]=bases
                 self.cache[fingerprint] = mask
                 self.classifications += 1
             masks[k] = mask

@@ -32,9 +32,14 @@ def read_upstream(path):
 
 def worker(job):
     label,options=job;base=A.result_root('B')/label
-    out=base/'step4/step4.2'/options['output_name'];out.mkdir(parents=True,exist_ok=False);(out/'data').mkdir()
+    out=base/'step4/step4.2'/options['output_name']
+    continuing=options.get('continue_checkpoint',False) and out.exists()
+    out.mkdir(parents=True,exist_ok=continuing);(out/'data').mkdir(exist_ok=continuing)
     began=time.monotonic();result=dict(id=label,passed=False,force_passed=False,base_oracle_passed=False)
+    model=None;search_finished=False
     try:
+        import gpu_replay
+        gpu_replay.configure(options.get('gpu_replay','off'))
         source=base/'step4/step4.1';original=read_upstream(source/'data/report.json')
         result['pose_count']=len(original['poses'])
         initialized=base/'step3/step3.1';read_upstream(initialized/'data/report.json')
@@ -58,6 +63,10 @@ def worker(job):
         search.allow_native_sliding=options.get('allow_native_sliding',False)
         search.allow_geometry_validation=options.get('allow_geometry_validation',False)
         search.population_continuous_policy=options.get('population_continuous_policy','pso')
+        search.pso_refinement_rounds=options.get('pso_refinement_rounds',0)
+        search.pso_refinement_policy=options.get('pso_refinement_policy','pso')
+        search.pso_refinement_seed=options.get('pso_refinement_seed',42)
+        search.continue_checkpoint=continuing
         search.warm_checkpoint_experiment=options.get('warm_checkpoint_experiment')
         search.initialization_seeds=options.get('initialization_seeds')
         search.material_warm_layouts=[]
@@ -69,10 +78,20 @@ def worker(job):
                 search.material_warm_layouts.append((str(path.relative_to(ROOT)),load_layout(path)))
                 model.inputs.append(path)
         search.screen_budget=96;search.capture_process=True;search.volume_rounds=2
+        if options.get('runtime_cache',False):
+            from search_runtime import SearchRuntime,execution_scope
+            model.search_runtime=SearchRuntime(out/'.search_runtime',execution_scope(model,options),
+                options.get('runtime_cache_memory_mb',32)*1024**2)
         layout=load_layout(source/'layout.npz')
-        current=(model.evaluate(layout) if model.require_connected_core else
-            search.initialize_exact(layout,'saved_step4.1_registered_initial'))
-        search.baseline(current)
+        if continuing:
+            from search_runtime import MISSING
+            saved=model.search_runtime.get('checkpoint','latest')
+            if saved is MISSING:raise ValueError('No intact checkpoint to continue')
+            current=saved['extra'].get('current',saved['extra'].get('cold_result'))
+        else:
+            current=(model.evaluate(layout) if model.require_connected_core else
+                search.initialize_exact(layout,'saved_step4.1_registered_initial'))
+            search.baseline(current)
         initial=current['counts']
         if options.get('resume'):
             current=model.evaluate(load_layout(base/'step4/step4.2'/options['resume']/'layout.npz'))
@@ -92,6 +111,7 @@ def worker(job):
             resume_own_experiment=options.get('resume')),initial_counts=initial)
         data=dict(report);data['artifacts']={'../'+k:v for k,v in report['artifacts'].items()}
         save(out/'data/report.json',data)
+        search_finished=True
         if report['mesh_exported']:
             try:render_search(model,out,report)
             except Exception as error:report['render_error']=str(error)
@@ -118,11 +138,32 @@ def worker(job):
             export_pose_constraints(model,current['layout'],oracle_out,model.base_oracle)
     except Exception as error:
         traceback.print_exc();result.update(status='unresolved',error=str(error))
-    A.publish_visuals(out)
-    A.cleanup_stage(out)
-    result['seconds']=time.monotonic()-began;save(out/'run_result.json',result)
-    print('ORACLE RESULT',json.dumps(result),flush=True)
-    return result
+    store=getattr(model,'search_runtime',None)
+    import gpu_replay
+    result['gpu_replay']=gpu_replay.report()
+    try:
+        try:
+            if store is not None:
+                diagnostics=store.report()
+                diagnostics['oracle_obstacle_slices']=dict(hits=model.base_oracle.slice_cache_hits,
+                    misses=model.base_oracle.slice_cache_misses,retained=len(model.base_oracle.slice_cache))
+                result['runtime_cache']=diagnostics
+                save(out/'runtime_cache.json',diagnostics)
+        finally:
+            # Remove scratch before publishing scans the result directory.
+            if search_finished and store is not None:store.cleanup()
+        A.publish_visuals(out)
+        result['seconds']=time.monotonic()-began;save(out/'run_result.json',result)
+        print('ORACLE RESULT',json.dumps(result),flush=True)
+        return result
+    finally:
+        # Completion is the saved numerical result, including SEARCH_FAIL.
+        # Later presentation/I/O errors must not retain a finished set's cache.
+        # Interrupted searches keep their checkpoint for same-run continuation.
+        if search_finished:
+            A.cleanup_stage(out)
+            for filename in ('pso_memory.npz', 'pso_refinement_memory.npz'):
+                (out/filename).unlink(missing_ok=True)
 
 
 def main():
@@ -142,6 +183,17 @@ def main():
     parser.add_argument('--require-connected-core',action='store_true')
     parser.add_argument('--population-continuous-policy',choices=['pso','differential'],default='pso',
                         help='Continuous branch only; differential retains the original comparison')
+    parser.add_argument('--pso-refinement-rounds',type=int,default=0,
+                        help='Explicit extra moving-particle rounds after the unchanged cold search')
+    parser.add_argument('--pso-refinement-policy',choices=['pso','differential'],default='pso')
+    parser.add_argument('--pso-refinement-seed',type=int,default=42)
+    parser.add_argument('--runtime-cache',action=argparse.BooleanOptionalAction,default=True,
+                        help='Disposable exact-input disk caches and population round checkpoints')
+    parser.add_argument('--runtime-cache-memory-mb',type=int,default=32)
+    parser.add_argument('--gpu-replay',choices=['off','auto','required'],default='auto',
+                        help='Bounded FP64 basis batches; original CPU replays ambiguous demands')
+    parser.add_argument('--continue-checkpoint',action='store_true',
+                        help='Continue this interrupted population, including RNG and measure')
     parser.add_argument('--initialization-budget',type=int,default=96)
     parser.add_argument('--warm-start-experiments',nargs='*',default=[])
     parser.add_argument('--warm-checkpoint-experiment')
@@ -154,6 +206,14 @@ def main():
     parser.add_argument('--output-name',default='base_oracle_v1');args=parser.parse_args()
     if args.frontier_width<1:
         parser.error('--frontier-width must be positive')
+    if args.runtime_cache_memory_mb<0:parser.error('Runtime cache memory must be nonnegative')
+    if args.continue_checkpoint and (not args.runtime_cache or not args.require_connected_core
+            or args.search_policy!='population_soft'):
+        parser.error('Checkpoint continuation requires runtime-cache connected-core population_soft')
+    if args.search_policy!='population_soft' or not args.require_connected_core:
+        args.runtime_cache=False
+    if args.pso_refinement_rounds<0 or (args.pso_refinement_rounds and args.search_policy!='population_soft'):
+        parser.error('Refinement rounds must be nonnegative and use population_soft')
     if args.search_policy in ('population32','population_soft'):
         if (args.search_policy=='population32' and args.frontier_width!=32) or args.frontier_width<3:
             parser.error('population32 requires 32 slots; population_soft requires at least 3')
@@ -169,23 +229,36 @@ def main():
         (base/label/'step4/step4.1/data/report.json').read_text())['poses'])<=args.max_poses]
     if not sets:
         parser.error('No saved pose sets in the requested range')
-    directory=base/'data'/args.output_name;directory.mkdir(parents=True,exist_ok=False)
+    directory=base/'data'/args.output_name;directory.mkdir(parents=True,exist_ok=args.continue_checkpoint)
     sources=list((COOPT/'helper_func').rglob('*.py'))+list((COOPT/'vis_func').glob('*.py'))+list((COOPT/'step4.2').glob('*.py'))
     sources.append(COOPT/'step5.3/deterministic_base.py')
     hashes=I.hashes(sources)
-    for relative in hashes:
-        target=directory/'executed_sources'/relative;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/relative,target)
-    save(directory/'sources.json',hashes)
+    if args.continue_checkpoint:
+        I.check_hashes(json.loads((directory/'sources.json').read_text()))
+    else:
+        for relative in hashes:
+            target=directory/'executed_sources'/relative;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(ROOT/relative,target)
+        save(directory/'sources.json',hashes)
     protected={}
     for label in sets:
         for stage in ['step3','step4/step4.1']:
             protected.update(I.hashes([p for p in (base/label/stage).rglob('*') if p.is_file()]))
-    save(directory/'protected.json',protected)
-    batch=dict(complete=False,sets=sets,group_count=len(sets),options=vars(args),results=[],
-        old_incumbents_accepted_without_oracle=False,intermediate_rotations_constrained=False)
+    if args.continue_checkpoint:
+        batch=json.loads((directory/'batch.json').read_text())
+        excluded={'continue_checkpoint','jobs'}
+        if ({k:v for k,v in batch['options'].items() if k not in excluded}!=
+                {k:v for k,v in vars(args).items() if k not in excluded}):
+            parser.error('Checkpoint continuation must use the same experiment options')
+        I.check_hashes(json.loads((directory/'protected.json').read_text()))
+    else:
+        save(directory/'protected.json',protected)
+        batch=dict(complete=False,sets=sets,group_count=len(sets),options=vars(args),results=[],
+            old_incumbents_accepted_without_oracle=False,intermediate_rotations_constrained=False)
     save(directory/'batch.json',batch);start=time.monotonic()
     with ProcessPoolExecutor(max_workers=args.jobs,mp_context=multiprocessing.get_context('spawn')) as pool:
-        futures=[pool.submit(worker,(label,vars(args))) for label in sets]
+        done={r['id'] for r in batch['results'] if r.get('status')!='unresolved'}
+        batch['results']=[r for r in batch['results'] if r['id'] in done]
+        futures=[pool.submit(worker,(label,vars(args))) for label in sets if label not in done]
         for future in as_completed(futures):
             batch['results'].append(future.result());batch['seconds']=time.monotonic()-start
             batch['passed']=sum(r['passed'] for r in batch['results']);save(directory/'batch.json',batch)

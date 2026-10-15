@@ -119,8 +119,20 @@ class FastModel(Model):
                 mask, info = self.force_cache[force_key]
                 self.force_cache.move_to_end(force_key)
             else:
-                mask, info = classify(full, self.tasks[k].targets,
-                                      basis_cache=self.basis_caches[k], column_ids=column_ids)
+                from search_runtime import runtime, array_key, MISSING
+                store=runtime(self)
+                # Basis history is retained with the result: a cache hit must
+                # not silently change the later numerical projection path.
+                disk_key=(k,array_key(full),array_key(self.tasks[k].targets),
+                          tuple(self.basis_caches[k]),tuple(column_ids)) if store else None
+                saved=store.get('sampled_force',disk_key) if store else MISSING
+                if saved is MISSING:
+                    mask, info = classify(full, self.tasks[k].targets,
+                                          basis_cache=self.basis_caches[k], column_ids=column_ids)
+                    if store:store.put('sampled_force',disk_key,(mask,info,list(self.basis_caches[k])))
+                else:
+                    mask,info,bases=saved
+                    self.basis_caches[k][:]=bases
                 self.force_cache[force_key] = mask, info
                 while len(self.force_cache) > 64:
                     self.force_cache.popitem(last=False)

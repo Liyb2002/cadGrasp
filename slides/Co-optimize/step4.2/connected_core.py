@@ -5,6 +5,7 @@ Deleted components never contribute contact reactions or Oracle anchors.
 """
 from collections import OrderedDict
 import hashlib
+import time
 import numpy as np
 from whole_search.common import C, unpack_solid
 
@@ -34,11 +35,20 @@ def prepare(model, layout):
     cache=getattr(model,'connected_core_cache',None)
     if cache is None:
         cache=model.connected_core_cache=OrderedDict()
+    if not hasattr(model,'connected_core_builder'):
         from whole_step4_render import NominalBuilder
         model.connected_core_builder=NominalBuilder(model)
     key=layout.key()
     if key not in cache:
+        from search_runtime import runtime, layout_key, MISSING
+        store=runtime(model)
+        saved=store.get('contact_core',layout_key(layout)) if store else MISSING
+        if saved is not MISSING:
+            cache[key]=saved
+            while len(cache)>16:cache.popitem(last=False)
+            return saved
         builder=model.connected_core_builder
+        began=time.monotonic()
         original=builder.solid(layout)
         kept,record=largest_material_component(original)
         mesh=unpack_solid(kept)
@@ -55,7 +65,10 @@ def prepare(model, layout):
             all_pose_floor_clipping_applied=True,
             material_domain='original finite Step4 wrap minus original exclusions')
         cache[key]=(mesh,record)
-        while len(cache)>128:cache.popitem(last=False)
+        if store:
+            store.timings['contact_core']=store.timings.get('contact_core',0.)+time.monotonic()-began
+            store.put('contact_core',layout_key(layout),(mesh,record))
+        while len(cache)>(16 if store else 128):cache.popitem(last=False)
         if len(builder.shapes)>128:builder.shapes.clear()
         if len(builder.parts)>2048:builder.parts.clear()
     return cache[key]

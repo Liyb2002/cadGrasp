@@ -303,6 +303,9 @@ class OracleSearch(StableGradientSearch):
 
     def solve_frontier(self,current,anchor=None,insertion_guest=None):
         if getattr(self,'search_policy','frontier')=='population_soft':
+            if getattr(self,'pso_refinement_rounds',0):
+                from population_pso_refine import PopulationPSORefine
+                return PopulationPSORefine(self).solve(current)
             from population_soft import PopulationSoftSearch
             return PopulationSoftSearch(self).solve(current)
         if getattr(self,'search_policy','frontier')=='population32':
@@ -400,7 +403,8 @@ class OracleSearch(StableGradientSearch):
             frontier_search=getattr(self,'frontier_statistics',None),
             oracle_work_access_mode=self.model.base_oracle.work_mode)
         if oracle_passed and getattr(self.model.base_oracle,'witness',(None,None))[0]==current['layout'].key():
-            self.model.base_oracle.witness[1].export(self.out/'oracle_connected_witness.obj',digits=16)
+            from co_common import D
+            D.export_exact_obj(self.model.base_oracle.witness[1],self.out/'oracle_connected_witness.obj')
         if selected is not None:
             from material_evaluator import membership,target_gap,mixed_target_applicable
             reuse,jux=membership(current['layout'])
@@ -422,9 +426,16 @@ class OracleSearch(StableGradientSearch):
                 from co_common import D,I
                 D.export_exact_obj(selected.solid,self.out/'support_with_base.obj')
                 fields=['layout.npz','support.obj','oracle_connected_witness.obj','support_with_base.obj']
+                full_force=getattr(selected,'full_certificate',None)
+                if full_force is not None:
+                    np.savez_compressed(self.out/'preconstructed_force_certificate.npz',
+                        **{'mask_'+str(k):v for k,v in full_force['masks'].items()})
+                    fields.append('preconstructed_force_certificate.npz')
                 prebuilt=dict(complete=True,construction=selected.construction,
                     evaluation=selected.evaluation,fixture_weight_ratio=0.,
-                    support='support_with_base.obj',layout_changed=False,force_solver_run=False,
+                    support='support_with_base.obj',layout_changed=False,
+                    force_solver_run=full_force is not None,
+                    full_force_certificate='preconstructed_force_certificate.npz'if full_force is not None else None,
                     source_sha256={name:I.sha256(self.out/name) for name in fields})
                 save(self.out/'preconstructed_base.json',prebuilt)
                 report['preconstructed_base']='preconstructed_base.json'

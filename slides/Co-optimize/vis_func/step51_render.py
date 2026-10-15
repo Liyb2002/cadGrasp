@@ -20,7 +20,7 @@ if str(BASELINE) not in sys.path:
 from step4_connect_support.clean_render import Renderer
 
 # These utilities only build raster input; they never run the reuse experiment.
-CPU_PATH = ROOT / 'slides/reuse/code/render_cpu.py'
+CPU_PATH = Path(__file__).with_name('cpu_mesh.py')
 spec = importlib.util.spec_from_file_location('step51_cpu_pieces', CPU_PATH)
 CPU = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(CPU)
