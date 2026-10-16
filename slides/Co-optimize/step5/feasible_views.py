@@ -30,7 +30,8 @@ def main():
     inputs = C.Inputs(args.object, args.selection_summary, args.step51_experiment)
     renderer = C.V.Renderer() if not args.skip_images else None
     R = load_module('feasible_final_renderer', COOPT/'step5.3/render.py') if renderer else None
-    E = load_module('feasible_saved_evaluation', COOPT/'evaluation/run.py') if renderer else None
+    E = load_module('feasible_saved_evaluation', COOPT/'evaluation/run.py') if not args.skip_evaluation else None
+    evaluation_renderer=(renderer or C.V.Renderer())if E else None
     results = []
     for case in inputs.cases:
         data = inputs.load(case)
@@ -93,21 +94,22 @@ def main():
             panels = [renderer.render([C.V.CPU.placed(C.V.piece(m, C.V.BLUE))], camera, 800)
                       for m in posed]
             C.V.sheet(panels, images/'comparison.png')
-            E.render(renderer, data['body'], data['fixture'], final, layout, result, images)
             result['images'] = {p.name:dict(path=relative(p), sha256=digest(p))
                                 for p in images.glob('*.png')}
-        save(folder/'evaluation.json', result)
+        if E:
+            result['step4_source']=relative(data['selected'])
+            E.publish_case(args.object,result,data['body'],data['fixture'],final,layout,
+                evaluation_renderer,inputs.protected)
         results.append(result)
         print('STEP5 SAVED EVALUATION',case['id'],round(result['with_full_support']['volume_litres'],4),flush=True)
     inputs.verify()
-    directory = inputs.base/'data'/('step5_feasible_'+args.experiment)
-    save(directory/'evaluation.json', dict(complete=True, passed=True, group_count=len(results),
-        results=results, original_demands_passed=sum(r['original_demands_passed'] for r in results),
-        independent_bbx_sum_l=sum(r['with_full_support']['volume_litres'] for r in results),
-        original_step4_full_bbx_sum_l=sum(r['step4_full_bbx_l'] for r in results),
-        material_sum_cm3=sum(r['material_full_cm3'] for r in results),
-        step4_layouts_and_demands_unchanged=True, force_solver_run=False,
-        protected_inputs=inputs.protected))
+    if E:
+        full=inputs.base/'data'/('step5_feasible_'+args.experiment)/'summary.json'
+        selection=read(full)if full.exists()else read(args.selection_summary)
+        for case in selection.get('results',selection.get('selected',[])):
+            if not case['passed']:E.unavailable(args.object,case,inputs.mesh,evaluation_renderer)
+        summary=E.write_summary(args.object,selection,full if full.exists()else args.selection_summary)
+        if summary['complete']:E.clean_legacy(args.object)
 
 
 if __name__ == '__main__':

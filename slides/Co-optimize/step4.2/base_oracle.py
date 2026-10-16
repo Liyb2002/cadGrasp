@@ -52,12 +52,19 @@ def clip(points, a, b):
     if values.min() >= -1e-12: return points
     if values.max() < -1e-12: return np.empty((0, 2))
     output = []
-    for p, q, f, g in zip(points, np.roll(points, -1, axis=0), values, np.roll(values, -1)):
+    count = len(points)
+    for i in range(count):
+        following = (i+1) % count
+        p, q = points[i], points[following]
+        f, g = values[i], values[following]
         if f >= -1e-12: output.append(p)
         if (f >= -1e-12) != (g >= -1e-12):
             # Tolerant inclusion can classify a tiny negative f as inside.
             # Its intersection must stay on the edge, never extrapolate.
-            output.append(p + np.clip(f/(f-g),0.,1.)*(q-p))
+            fraction = f/(f-g)
+            if fraction < 0.: fraction = 0.
+            elif fraction > 1.: fraction = 1.
+            output.append(p + fraction*(q-p))
     return np.asarray(output).reshape(-1, 2)
 
 
@@ -132,10 +139,16 @@ class BaseOracle:
         self.constraint_cache = OrderedDict()
         self.slice_cache = OrderedDict()
         self.slice_cache_hits=0;self.slice_cache_misses=0
+        self.floor_rejections = OrderedDict()
+        self.slice_planes = OrderedDict()
+        self.equivalent_statistics = dict(floor_rejection_reuses=0,
+            obstacle_plane_reuses=0, deferred_losing_oracles=0)
         self.work_access=[normal_work_access(model.mesh, work) if work_mode=='normal' else
             shadow_clipped_access(model.mesh,work,
                 task.domain.data.get('reachability',{}).get('ray_offset_m',1e-5))
             for work,task in zip(model.work_rays,model.tasks)]
+        from fixed_work_planes import FixedWorkPlanes
+        self.fixed_work_planes = FixedWorkPlanes(self.work_access)
 
     def rows(self, layout):
         result = []
@@ -174,7 +187,7 @@ class BaseOracle:
         """Keep work and exit constraints tagged by the task that owns them."""
         output = []
         for task in self.pose_constraints(layout).poses:
-            k=task.index; Q = task.Q_fixture_object; inverse = np.linalg.inv(Q)
+            k=task.index; Q = task.Q_fixture_object; inverse = self.fixed_work_planes.inverse(Q)
             d = Q[:3, :3].T @ layout.directions[k]
             length = self.model.length
             if bounds is not None:
@@ -182,15 +195,13 @@ class BaseOracle:
                 length = max(length, float((local@d).max()-(self.model.mesh.vertices@d).min())+.01)
             key = k, np.round(Q, 11).tobytes(), np.round(d, 11).tobytes(), round(length, 11)
             if key not in self.family_cache:
-                families = list(task.work_common)
                 # A containing convex sweep is a safe fast screen. A failure
                 # is UNKNOWN; exact union sweeps are used in component checks.
                 body = self.model.mesh.vertices
                 sweep = ConvexHull(np.vstack([body, body+length*d]))
-                families.append(change_planes(sweep.equations, inverse))
-                self.family_cache[key] = families
+                self.family_cache[key] = change_planes(sweep.equations, inverse)
                 while len(self.family_cache) > 256: self.family_cache.popitem(last=False)
-            output.append(dict(index=int(k),work=self.family_cache[key][:-1],exit=self.family_cache[key][-1]))
+            output.append(dict(index=int(k),work=task.work_common,exit=self.family_cache[key]))
         return output
 
     def families(self, layout, *, work_only=False, bounds=None):
@@ -202,7 +213,7 @@ class BaseOracle:
             if not work_only:output.append(task['exit'])
         return output
 
-    def sliced_obstacle(self,family,inv,polygon,ground_key):
+    def sliced_obstacle(self,family,inv,polygon,ground_key,prepared=None):
         """Reuse unchanged prism/floor slices across direction and seat probes."""
         from search_runtime import array_key
         key=(ground_key,array_key(family))
@@ -211,8 +222,18 @@ class BaseOracle:
             self.slice_cache.move_to_end(key)
             return self.slice_cache[key]
         self.slice_cache_misses+=1
-        p=change_planes(family,inv)
-        b=foot_obstacle_offsets(p,self.foot_width)
+        plane_key=(self.foot_width,array_key(inv),key[1])
+        if prepared is None:
+            prepared=self.slice_planes.get(plane_key) if getattr(self.model,'equivalent_search',False) else None
+        if prepared is None:
+            p=change_planes(family,inv)
+            b=foot_obstacle_offsets(p,self.foot_width)
+            if getattr(self.model,'equivalent_search',False):
+                self.slice_planes[plane_key]=(p,b)
+                while len(self.slice_planes)>8192:self.slice_planes.popitem(last=False)
+        else:
+            p,b=prepared
+            self.equivalent_statistics['obstacle_plane_reuses']+=1
         cut=polygon.copy()
         for a,offset in zip(p[:,:2],b):
             cut=clip(cut,-a,-offset)
@@ -260,9 +281,29 @@ class BaseOracle:
     def _query(self, layout, *, connected=False):
         key = layout.key(), connected
         if key in self.cache: return self.cache[key]
-        began = time.monotonic(); self.queries += 1
+        began = time.monotonic()
+        # Preserve legacy rounded-cache insertion order, even on a reuse hit.
         constraints = self.pose_constraints(layout)
         rows = self.rows(layout)
+        rejection_key=None
+        if getattr(self.model,'equivalent_search',False):
+            from search_runtime import array_key
+            # Identical seats can see different cached hulls after eviction.
+            # Reuse only the exact numerical inputs to the old floor test.
+            rejection_key=(connected,constraints.support_contact_clearance_m,
+                tuple((r['index'],r['pose'],array_key(r['T']),array_key(r['U']),
+                       array_key(r['hull']),array_key(r['own'])) for r in rows))
+            if rejection_key in self.floor_rejections:
+                from copy import deepcopy
+                result=deepcopy(self.floor_rejections[rejection_key])
+                result['query_seconds']=time.monotonic()-began
+                self.equivalent_statistics['floor_rejection_reuses']+=1
+                self.seconds+=result['query_seconds']
+                # Preserve the original full-query cache's order and keys.
+                self.cache[key]=result
+                while len(self.cache)>256:self.cache.popitem(last=False)
+                return result
+        self.queries += 1
         # Exact, unbounded upper-bound rejection, including object contacts.
         certificates = []
         for row in rows:
@@ -297,7 +338,7 @@ class BaseOracle:
                         demand_hull_xy_m=row['hull'].tolist(), object_ground_xy_m=row['own'].tolist()))
                     records[-1]['work_only_enclosure_passed']=cover(row['hull'],np.vstack([work_contacts,row['own']]))[0]
                     geometry.append((row,legal,forbidden_shape)); continue
-                inv = np.linalg.inv(row['T']); world = transform_points(joined, row['T'])
+                inv = self.fixed_work_planes.inverse(row['T']); world = transform_points(joined, row['T'])
                 lo, hi = world[:, :2].min(0)-self.padding, world[:, :2].max(0)+self.padding
                 polygon = np.array([[*lo], [hi[0],lo[1]], [*hi], [lo[0],hi[1]]])
                 for state in [r['T'] for r in rows]:
@@ -312,20 +353,26 @@ class BaseOracle:
                 legal = slice_polygon(polygon)
                 forbidden = []; work_forbidden=[]; work_legal=legal
                 if not legal.is_empty:
-                    tagged = [(kind,family) for task in task_families
-                              for kind,families in [('work',task['work']),('exit',[task['exit']])]
-                              for family in families]
+                    tagged = []
+                    for task in task_families:
+                        prepared = self.fixed_work_planes.on_ground(
+                            constraints.by_index[task['index']], inv, self.foot_width)
+                        tagged.extend(('work', family, coefficients)
+                                      for family, coefficients in zip(task['work'], prepared))
+                        tagged.append(('exit', task['exit'], None))
                     store=getattr(self.model,'search_runtime',None)
                     if store:
                         from search_runtime import array_key
                         ground_key=(self.foot_width,array_key(inv),array_key(polygon))
-                    for kind,family in tagged:
+                    for kind,family,prepared in tagged:
                         if store:
-                            shape=self.sliced_obstacle(family,inv,polygon,ground_key)
+                            shape=self.sliced_obstacle(family,inv,polygon,ground_key,prepared)
                         else:
-                            p = change_planes(family, inv)
-                            # Default width=0 leaves the original exclusions intact.
-                            b = foot_obstacle_offsets(p, self.foot_width)
+                            if prepared is None:
+                                p = change_planes(family, inv)
+                                b = foot_obstacle_offsets(p, self.foot_width)
+                            else:
+                                p, b = prepared
                             cut = polygon.copy()
                             for a, offset in zip(p[:,:2], b):
                                 cut = clip(cut, -a, -offset)
@@ -374,6 +421,10 @@ class BaseOracle:
             support_contact_clearance_m=constraints.support_contact_clearance_m,
             base_feet_ground_height_m=0.)
         self.seconds += time.monotonic()-began
+        if rejection_key is not None and result['status']=='certified_floor_incompatible':
+            from copy import deepcopy
+            self.floor_rejections[rejection_key]=deepcopy(result)
+            while len(self.floor_rejections)>256:self.floor_rejections.popitem(last=False)
         self.cache[key] = result
         while len(self.cache) > 256: self.cache.popitem(last=False)
         return result

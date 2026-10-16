@@ -161,6 +161,8 @@ class MaterialSearch:
         return checked
 
     def certify(self, items, connections=3, constructions=2):
+        if getattr(self.search, 'stop_when_feasible', False) and self.incumbent is not None:
+            return
         pending = [x for x in items if self.evaluator.space_candidate(x)
                    and x.oracle.get('enclosure_passed')]
         pending.sort(key=self.certification_rank)
@@ -185,6 +187,12 @@ class MaterialSearch:
                     (self.goal_gap(item.layout), *item.cost) <
                     (self.goal_gap(self.incumbent.layout), *self.incumbent.cost)):
                 self.incumbent = item
+                if getattr(self.search, 'stop_when_feasible', False):
+                    from co_common import save
+                    save(self.search.out/'first_complete_solid.json', dict(
+                        layout_id=sample_id(item.layout), statistics=dict(self.evaluator.stats),
+                        full_solid_certified=True, stop_search=True))
+                    return
 
     def continuation_rows(self, parent, round_index):
         """Original sphere/XYZ secants, with ALL owners in every objective."""

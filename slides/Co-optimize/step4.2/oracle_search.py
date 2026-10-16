@@ -303,7 +303,7 @@ class OracleSearch(StableGradientSearch):
 
     def solve_frontier(self,current,anchor=None,insertion_guest=None):
         if getattr(self,'search_policy','frontier')=='population_soft':
-            if getattr(self,'pso_refinement_rounds',0):
+            if getattr(self,'pso_refinement_rounds',0) and not getattr(self, 'stop_when_feasible', False):
                 from population_pso_refine import PopulationPSORefine
                 return PopulationPSORefine(self).solve(current)
             from population_soft import PopulationSoftSearch

@@ -1,234 +1,324 @@
-"""Evaluate overlapping unsupported poses and actual supported static layouts."""
+"""Overwrite one normalized three-column BBX image per pose set."""
 from pathlib import Path
-import argparse, html, json, os, shutil, sys, time
+import argparse, json, os, shutil, sys
 import numpy as np
 import trimesh
-from metrics import static_bounds, METRIC_VERSION, SUPPORT_POSE_METRIC_VERSION, BOX_KEYS, STATE_KEYS
+from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 
 COOPT=Path(__file__).resolve().parents[1];ROOT=COOPT.parents[1]
-for folder in [ROOT,COOPT/'vis_func',COOPT/'helper_func',COOPT/'step5.1']:sys.path.insert(0,str(folder))
+sys.path[:0]=[str(ROOT),str(COOPT/'evaluation'),str(COOPT/'helper_func'),str(COOPT/'vis_func'),str(COOPT/'step5.1')]
+from metrics import static_bounds,BOX_KEYS
+import artifact_store as A
 import step51_render as V
 import hull_render as H
-import artifact_store as A
+
+VERSION='representative_pose_strip_box_v4'
+DEFAULT_EXPERIMENT='outside_in_all52_20261015_03'
+FIGURE_SIZE=(1950,1210)
 
 
-def sha(p):return A.digest(p)
-def relative(p):return str(Path(p).resolve().relative_to(ROOT))
-def save(p,data):
-    p.parent.mkdir(parents=True,exist_ok=True)
-    p.write_text(json.dumps(data,ensure_ascii=False,indent=2,allow_nan=False)+'\n')
+def sha(path):return A.digest(path)
+def relative(path):return str(Path(path).resolve().relative_to(ROOT))
+def read(path):return json.loads(Path(path).read_text())
+def save(path,value):
+    path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text(json.dumps(value,ensure_ascii=False,indent=2,allow_nan=False)+'\n')
+def directory(name):return A.result_root(name)/'data/evaluation'
+def image_path(name,label):return A.VISUALS/name/label/'evaluation.png'
+def report_path(name,label):return A.result_root(name)/label/'evaluation.json'
 
 
-def final_stage(root, experiment):
-    for stage in ['step5.3','step5.2']:
-        folder=root/'step5'/stage/experiment
-        if (folder/'data/report.json').exists():
-            record=json.loads((folder/'data/report.json').read_text())
-            if record.get('stage_type')=='support_pruning':
-                raise ValueError('Step5.2 is pruned material; construct Step5.3 before Evaluation')
-            return folder
-    raise FileNotFoundError('No completed final support for '+str(root))
+def normalize(result):
+    reference=result['object_static']['volume_litres']
+    if not np.isfinite(reference)or reference<=0:raise ValueError('Invalid object-only BBX')
+    result['relative_bbx_volume']={k:None if result[k]is None else result[k]['volume_litres']/reference for k in BOX_KEYS}
+    result['relative_bbx_volume']['object_static']=1.
+    result['bbx_increase_percent']={k:None if v is None else 100*(v-1)for k,v in result['relative_bbx_volume'].items()}
+    result['bbx_increase_litres']={k:None if result[k]is None else result[k]['volume_litres']-reference for k in BOX_KEYS}
+    result['evaluation_output_version']=VERSION
+    return result
 
 
 def corners(record):
     lo,hi=record['min_m'],record['max_m']
-    return np.array([[x,y,z] for x in [lo[0],hi[0]] for y in [lo[1],hi[1]] for z in [lo[2],hi[2]]])
+    return np.array([[x,y,z]for x in [lo[0],hi[0]]for y in [lo[1],hi[1]]for z in [lo[2],hi[2]]])
+
+
+def presentation(layout,result):
+    """Group actual installation transforms without superimposing their meshes."""
+    poses={p['layout_index']:p for p in result['per_pose']};groups={}
+    for value in layout['active']:
+        k=int(value);T=layout['native_world'][layout['hosts'][k]]
+        group=groups.setdefault(np.round(T,11).tobytes(),dict(indices=[],fixture_transform=T.tolist()))
+        group['indices'].append(k)
+    groups=list(groups.values())
+    if not result['passed']:groups=[dict(indices=[int(k)for k in layout['active']],fixture_transform=None)]
+    largest=max(groups,key=lambda group:len(group['indices']))
+    representative=max(largest['indices'],key=lambda k:poses[k]['objects_in_final_layout']['dimensions_m'][2])
+    for index,group in enumerate(groups):
+        group.update(placement=index+1 if result['passed']else None,poses=[poses[k]['pose']for k in group['indices']])
+    return dict(representative_layout_index=representative,representative_pose=poses[representative]['pose'],
+        representative_selection='largest placement group; greatest object vertical extent',
+        groups=groups,main_instances=[],thumbnail_poses=[],bbox_includes_all_task_poses=True,
+        column_percent_labels=['']+[''if result[k]is None else f'{result["bbx_increase_percent"][k]:+.0f}%'for k in BOX_KEYS[1:]],
+        visible_text=[],annotation_policy='percent_and_placement_only',
+        bbox_style='complete_wireframe_box',bbox_edges_per_main_column=[],
+        volume_ratios_printed=False,litres_printed=False,figure_size=list(FIGURE_SIZE))
+
+
+def box_piece(record,camera,size):
+    """Render all twelve exact BBX edges with ordinary scene depth occlusion."""
+    _,basis,span=camera;box=corners(record)
+    pairs=[(index,index^bit)for index in range(8)for bit in [1,2,4]if index<(index^bit)]
+    starts=box[[a for a,b in pairs]];ends=box[[b for a,b in pairs]]
+    projected=(ends-starts)@basis[:2].T
+    lengths=np.linalg.norm(projected,axis=1)
+    perpendicular=np.c_[-projected[:,1],projected[:,0]]/lengths[:,None]
+    offsets=perpendicular@basis[:2]*(.9*span/size)
+    vertices=np.stack([starts+offsets,ends+offsets,ends-offsets,starts-offsets],axis=1)
+    triangles=vertices[:,[[0,1,2],[0,2,3]],:].reshape(-1,3,3)
+    return dict(triangles=triangles,normals=np.broadcast_to(basis[2],triangles.shape),
+        colors=np.broadcast_to(V.CPU.rgb('#9FB1BD'),triangles.shape),bias=4e-6,unlit=True),len(pairs)
+
+
+def posed_piece(mesh,transform,color,opacity=1.):
+    posed=mesh.copy();posed.apply_transform(transform)
+    return V.piece(posed,color,opacity)
 
 
 def render(renderer,body,nominal,full,layout,result,out):
-    cameras={key:V.camera_for(corners(result[key])) for key in BOX_KEYS}
-    span=max(camera[2] for camera in cameras.values())
-    baseline={p['layout_index']:np.array(p['unsupported_world_transform']) for p in result['per_pose']}
-    tiles=[]
-    for key,fixture in [('object_static',None),('with_step4_support',nominal),('with_full_support',full)]:
+    """One representative scene, full-task BBX, and one shared grouped pose strip."""
+    normalize(result);out=Path(out);out.parent.mkdir(parents=True,exist_ok=True)
+    size=650;header=145;display=presentation(layout,result);result['presentation']=display
+    cameras={k:V.camera_for(corners(result[k]))for k in BOX_KEYS if result[k]is not None}
+    span=max(c[2]for c in cameras.values())
+    baseline={p['layout_index']:np.array(p['unsupported_world_transform'])for p in result['per_pose']}
+    k=display['representative_layout_index'];T=layout['native_world'][layout['hosts'][k]]
+    board=Image.new('RGB',FIGURE_SIZE,'white');ink=ImageDraw.Draw(board)
+    font=lambda n:ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',n)
+    for column,(key,fixture)in enumerate(zip(BOX_KEYS,[None,nominal,full])):
+        center=size*(column+.5)
+        label=display['column_percent_labels'][column]
+        if label:
+            ink.text((center,106),label,font=font(36),fill='#267C9F',anchor='mt')
+            display['visible_text'].append(label)
+        record=result[key]
+        if record is None:
+            display['main_instances'].append(dict(objects=0,supports=0))
+            display['bbox_edges_per_main_column'].append(0)
+            continue
         focus,basis,_=cameras[key];camera=(focus,basis,span)
-        pieces=[];seen=set()
-        for k in layout['active']:
-            T=layout['native_world'][layout['hosts'][k]]
-            U=baseline[int(k)] if fixture is None else T@layout['placements'][k]
-            start=body.copy();start.apply_transform(U)
-            pieces.append(V.piece(start,V.GRAY,.5))
-            state=np.round(T,11).tobytes()
-            if fixture is not None and state not in seen:
-                mesh=fixture.copy();mesh.apply_transform(T);pieces.append(V.piece(mesh,V.BLUE))
-                seen.add(state)
-        v=corners(result[key])
-        for q in [[0,1,3,2],[4,5,7,6],[0,1,5,4],[2,3,7,6],[0,2,6,4],[1,3,7,5]]:
-            pieces.append(H.outline_piece(v[q],'#466474',camera,650,.65))
-        tiles.append(renderer.render([V.CPU.placed(p) for p in pieces],camera,650))
-    V.sheet(tiles,out/'static_occupancy.png')
+        U=baseline[k]if column==0 else T@layout['placements'][k]
+        pieces=[posed_piece(body,U,V.GRAY)]
+        if fixture is not None:pieces.append(posed_piece(fixture,T,V.BLUE))
+        display['main_instances'].append(dict(objects=1,supports=int(fixture is not None)))
+        box,edge_count=box_piece(record,camera,size);pieces.append(box)
+        display['bbox_edges_per_main_column'].append(edge_count)
+        tile=renderer.render([V.CPU.placed(p)for p in pieces],camera,size)
+        board.paste(tile,(column*size,header))
+    ink.line([(60,853),(1890,853)],fill='#E3E9ED',width=2)
+    groups=display['groups'];gap=34;count=sum(len(g['indices'])for g in groups)
+    cell=min(210.,(1830-gap*(len(groups)-1))/count);thumb=min(176,int(cell)-8)
+    group_cameras=[]
+    for group in groups:
+        box=result['fixture_states'][group['placement']-1]['with_full_support']if result['passed']else result['object_static']
+        group_cameras.append(V.camera_for(corners(box)))
+    thumb_span=max(c[2]for c in group_cameras)
+    x=(1950-(cell*count+gap*(len(groups)-1)))/2
+    for group,(focus,basis,_)in zip(groups,group_cameras):
+        width=cell*len(group['indices']);center=x+width/2;camera=(focus,basis,thumb_span)
+        group['thumbnail_camera']=dict(focus_m=focus.tolist(),basis=basis.tolist(),span_m=thumb_span)
+        if result['passed']:
+            label='Placement '+str(group['placement'])
+            ink.text((center,926),label,font=font(21),fill='#5E7D8E',anchor='mt')
+            display['visible_text'].append(label)
+            ink.line([(x+10,951),(x+10,958),(x+width-10,958),(x+width-10,951)],fill='#B3C7D2',width=2)
+        for position,index in enumerate(group['indices']):
+            cx=x+cell*(position+.5);S=layout['native_world'][layout['hosts'][index]]
+            U=S@layout['placements'][index]if result['passed']else baseline[index]
+            pieces=[posed_piece(body,U,V.GRAY)]
+            if full is not None:pieces.append(posed_piece(full,S,V.BLUE,.8))
+            tile=renderer.render([V.CPU.placed(p)for p in pieces],camera,thumb)
+            board.paste(tile,(round(cx-thumb/2),round(975+(176-thumb)/2)))
+            pose=next(p['pose']for p in result['per_pose']if p['layout_index']==index)
+            display['thumbnail_poses'].append(pose)
+        x+=width+gap
+    info=PngImagePlugin.PngInfo()
+    info.add_text('evaluation_output_version',VERSION)
+    info.add_text('relative_bbx_volume',json.dumps(result['relative_bbx_volume']))
+    info.add_text('bbx_increase_percent',json.dumps(result['bbx_increase_percent']))
+    info.add_text('presentation',json.dumps(display))
+    pending=out.with_name('.'+out.name+'.pending')
+    board.save(pending,format='PNG',pnginfo=info);pending.replace(out)
+
+
+def publish_case(name,result,body,nominal,full,layout,renderer,protected=None):
+    result=normalize(dict(result));result.setdefault('passed',True);result.setdefault('status','PASS')
+    result.update(object=name,force_solver_run=False,geometry_boolean_run=False,
+        columns=['object_only','object_and_support_body','object_and_complete_support_with_feet'],
+        protected_inputs=dict(protected or result.get('protected_inputs',{})))
+    image=image_path(name,result['id']);render(renderer,body,nominal,full,layout,result,image)
+    result['output']=relative(image);result['image_sha256']=sha(image)
+    save(report_path(name,result['id']),result)
+    return result
+
+
+def poses_for(label):return ['pose_'+n for n in label.split('/')[-1].removeprefix('pose').split('+')]
+
+
+def unavailable(name,case,body,renderer):
+    poses=poses_for(case['id']);native=[];protected={}
+    for pose in poses:
+        path=ROOT/'objects'/name/'poses'/pose/'setup.npz';protected[relative(path)]=sha(path)
+        with np.load(path)as arrays:native.append(arrays['T_world_mesh'].copy())
+    count=len(poses);layout=dict(native_world=np.asarray(native),hosts=np.arange(count),
+        placements=np.repeat(np.eye(4)[None],count,axis=0),active=np.arange(count))
+    result=static_bounds(body.vertices,layout,pose_names=poses)
+    result.update(id=case['id'],passed=False,status=case.get('status','STEP4_FAIL'),step53_source=None)
+    return publish_case(name,result,body,None,None,layout,renderer,protected)
+
+
+def final_stage(root,experiment):
+    unified=root/'step5'/experiment
+    path=unified/'data/report.json'
+    if path.exists():
+        record=read(path)
+        if record.get('passed') and record.get('complete'):return unified
+    for stage in ['step5.3','step5.2']:
+        folder=root/'step5'/stage/experiment;path=folder/'data/report.json'
+        if path.exists():
+            record=read(path)
+            if record.get('stage_type')=='support_pruning':continue
+            if record.get('passed')and record.get('complete'):return folder
+    raise FileNotFoundError('No certified complete support: '+str(root))
+
+
+def evaluate(name,case,body,renderer,experiment=None):
+    if not case['passed']:return unavailable(name,case,body,renderer)
+    base=A.result_root(name);folder=final_stage(base/case['id'],experiment)if experiment else ROOT/case['output']
+    path=folder/'data/report.json';final=read(path)
+    if not final['passed']or not final['complete']or final['selected_step4_experiment']!=case['experiment']:
+        raise ValueError('Unfinished or mismatched selected support: '+case['id'])
+    s4=ROOT/final['selected_step4_source'];protected={}
+    def protect(p):protected[relative(p)]=sha(p);return p
+    protect(path)
+    for filename,expected in final['artifacts'].items():
+        if sha(folder/filename)!=expected:raise ValueError('Changed saved artifact: '+filename)
+        protect(folder/filename)
+    nominal_path=protect(s4/'support.obj');layout_path=protect(s4/'layout.npz')
+    layout_report=s4/'data/report.json'
+    if not layout_report.exists():layout_report=s4/'report.json'
+    saved=read(protect(layout_report))
+    nominal=trimesh.load(nominal_path,force='mesh',process=False)
+    full=trimesh.load(folder/final['support'],force='mesh',process=False)
+    with np.load(layout_path)as arrays:layout={k:arrays[k].copy()for k in arrays.files}
+    result=static_bounds(body.vertices,layout,nominal.vertices,full.vertices,saved['poses'])
+    result.update(id=case['id'],step4_source=relative(s4),step53_source=relative(folder),
+        material_step4_cm3=abs(float(nominal.volume))*1e6,material_full_cm3=abs(float(full.volume))*1e6)
+    return publish_case(name,result,body,nominal,full,layout,renderer,protected)
+
+
+def write_summary(name,selection,selection_path=None):
+    folder=directory(name);cases=selection.get('results',selection.get('selected',selection.get('cases',[])))
+    rows=[];missing=[]
+    for case in cases:
+        path=report_path(name,case['id'])
+        if not path.exists():missing.append(case['id']);continue
+        row=read(path)
+        if row.get('evaluation_output_version')!=VERSION or bool(row['passed'])!=bool(case['passed']):
+            missing.append(case['id']);continue
+        rows.append(row)
+    valid=[r for r in rows if r['passed']]
+    protected={p:h for row in rows for p,h in row['protected_inputs'].items()}
+    protected[relative(ROOT/'objects'/name/'mesh.stl')]=sha(ROOT/'objects'/name/'mesh.stl')
+    changed=[p for p,h in protected.items()if sha(ROOT/p)!=h]
+    if changed:raise ValueError('Saved numerical input changed: '+str(changed[:3]))
+    code={}
+    for source in [Path(__file__),Path(__file__).with_name('metrics.py'),Path(__file__).with_name('verify_outputs.py'),
+            Path(V.__file__),Path(H.__file__),V.CPU_PATH,V.BASELINE/'step4_connect_support/clean_render.py',
+            V.BASELINE/'step4_connect_support/translucent_raster.cpp']:
+        target=folder/'executed_sources'/source.resolve().relative_to(ROOT)
+        target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,target);code[relative(source)]=sha(source)
+    report=dict(complete=not missing,passed=not missing,object=name,group_count=len(cases),rendered_groups=len(rows),
+        certified_groups=len(valid),unavailable_groups=len(rows)-len(valid),missing=missing,results=rows,
+        evaluation_output_version=VERSION,source_selection=None if selection_path is None else relative(selection_path),
+        unsupported_baseline=1.,fixed_output_pattern=f'output/{name}/<pose-set>/evaluation.png',
+        mean_bbx_increase_percent={k:float(np.mean([r['bbx_increase_percent'][k]for r in valid]))for k in BOX_KEYS}if valid else{},
+        force_solver_run=False,geometry_boolean_run=False)
+    save(folder/'selection.json',selection);save(folder/'summary.json',report)
+    save(folder/'verification.json',dict(passed=not missing,protected_inputs=protected,executed_code=code,
+        published_images={r['output']:r['image_sha256']for r in rows},independent_metrics_recomputed=False))
+    return report
+
+
+def clean_legacy(name):
+    """Delete derived evaluation outputs, preserving models and physical audits."""
+    base=A.result_root(name);visual=A.VISUALS/name;fixed=directory(name);targets=set();folders=set()
+    allowed={ROOT/r['output']for r in read(fixed/'summary.json')['results']}
+    prune=lambda d:any(tag in d for tag in ['sources','snapshot','dependencies'])
+    for tree in [base,visual]:
+        for parent,dirs,files in os.walk(tree):
+            parent=Path(parent);dirs[:]=[d for d in dirs if not prune(d)and parent/d!=fixed]
+            for old_name in ['evaluation','evaluations']:
+                if old_name in dirs:folders.add(parent/old_name);dirs.remove(old_name)
+            for filename in files:
+                path=parent/filename
+                if tree==visual and filename in ['static_occupancy.png','evaluation.png']and path not in allowed:
+                    targets.add(path)
+                elif tree==base and 'evaluation'in filename.lower()and path.suffix=='.json':
+                    value=read(path)
+                    if value.get('evaluation_output_version')==VERSION:continue
+                    physical_audit=any(k in value for k in ['geometry_audit','saved_full_demand_masks_checked',
+                        'original_demand_masks_checked','full_certificate_binding'])
+                    derived_report=filename in ['previous_evaluation.json','evaluation_results.json',
+                        'control_evaluation.json','progress_evaluation.json']and not physical_audit
+                    if 'object_static'in value or 'independent_bbx_sum_l'in value or derived_report:targets.add(path)
+                elif tree==base and filename=='static_occupancy.png':targets.add(path)
+    for path in (base/'data').glob('evaluation_*'):
+        if path.is_dir():folders.add(path)
+        elif path.is_file():targets.add(path)
+    targets.update(p for p in base.glob('evaluation_*')if p.is_file())
+    for folder in folders:
+        if any(p.suffix.lower()in ['.obj','.npz','.stl','.py','.cpp']for p in folder.rglob('*')if p.is_file()):
+            raise ValueError('Refuse to delete physical artifacts or code from '+str(folder))
+        targets.update(p for p in folder.rglob('*')if p.is_file())
+    protected=read(fixed/'verification.json')['protected_inputs']
+    collision=set(map(relative,targets))&set(protected)
+    if collision:raise ValueError('Evaluation cleanup intersects saved physical inputs: '+str(collision))
+    old=read(fixed/'cleanup.json')if(fixed/'cleanup.json').exists()else{}
+    deleted=old.get('deleted_files',{})
+    for path in sorted(targets):
+        if path.exists():deleted[relative(path)]=sha(path);path.unlink()
+    removed=set(old.get('removed_directories',[]))
+    for folder in sorted(folders,key=lambda p:-len(p.parts)):
+        if folder.exists():shutil.rmtree(folder);removed.add(relative(folder))
+    save(fixed/'cleanup.json',dict(old,complete=True,deleted_files=deleted,removed_directories=sorted(removed),
+        derived_file_count=len(deleted),removed_directory_root_count=len(removed),
+        physical_models_and_certificates_preserved=True,no_backup_copies_created=True))
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('object',nargs='?',default='B')
-    parser.add_argument('--experiment',default='connected_base_v1')
-    parser.add_argument('--selection-summary',type=Path)
-    parser.add_argument('--batch-name',default='evaluation_connected_base_v1')
-    parser.add_argument('--sets',nargs='+')
-    parser.add_argument('--replace',action='store_true',help='Replace only this evaluation batch and its visualizations')
-    args=parser.parse_args()
-    base=A.result_root(args.object)
-    selection=A.resolve_artifact(args.selection_summary or base/'data/base_oracle_results/summary.json')
-    protected={}
-    def protect(p):protected[relative(p)]=sha(p);return p
-    selected=json.loads(protect(selection).read_text())
-    cases=selected.get('selected',selected.get('results',selected.get('cases',[])))
-    if args.sets:
-        if set(args.sets)-{case['id'] for case in cases}:parser.error('Unknown set')
-        cases=[case for case in cases if case['id'] in args.sets]
-    mesh_path=protect(ROOT/'objects'/args.object/'mesh.stl')
-    body=trimesh.load(mesh_path,force='mesh',process=False)
-    if any(Path(name).name!=name for name in [args.experiment,args.batch_name]):
-        raise ValueError('Experiment and batch names must be single directory names')
-    directory=base/'data'/args.batch_name
-    # Validate all physical inputs before replacing the obsolete evaluation.
-    for case in cases:
-        root=base/case['id'];s4=root/'step4/step4.2'/case['experiment'];s52=final_stage(root,args.experiment)
-        final=json.loads(protect(s52/'data/report.json').read_text())
-        if not final['complete'] or not final['passed'] or final['selected_step4_experiment']!=case['experiment']:
-            raise ValueError(f'Incomplete or mismatched Step5.2: {case["id"]}')
-        for p in [s4/'layout.npz',s4/'report.json',s4/'support.obj',s52/final['support']]:protect(p)
-    destinations=[directory]+[base/c['id']/'evaluation'/args.experiment for c in cases]
-    destinations += [A.VISUALS/args.object/c['id']/'evaluation'/args.experiment for c in cases]
-    if args.replace:
-        for p in destinations:shutil.rmtree(p,ignore_errors=True)
-    elif any(p.exists() for p in destinations):
-        raise FileExistsError('Evaluation exists; use --replace to regenerate the evaluation only')
-    directory.mkdir(parents=True,exist_ok=False)
-    code={}
-    paths={Path(__file__).resolve(),COOPT/'evaluation/metrics.py',V.CPU_PATH,V.BASELINE/'step4_connect_support/translucent_raster.cpp'}
-    for module in list(sys.modules.values()):
-        file=getattr(module,'__file__',None)
-        if file:
-            p=Path(file).resolve()
-            if p.is_relative_to(ROOT) and not p.is_relative_to(ROOT/'.venv') and p.is_file():paths.add(p)
-    for p in sorted(paths):
-        target=directory/'executed_sources'/p.relative_to(ROOT);target.parent.mkdir(parents=True,exist_ok=True)
-        shutil.copy2(p,target);code[relative(p)]=sha(p)
-    save(directory/'execution.json',dict(executed_code=code,selection=relative(selection),
-        metric_version=METRIC_VERSION,support_pose_metric_version=SUPPORT_POSE_METRIC_VERSION))
-    renderer=V.Renderer();rows=[];began=time.monotonic()
-    for case in sorted(cases,key=lambda c:(-c['pose_count'],c['id'])):
-        root=base/case['id'];step4=root/'step4/step4.2'/case['experiment'];step52=final_stage(root,args.experiment)
-        final=json.loads(protect(step52/'data/report.json').read_text())
-        if not final['complete'] or not final['passed']:raise ValueError(f'Unfinished Step5.2: {case["id"]}')
-        if final['selected_step4_experiment']!=case['experiment']:raise ValueError('Comparison layouts differ')
-        with np.load(protect(step4/'layout.npz')) as z:layout={k:z[k].copy() for k in z.files}
-        layout_report=json.loads(protect(step4/'report.json').read_text())
-        nominal=trimesh.load(protect(step4/'support.obj'),force='mesh',process=False)
-        full=trimesh.load(protect(step52/final['support']),force='mesh',process=False)
-        result=static_bounds(body.vertices,layout,nominal.vertices,full.vertices,layout_report['poses'])
-        for key in ['juxtaposed_pose_count','rotating_reuse_pose_count']:
-            if result[key]!=layout_report[key]:raise ValueError(f'Layout membership differs from saved Step4: {case["id"]}')
-        result.update(id=case['id'],step4_source=relative(step4),step53_source=relative(step52),
-            material_step4_cm3=float(abs(nominal.volume)*1e6),material_full_cm3=float(abs(full.volume)*1e6),
-            material_added_cm3=final['construction']['added_material_cm3'],
-            material_removed_illegal_nominal_cm3=final['construction']['removed_illegal_nominal_material_cm3'])
-        result['base_bbx_increase_litres']=result['with_full_support']['volume_litres']-result['with_step4_support']['volume_litres']
-        result['base_bbx_increase_percent']=100*(result['with_full_support']['volume_cm3']/result['with_step4_support']['volume_cm3']-1)
-        result['state_space_base_increase_percent']=100*(result['state_space_sums_litres']['with_full_support']/result['state_space_sums_litres']['with_step4_support']-1)
-        out=root/'evaluation'/args.experiment;out.mkdir(parents=True,exist_ok=False)
-        render(renderer,body,nominal,full,layout,result,out)
-        result['output']=relative(out);save(out/'report.json',result)
-        b=lambda k:f"{result[k]['volume_litres']:.2f} L ({' × '.join(f'{d:.2f}' for d in result[k]['dimensions_cm'])} cm)"
-        state_list=''.join(f'<li>Support pose {s["state"]}: {s["pose_count"]} object poses — {html.escape(", ".join(s["poses"]))}</li>' for s in result['fixture_states'])
-        sums=result['state_space_sums_litres']
-        (out/'index.html').write_text('<!doctype html><meta charset="utf-8"><style>body{font:16px system-ui;max-width:1600px;margin:24px auto}img{width:100%}</style>'
-            f'<h1>{html.escape(case["id"])} · Static occupied space</h1><p>Tasks run one at a time; object poses may overlap.</p>'
-            '<p>The no-fixture baseline preserves task rotations, aligns horizontal box centers and rests each pose on z=0. '
-            'It attains the smallest XYZ box under free translations. Supported columns retain the saved fixture layout.</p>'
-            f'<p>Left: overlapping objects without support {b("object_static")}; middle: actual layout with Step4 {b("with_step4_support")}; '
-            f'right: actual layout with full Step5.2 support {b("with_full_support")}.</p>'
-            '<p>All three images use the same isometric orientation and length scale, with each box centered in its panel.</p>'
-            '<img src="static_occupancy.png">'
-            f'<p>Diagnostic objects at fixture seats: {b("objects_in_final_layout")}. '
-            f'Sum of separately allocated state spaces: objects {sums["objects_in_final_layout"]:.2f} L; '
-            f'with Step4 {sums["with_step4_support"]:.2f} L; with Step5.2 {sums["with_full_support"]:.2f} L. '
-            'These sums are not the no-fixture baseline.</p>'
-            f'<p>Support poses: {result["support_pose_count"]}. Object poses per support pose: '
-            f'{", ".join(str(n) for n in result["object_pose_counts_per_support_pose"])}. '
-            'Each support pose is a distinct saved world position and orientation of the same fixture; tasks run sequentially.</p><ul>'
-            f'{state_list}</ul>'
-            f'<p>Final Juxtapose seats: {result["juxtaposed_pose_count"]}; unchanged rotating-reuse poses: {result["rotating_reuse_pose_count"]}. '
-            f'Multi-object-pose states: {result["multi_pose_fixture_state_count"]}; single-object-pose states: {result["singleton_fixture_state_count"]}. These are different classifications.</p>'
-            '<p><a href="report.json">Per-pose bounds, state membership and material volumes</a></p>\n')
-        visual=A.VISUALS/args.object/case['id']/'evaluation'
-        visual.mkdir(parents=True,exist_ok=True)
-        shutil.copy2(out/'static_occupancy.png',visual/'static_occupancy.png')
-        (out/'index.html').unlink(missing_ok=True)
-        (out/'static_occupancy.png').unlink()
-        if args.object=='B':
-            from publish_output_images import publish_case_images
-            publish_case_images(case['id'],args.experiment,include_evaluation=True)
-        rows.append(result)
-        save(directory/'progress.json',dict(complete=False,completed=len(rows)))
-        print('EVALUATION',case['id'],*[round(result[k]['volume_litres'],2) for k in BOX_KEYS],flush=True)
-    for p,h in protected.items():
-        if sha(ROOT/p)!=h:raise ValueError(f'Input changed: {p}')
-    for p,h in code.items():
-        if sha(ROOT/p)!=h or sha(directory/'executed_sources'/p)!=h:raise ValueError(f'Execution source changed: {p}')
-    sums={k:sum(r[k]['volume_litres'] for r in rows) for k in BOX_KEYS}
-    report=dict(complete=True,object=args.object,cases=rows,group_count=len(rows),pose_instance_count=sum(r['pose_count'] for r in rows),
-        metric='static working occupancy: optimal overlapping unsupported poses versus saved supported world-axis union AABBs',
-        metric_version=METRIC_VERSION,support_pose_metric_version=SUPPORT_POSE_METRIC_VERSION,
-        same_final_object_placements_in_all_columns=False,
-        unsupported_baseline_translation_optimal=True,
-        object_withdrawal_motion_included=False,fixture_transfer_motion_included=False,
-        robot_tool_motion_included=False,unbounded_work_exclusions_included=False,
-        material_volume_is_not_bbox_volume=True,force_solver_run=False,boolean_run=False,
-        independent_group_bbox_sums_litres=sums,
-        independent_pose_object_sum_litres=sum(r['independent_pose_object_sum_litres'] for r in rows),
-        state_space_sums_litres={k:sum(r['state_space_sums_litres'][k] for r in rows) for k in STATE_KEYS},
-        layout_totals={k:sum(r[k] for r in rows) for k in ['juxtaposed_pose_count','rotating_reuse_pose_count',
-            'state_count','support_pose_count','multi_pose_fixture_state_count','singleton_fixture_state_count','poses_in_multi_pose_fixture_states']},
-        material_step4_sum_cm3=sum(r['material_step4_cm3'] for r in rows),material_full_sum_cm3=sum(r['material_full_cm3'] for r in rows),
-        maximum_base_bbx_increase_percent=max(r['base_bbx_increase_percent'] for r in rows),
-        median_base_bbx_increase_percent=float(np.median([r['base_bbx_increase_percent'] for r in rows])),
-        seconds=time.monotonic()-began,upstream_unchanged=True,executed_source_hashes_match=True)
-    save(directory/'summary.json',report);save(directory/'verification.json',dict(protected=protected,executed_code=code,passed=True))
-    lines=['# 静态工作空间：无支撑叠放基线／真实支撑布局','',
-        f'全部 {len(rows)} 组，共 {report["pose_instance_count"]} 个 pose。只计最终工作位置，单位 L；1 L=1000 cm³。',
-        '无支撑基线保留各原任务朝向，将物体的水平包围盒中心对齐、最低点放在z=0，叠放全部pose后取一个BBX。其每轴长度为该轴各pose长度的最大值，达到自由平移时的最小XYZ盒。',
-        '任务依次执行；一个 state 服务多个 object pose 不表示多个物体同时装入。Juxtapose 是最终 pose 是否重新落座，multi-object-pose state 是共享关系，两者不是互斥分类。',
-        '支撑pose按保存的实际世界位置与朝向分组；同一件支撑换位置或转动后可以有多个支撑pose。每组列出服务的物体pose数量与成员。',
-        '有支撑两列使用保存的真实优化位置及全部最终支撑state；不改变物理结果。三列图同等轴测方向、同长度比例，分别居中。','',
-        '| Pose set | 物体pose数 | 无支撑叠放BBX (L) | +Step4 BBX (L) | +Step5.2 BBX (L) | 支撑pose数 | 每个支撑pose服务的物体pose数 | 物体pose分组 | Juxtapose pose数 | 原位转动复用pose数 |',
-        '|---|---:|---:|---:|---:|---:|---|---|---:|---:|']
-    for r in rows:
-        url=os.path.relpath(A.VISUALS/args.object/r['id']/'evaluation'/args.experiment/'static_occupancy.png',base)
-        membership='; '.join('+'.join(p.removeprefix('pose_') for p in s['poses']) for s in r['fixture_states'])
-        counts=', '.join(str(n) for n in r['object_pose_counts_per_support_pose'])
-        lines.append(f'| [{r["id"]}]({url}) | {r["pose_count"]} | {r["object_static"]["volume_litres"]:.2f} | {r["with_step4_support"]["volume_litres"]:.2f} | {r["with_full_support"]["volume_litres"]:.2f} | {r["support_pose_count"]} | {counts} | {membership} | {r["juxtaposed_pose_count"]} | {r["rotating_reuse_pose_count"]} |')
-    allocated=report['state_space_sums_litres'];totals=report['layout_totals']
-    lines.extend(['',f'各集合BBX统计和：无支撑叠放 {sums["object_static"]:.2f} L，Step4 {sums["with_step4_support"]:.2f} L，完整支撑 {sums["with_full_support"]:.2f} L；不是同一工作站的总体积。',
-        f'支撑pose统计和：{totals["support_pose_count"]}，各组成员数量之和为{report["pose_instance_count"]}个物体pose实例。',
-        f'最终 Juxtapose {totals["juxtaposed_pose_count"]} 个 pose，原位转动复用 {totals["rotating_reuse_pose_count"]} 个 pose；{totals["multi_pose_fixture_state_count"]} 个 state 服务多个 object pose，{totals["singleton_fixture_state_count"]} 个 state 只服务一个。',
-        '', '以下为真实支撑落座物体的诊断空间，并非无支撑基线。', '',
-        '| Pose set | 支撑落座物体BBX (L) | +Step4 (L) | +Step5.2 (L) | 地脚BBX增幅 | Step4实体 (cm³) | 全部实体 (cm³) |',
-        '|---|---:|---:|---:|---:|---:|---:|'])
-    for r in rows:
-        lines.append(f'| {r["id"]} | {r["objects_in_final_layout"]["volume_litres"]:.2f} | {r["with_step4_support"]["volume_litres"]:.2f} | {r["with_full_support"]["volume_litres"]:.2f} | {r["base_bbx_increase_percent"]:+.2f}% | {r["material_step4_cm3"]:.2f} | {r["material_full_cm3"]:.2f} |')
-    lines.extend(['',f'单独分配不同state时的空间诊断统计和：物体 {allocated["objects_in_final_layout"]:.2f} L，Step4 {allocated["with_step4_support"]:.2f} L，Step5.2 {allocated["with_full_support"]:.2f} L。',
-        f'[逐 pose 尺寸、共享分组和材料数据](data/{args.batch_name}/summary.json)。'])
-    (base/f'evaluation_{args.experiment}.md').write_text('\n'.join(lines)+'\n')
-    headers='<tr><th>Set</th><th>Object poses</th><th>Overlapping objects, no support (L)</th><th>Step4 BBX (L)</th><th>Step5.2 BBX (L)</th><th>Support poses</th><th>Object poses per support pose</th><th>Object pose membership</th><th>Juxtapose poses</th><th>Rotating reuse poses</th></tr>'
-    cells=''.join(f'<tr><td><a href="{r["id"]}/evaluation/{args.experiment}/index.html">{r["id"]}</a></td>'
-        f'<td>{r["pose_count"]}</td><td>{r["object_static"]["volume_litres"]:.2f}</td>'
-        f'<td>{r["with_step4_support"]["volume_litres"]:.2f}</td><td>{r["with_full_support"]["volume_litres"]:.2f}</td>'
-        f'<td>{r["support_pose_count"]}</td><td>{", ".join(str(n) for n in r["object_pose_counts_per_support_pose"])}</td>'
-        f'<td>{html.escape("; ".join("+".join(p.removeprefix("pose_") for p in s["poses"]) for s in r["fixture_states"]))}</td>'
-        f'<td>{r["juxtaposed_pose_count"]}</td><td>{r["rotating_reuse_pose_count"]}</td></tr>' for r in rows)
-    (base/f'evaluation_{args.experiment}_index.html').write_text('<!doctype html><meta charset="utf-8"><style>body{font:16px system-ui;max-width:1400px;margin:24px auto}td,th{padding:7px;border-bottom:1px solid #ddd;text-align:right}td:first-child{text-align:left}</style>'
-        '<h1>Static occupied spaces</h1><p>Overlapping object poses without support versus saved Step4 and full Step5.2 layouts. '
-        'Fixed task rotations; the no-support translations attain the smallest XYZ union box. Working positions only; tasks run one at a time.</p>'
-        f'<p>Support poses across these independent sets: {totals["support_pose_count"]}. '
-        'Group tasks by the saved world position and orientation of the fixture.</p>'
-        f'<p>Juxtapose: {totals["juxtaposed_pose_count"]} poses; unchanged rotating reuse: {totals["rotating_reuse_pose_count"]} poses. '
-        f'{totals["multi_pose_fixture_state_count"]} multi-object-pose states and {totals["singleton_fixture_state_count"]} single-object-pose states. Seating and sharing are distinct classifications.</p><table>'+headers+cells+'</table>\n')
-    A.publish_gallery(base/f'evaluation_{args.experiment}_index.html')
-    A.finish_batch(directory)
-    print('EVALUATION ALL',len(rows),'seconds',round(report['seconds'],2),flush=True)
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('object',nargs='?',default='B')
+    parser.add_argument('--experiment',help='Select input geometry; never names an output folder')
+    parser.add_argument('--selection-summary',type=Path);parser.add_argument('--sets',nargs='+')
+    parser.add_argument('--batch-name',help=argparse.SUPPRESS);parser.add_argument('--replace',action='store_true',help=argparse.SUPPRESS)
+    args=parser.parse_args();base=A.result_root(args.object);selection=args.selection_summary
+    if selection is None:
+        latest=base/'data/step5_current.json'
+        current=directory(args.object)/'selection.json'
+        selection=(ROOT/read(latest)['summary'] if latest.exists() and read(latest).get('complete')
+            else current if current.exists() else base/'data'/('step5_feasible_'+DEFAULT_EXPERIMENT)/'summary.json')
+    selection=A.resolve_artifact(selection);record=read(selection)
+    cases=record.get('results',record.get('selected',record.get('cases',[])))
+    if args.sets and set(args.sets)-{c['id']for c in cases}:parser.error('Unknown pose set')
+    chosen=[c for c in cases if not args.sets or c['id']in args.sets]
+    body=trimesh.load(ROOT/'objects'/args.object/'mesh.stl',force='mesh',process=False);renderer=V.Renderer()
+    for i,case in enumerate(chosen):
+        evaluate(args.object,case,body,renderer,args.experiment)
+        print('EVALUATION',i+1,'/',len(chosen),case['id'],flush=True)
+    summary=write_summary(args.object,record,selection)
+    if summary['complete']:clean_legacy(args.object)
+    print('EVALUATION_FIXED',summary['rendered_groups'],'/',summary['group_count'],flush=True)
 
 
 if __name__=='__main__':main()

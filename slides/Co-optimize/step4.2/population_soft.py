@@ -487,13 +487,19 @@ class PopulationSoftSearch(MaterialSearch):
         return item
 
     def checked(self, item):
+        if self.stop_when_feasible and self.incumbent is not None:
+            return self.incumbent
         rows = self.classify([item], 1)
         if not rows:
             raise RuntimeError('Original full-demand classification failed')
         return rows[0]
 
     def checked_adjustment(self,raw,iteration,slot,parent=None):
+        if self.stop_when_feasible and self.incumbent is not None:
+            return self.incumbent
         refined=self.checked(self.refine_preview(raw,iteration,maximum=1))
+        if self.stop_when_feasible and self.incumbent is not None:
+            return self.incumbent
         options=[raw,refined]
         if getattr(self.model,'require_connected_core',False):
             eligible=[x for x in [raw,parent]if x is not None and x.result.get('material_contact_certification_run')
@@ -511,6 +517,8 @@ class PopulationSoftSearch(MaterialSearch):
         return min(options,key=lambda item:physical_rank(item,slot))
 
     def certify(self, items, connections=3, constructions=2):
+        if self.stop_when_feasible and self.incumbent is not None:
+            return
         if self.allow_geometry_validation and getattr(self.model,'require_connected_core',False):
             seen=set();candidates=[]
             for item in sorted(items,key=lambda x:(not x.oracle.get('enclosure_passed'),failed_count(x.result),x.loss)):
@@ -530,6 +538,8 @@ class PopulationSoftSearch(MaterialSearch):
                 self.evaluated[item.layout.key()] = item
 
     def propagate_evidence(self):
+        if self.stop_when_feasible and self.incumbent is not None:
+            return
         for i, item in enumerate(self.slots):
             self.slots[i] = self.preview_cached(item.layout, item.operation, item.parent, item.detail, item.result)
 
@@ -578,6 +588,10 @@ class PopulationSoftSearch(MaterialSearch):
                     np.savez_compressed(initialization/f'slot_{i:02d}.npz',**item.layout.arrays(m.native))
                     self.errors.append(dict(stage='registered-direction-fallback',slot=i,error=str(error)))
                 self.slots.append(item)
+                if self.stop_when_feasible and self.incumbent is not None:
+                    # Retained slots are bookkeeping; no more seed queries.
+                    self.slots.extend([self.incumbent]*(self.population_size-len(self.slots)))
+                    break
             self.certify(self.slots); self.propagate_evidence()
         save(s.out/'initial_population_summary.json',[dict(slot=i,**self.describe(item))for i,item in enumerate(self.slots)])
         save(s.out/'population32_trace.json',self.audit)
@@ -594,7 +608,8 @@ class PopulationSoftSearch(MaterialSearch):
         if resumed is None:
             start=self.initialize_population(current)
             next_iteration=0
-            save_checkpoint(self,'cold',0,start=start,current=current)
+            if self.incumbent is None:
+                save_checkpoint(self,'cold',0,start=start,current=current)
         else:
             start=resumed['extra']['start'];current=resumed['extra']['current']
             next_iteration=resumed['next_iteration']
@@ -679,13 +694,16 @@ class PopulationSoftSearch(MaterialSearch):
                         event['error'] = str(error)
                         self.errors.append(dict(stage='population-soft-slot', slot=slot, error=str(error)))
                     events.append(event)
+                    if self.stop_when_feasible and self.incumbent is not None:
+                        break
                     if slot % 8 == 7:
                         print('SOFT SLOTS', s.out, iteration+1, slot+1, '/', self.population_size, flush=True)
                 self.protected = ()
                 self.certify(self.slots); self.propagate_evidence()
                 selected = self.best_checked(start)
                 row = dict(phase='population_soft', iteration=iteration+1, population_size=len(self.slots),
-                    generated_trials=self.population_size, maximum_trials_per_slot=1, count_penalty_used=False,
+                    generated_trials=len(events), maximum_trials_per_slot=1, count_penalty_used=False,
+                    stopped_on_first_complete_solid=self.incumbent is not None and self.stop_when_feasible,
                     extra_role_seeds=0, events=events, branches=dict(self.branch_counts),
                     statistics=dict(self.evaluator.stats), retained=[dict(slot=i, **self.describe(x))
                     for i, x in enumerate(self.slots)], incumbent=self.describe(self.incumbent) if self.incumbent else None)
@@ -696,7 +714,8 @@ class PopulationSoftSearch(MaterialSearch):
                     s.process_snapshot(selected.result, 'population_soft', dict(iteration=iteration+1))
                     self.snapshot_signature=signature
                 print('SOFT32 ROUND', s.out, iteration+1, self.describe(selected), flush=True)
-            save_checkpoint(self,'cold',iteration+1,start=start,current=current)
+            if self.incumbent is None:
+                save_checkpoint(self,'cold',iteration+1,start=start,current=current)
         self.certify(self.slots); selected = self.best_checked(start)
         if self.continuous_policy == 'pso':
             for slot, item in enumerate(self.slots):
@@ -707,7 +726,8 @@ class PopulationSoftSearch(MaterialSearch):
         s.frontier_witnesses = self.witnesses; s.frontier_states = [x.result for x in self.slots]
         s.frontier_statistics = dict(self.evaluator.stats, width=self.population_size, rounds=len(self.audit),configured_rounds=s.iterations,
             policy='failure_weighted_soft_count', maximum_retained=self.population_size, population_size=self.population_size,
-            generated_trials=len(self.audit)*self.population_size, maximum_trials_per_slot=1, initialization_role_seeds=0,
+            generated_trials=sum(len(row['events']) for row in self.audit), maximum_trials_per_slot=1, initialization_role_seeds=0,
+            stopped_on_first_complete_solid=self.incumbent is not None and self.stop_when_feasible,
             warm_start=False, count_penalty_used=False, sampling_count_center=len(current['layout'].active)/3.,
             oracle_fallback_when_all_force_passed=self.allow_oracle_fallback,
             coupled_adjustment_for_oracle_failure=self.allow_coupled_adjustment,
@@ -727,5 +747,6 @@ class PopulationSoftSearch(MaterialSearch):
         if selected.witness is not None:
             m.base_oracle.witness = selected.layout.key(), selected.witness
         selected.result['base_oracle'] = selected.oracle; m.commit(selected.result)
-        save_checkpoint(self,'cold_done',len(self.audit),cold_result=selected.result)
+        if self.incumbent is None:
+            save_checkpoint(self,'cold_done',len(self.audit),cold_result=selected.result)
         return selected.result

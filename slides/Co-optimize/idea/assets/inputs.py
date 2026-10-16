@@ -43,14 +43,20 @@ def load(label,selection=None,yaw_offset_deg=0.):
     if not case['passed']:raise ValueError('Video requires a certified complete support: '+label)
     path=case.get('output')or case.get('construction',{}).get('output')
     folder=ROOT/path;record=json.loads((folder/'data/report.json').read_text())
-    evaluation=json.loads((folder/'evaluation.json').read_text())if(folder/'evaluation.json').exists()else{}
-    evaluation.update(step53_source=str(folder.relative_to(ROOT)),step51_source=record['step51_source'])
+    evaluation=dict(step53_source=str(folder.relative_to(ROOT)),step51_source=record.get('step51_source'))
     if not record['passed']or record['selected_step4_experiment']!=case['experiment']:
         raise ValueError('Video selection and saved layout differ: '+label)
     for name,expected in record['artifacts'].items():
         if sha(folder/name)!=expected:raise ValueError('Selected video solid/certificate changed: '+name)
-    reader=C.Inputs('B',selection_path,Path(evaluation['step51_source']).name)
-    data=reader.load(case)
+    if record.get('schema')=='coopt_connected_wrap_delete_v1':
+        sys.path.insert(0,str(COOPT/'step5'))
+        from wrap_geometry import WrapInputs,original_demands
+        reader=WrapInputs('B',selection_path)
+        data=reader.load(case);original_demands(reader,data,None)
+        evaluation['ground_demands_source']=str((folder/'demands').relative_to(ROOT))
+    else:
+        reader=C.Inputs('B',selection_path,Path(evaluation['step51_source']).name)
+        data=reader.load(case)
     support=C.trimesh.load(folder/record['support'],force='mesh',process=False)
     source=ROOT/record['selected_step4_source']
     with np.load(source/'layout.npz') as a:layout={k:a[k].copy() for k in a.files}

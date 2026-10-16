@@ -40,7 +40,8 @@ def save_checkpoint(controller, phase, next_iteration, **extra):
         oracle={k:getattr(m.base_oracle,k) for k in
                 ('cache','hulls','family_cache','constraint_cache','seconds','queries',
                  'component_queries','last_geometry','witness','core_clip_proposal',
-                 'slice_cache','slice_cache_hits','slice_cache_misses')
+                 'slice_cache','slice_cache_hits','slice_cache_misses',
+                 'floor_rejections','slice_planes','equivalent_statistics')
                 if hasattr(m.base_oracle,k) and k != 'constraint_cache'},
         elapsed_seconds=store.prior_elapsed+time.monotonic()-store.started,
         runtime_stats=store.stats,runtime_timings=store.timings,

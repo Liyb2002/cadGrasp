@@ -54,10 +54,16 @@ class PoseOracleConstraints:
             Q = layout.placements[k].copy()
             U = T @ Q
             work = work_access[k]
-            local = tuple(p[:n].copy() for p, n in zip(work.planes, work.counts))
+            fixed = getattr(getattr(model, 'base_oracle', None), 'fixed_work_planes', None)
+            inverse_Q = fixed.inverse(Q) if fixed is not None else np.linalg.inv(Q)
+            inverse_U = fixed.inverse(U) if fixed is not None else np.linalg.inv(U)
+            local = (fixed.local[k] if fixed is not None else
+                     tuple(p[:n].copy() for p, n in zip(work.planes, work.counts)))
             self.poses.append(PoseConstraint(int(k), model.poses[k], T, Q, U, local,
-                tuple(transform_planes(p, np.linalg.inv(Q)) for p in local),
-                tuple(transform_planes(p, np.linalg.inv(U)) for p in local),
+                fixed.transformed(k, inverse_Q) if fixed is not None else
+                    tuple(transform_planes(p, inverse_Q) for p in local),
+                fixed.transformed(k, inverse_U) if fixed is not None else
+                    tuple(transform_planes(p, inverse_U) for p in local),
                 np.asarray(work.face_ids, int).copy(), float(work.half_angle_deg),work))
         # h(q)>=0: a physical material point must be above every final floor.
         # Keep each final object-frame floor, including the object's Z move.

@@ -7,7 +7,7 @@ def main():
     if len(sys.argv)>1 and sys.argv[1]=='B':
         del sys.argv[1]
     for name,value in [('--search-policy','population_soft'),('--frontier-width','32'),
-                       ('--iterations','8'),('--min-poses','2'),('--max-poses','10')]:
+                       ('--iterations','12'),('--min-poses','2'),('--max-poses','10')]:
         if name not in sys.argv:
             sys.argv.extend([name,value])
     for name in ['--allow-oracle-fallback','--allow-coupled-adjustment','--allow-group-seating',

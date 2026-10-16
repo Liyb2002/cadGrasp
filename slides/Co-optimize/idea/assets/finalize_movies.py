@@ -66,7 +66,17 @@ def main():
                 or review['task_models_camera_margin_px']<0 or review['active_gripper_camera_margin_px']<0
                 or not review['joint_limits_passed'] or not review['source_hashes_unchanged']):
             raise ValueError('Motion/frame review failed: '+label)
-        evaluation=read(ROOT/report['fixture_source']/'evaluation.json')
+        # Evaluation plots are replaceable derived outputs. Check the movie's
+        # original model and layout directly instead of depending on old plots.
+        import sys,numpy as np,trimesh
+        sys.path.insert(0,str(ROOT/'slides/Co-optimize/evaluation'))
+        from metrics import static_bounds
+        numeric_folder=ROOT/report['fixture_source'];numeric=read(numeric_folder/'data/report.json')
+        step4=ROOT/numeric['selected_step4_source']
+        with np.load(step4/'layout.npz')as arrays:layout={k:arrays[k].copy()for k in arrays.files}
+        body=trimesh.load(ROOT/'objects/B/mesh.stl',force='mesh',process=False)
+        support=trimesh.load(numeric_folder/numeric['support'],force='mesh',process=False)
+        evaluation=static_bounds(body.vertices,layout,full_vertices=support.vertices)
         increase=100*(evaluation['with_full_support']['volume_litres']/evaluation['object_static']['volume_litres']-1)
         if increase>50. or abs(increase-case['bbx_increase_percent'])>1e-8:
             raise ValueError('Movie does not meet the selected BBX limit: '+label)

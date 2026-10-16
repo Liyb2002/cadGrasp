@@ -1,4 +1,4 @@
-"""Default: outside-in contact pruning and rounded, thickness-checked geometry."""
+"""Default: connect and wrap ground hulls, then progressively delete material."""
 from pathlib import Path
 import argparse
 import hashlib
@@ -40,8 +40,8 @@ def legacy_main():
     if not args.skip_evaluation:stages.append(('evaluation','evaluation_'+args.experiment,None))
     env=dict(os.environ,OPENBLAS_NUM_THREADS='1',OMP_NUM_THREADS='1',PYTHONDONTWRITEBYTECODE='1')
     for stage,batch,kind in stages:
-        summary=base/'data'/batch/'summary.json'
-        reused=summary.exists()
+        summary=base/'data'/('evaluation'if stage=='evaluation'else batch)/'summary.json'
+        reused=summary.exists()and stage!='evaluation'
         if reused:
             report=json.loads(summary.read_text())
             if (not report['complete'] or (kind and report.get('stage_type')!=kind)
@@ -76,9 +76,13 @@ def main():
         sys.argv.remove('--legacy-feasible')
         from feasible_pipeline import main as run_feasible
         return run_feasible()
-    else:
+    elif '--legacy-periphery' in sys.argv:
+        sys.argv.remove('--legacy-periphery')
         from periphery_pipeline import main as run_periphery
         return run_periphery()
+    else:
+        from wrap_pipeline import main as run_wrap
+        return run_wrap()
 
 
 if __name__=='__main__':main()

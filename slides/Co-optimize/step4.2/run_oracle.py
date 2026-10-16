@@ -46,6 +46,7 @@ def worker(job):
         model=OracleModel(original['poses'],'B',demand_nodes=32,
                          oracle_work_mode=options.get('oracle_work_mode','normal'))
         model.require_connected_core=options.get('require_connected_core',False)
+        model.equivalent_search=options.get('equivalent_search',False)
         seed=initialized/'wrapped_support.obj'
         model.registered_seed=S.solid(trimesh.load(seed,force='mesh',process=False))
         model.inputs += [seed,initialized/'data/report.json',source/'layout.npz']
@@ -63,7 +64,7 @@ def worker(job):
         search.allow_native_sliding=options.get('allow_native_sliding',False)
         search.allow_geometry_validation=options.get('allow_geometry_validation',False)
         search.population_continuous_policy=options.get('population_continuous_policy','pso')
-        search.pso_refinement_rounds=options.get('pso_refinement_rounds',0)
+        search.pso_refinement_rounds=(0 if search.stop_when_feasible else options.get('pso_refinement_rounds',0))
         search.pso_refinement_policy=options.get('pso_refinement_policy','pso')
         search.pso_refinement_seed=options.get('pso_refinement_seed',42)
         search.continue_checkpoint=continuing
@@ -141,6 +142,10 @@ def worker(job):
     store=getattr(model,'search_runtime',None)
     import gpu_replay
     result['gpu_replay']=gpu_replay.report()
+    if model is not None and getattr(model,'equivalent_search',False):
+        result['equivalent_search']=dict(model.base_oracle.equivalent_statistics)
+    if model is not None:
+        result['fixed_work_planes']=dict(model.base_oracle.fixed_work_planes.statistics)
     try:
         try:
             if store is not None:
@@ -190,6 +195,8 @@ def main():
     parser.add_argument('--runtime-cache',action=argparse.BooleanOptionalAction,default=True,
                         help='Disposable exact-input disk caches and population round checkpoints')
     parser.add_argument('--runtime-cache-memory-mb',type=int,default=32)
+    parser.add_argument('--equivalent-search',action=argparse.BooleanOptionalAction,default=False,
+                        help='Reuse exact floor rejections and transformed obstacle planes')
     parser.add_argument('--gpu-replay',choices=['off','auto','required'],default='auto',
                         help='Bounded FP64 basis batches; original CPU replays ambiguous demands')
     parser.add_argument('--continue-checkpoint',action='store_true',
