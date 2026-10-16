@@ -11,7 +11,7 @@ import sys
 import time
 
 COOPT=Path(__file__).resolve().parents[1];ROOT=COOPT.parents[1]
-DEFAULT_EXPERIMENT='wrap_balanced_all52_20261015_02'
+DEFAULT_EXPERIMENT='wrap_surface_reinforced_all52_20261015_03'
 DEFAULT_SELECTION=COOPT/'data/results/B/data/step5_show_all52_20261014_02_inputs/selection.json'
 
 def read(path):return json.loads(Path(path).read_text())

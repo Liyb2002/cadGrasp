@@ -1,0 +1,148 @@
+{
+  "status": "passed",
+  "model": "fixed_spatial_cone_intersect_local_sphere",
+  "all_candidates_edge_connected": true,
+  "candidate_count": 14207,
+  "source_face_count": 5000,
+  "source_geometry_unchanged": true,
+  "maxima": {
+    "surface_radius_m": 0.09499855834543573,
+    "spatial_cone_angle_deg": 23.749966364585475,
+    "local_normal_angle_deg": 42.74991660200575,
+    "tool_direction_angle_deg": 9.051425550292336e-13,
+    "incidence_angle_deg": 42.749916602005754,
+    "flange_base_radius_m": 0.6472514212827634
+  },
+  "minimum_forward_depth_m": 0.025075236852372076,
+  "examples": [
+    {
+      "id": "C01",
+      "candidate_index": 14203,
+      "component_count": 1,
+      "area_cm2": 8.212689429697539,
+      "face_count": 74,
+      "maxima": {
+        "surface_radius_m": 0.03227350473080058,
+        "spatial_cone_angle_deg": 15.054285957259127,
+        "local_normal_angle_deg": 30.84980268462998,
+        "tool_direction_angle_deg": 3.2756636037899933e-15,
+        "incidence_angle_deg": 30.849802684629967,
+        "flange_base_radius_m": 0.5821109998050747
+      },
+      "raw_area_cm2": 8.212689429697539,
+      "filled_area_cm2": 0.0,
+      "filled_face_count": 0,
+      "fill_normal_limit_failure_count": 0,
+      "fill_visibility_failure_count": 0,
+      "fills_require_step2_verification": true,
+      "final_component_count": 1
+    },
+    {
+      "id": "C02",
+      "candidate_index": 14204,
+      "component_count": 1,
+      "area_cm2": 37.40405643109437,
+      "face_count": 300,
+      "maxima": {
+        "surface_radius_m": 0.058510296177619874,
+        "spatial_cone_angle_deg": 21.67310644893515,
+        "local_normal_angle_deg": 42.30543285476272,
+        "tool_direction_angle_deg": 6.361109362927032e-15,
+        "incidence_angle_deg": 42.30543285476272,
+        "flange_base_radius_m": 0.6024999663798011
+      },
+      "raw_area_cm2": 35.15331764748907,
+      "filled_area_cm2": 2.250738783605295,
+      "filled_face_count": 22,
+      "fill_normal_limit_failure_count": 22,
+      "fill_visibility_failure_count": 0,
+      "fills_require_step2_verification": true,
+      "final_component_count": 1
+    },
+    {
+      "id": "C03",
+      "candidate_index": 14205,
+      "component_count": 1,
+      "area_cm2": 76.60171308552395,
+      "face_count": 552,
+      "maxima": {
+        "surface_radius_m": 0.06452672674161226,
+        "spatial_cone_angle_deg": 23.735896624291858,
+        "local_normal_angle_deg": 41.59484213147736,
+        "tool_direction_angle_deg": 7.180027038620053e-14,
+        "incidence_angle_deg": 41.5948421314774,
+        "flange_base_radius_m": 0.6233084797414115
+      },
+      "raw_area_cm2": 66.0543452716104,
+      "filled_area_cm2": 10.54736781391355,
+      "filled_face_count": 96,
+      "fill_normal_limit_failure_count": 95,
+      "fill_visibility_failure_count": 10,
+      "fills_require_step2_verification": true,
+      "final_component_count": 1
+    },
+    {
+      "id": "C04",
+      "candidate_index": 14206,
+      "component_count": 1,
+      "area_cm2": 66.48235396353422,
+      "face_count": 517,
+      "maxima": {
+        "surface_radius_m": 0.06459620023926614,
+        "spatial_cone_angle_deg": 23.7173946402693,
+        "local_normal_angle_deg": 42.69281479681908,
+        "tool_direction_angle_deg": 2.205537218775061e-14,
+        "incidence_angle_deg": 42.692814796819064,
+        "flange_base_radius_m": 0.6119295632685521
+      },
+      "raw_area_cm2": 64.34113335265805,
+      "filled_area_cm2": 2.14122061087617,
+      "filled_face_count": 15,
+      "fill_normal_limit_failure_count": 15,
+      "fill_visibility_failure_count": 0,
+      "fills_require_step2_verification": true,
+      "final_component_count": 1
+    }
+  ],
+  "example_pairwise_overlap_cm2": [
+    [
+      8.212689429697539,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      37.40405643109437,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      76.60171308552395,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      66.48235396353422
+    ]
+  ],
+  "representative_visibility_ray_count": 5772,
+  "filled_visibility_ray_count": 532,
+  "needle_direction_fixed_for_all_candidates": true,
+  "requested_aiming_sites_centered_in_cone_and_used_for_tool_contact": true,
+  "all_fills_surrounded_by_strictly_more_than_270_degrees": true,
+  "filled_faces_are_initialization_only": true,
+  "geometrically_screened_selected_area_fraction": 0.3104459403116077,
+  "pool_surface_coverage_fraction": 0.9999249092296039,
+  "selected_surface_coverage_fraction": 0.3371368578305879,
+  "full_coverage_plan_verified": false,
+  "native_robot_motion_verified": false,
+  "step1_2_empty": true,
+  "input_npz_sha256": "3f212f1d4f6ddeef1e6f6c64c7b020e8bd3be6e05c59d1346b38dff23beaa7c8",
+  "report_sha256": "8cc26fc1ebd3d770b41b8b583ced237f03367b9da932130b3d35ae0b6ba3171b",
+  "validator_sha256": "63cb83912d2ecb89387102bd16579a7257305d4ca7398da8cadd8ae31783388e"
+}

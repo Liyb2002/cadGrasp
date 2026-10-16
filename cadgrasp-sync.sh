@@ -19,7 +19,7 @@ usage() {
 只传输新增或发生变化的文件；上传时保留 Ubuntu 端多出的文件。
 下载时以 Ubuntu 为准，删除 Mac 同步范围内 Ubuntu 上已不存在的文件和目录。
 同名文件以传输来源为准，被覆盖或删除的旧文件另存到目标端的备份目录。
-同步 codes、objects、simulation、slides 和根目录的非隐藏文件、.gitignore。
+同步 codes、objects、simulation、slides、robots_config、whole_task 和根目录的非隐藏文件、.gitignore。
 这些目录内的模型、数据和算法输出也参与同步；其他顶层目录不参与同步。
 下载时额外跳过 slides/Co-optimize/data/（也匹配小写 co-optimize），本机已有内容保留。
 不传输 Git 元数据、虚拟环境、node_modules、工具缓存和传输临时目录。
@@ -135,6 +135,8 @@ rsync_args=(
     --include=/objects/
     --include=/simulation/
     --include=/slides/
+    --include=/robots_config/
+    --include=/whole_task/
     '--exclude=/*/'
     -e "ssh -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ControlMaster=auto -o ControlPersist=60 -o ControlPath=$control_socket"
 )
@@ -157,7 +159,7 @@ fi
 
 printf '来源：%s\n目标：%s\n旧文件备份（在接收端）：%s\n' \
     "$source_path" "$destination_path" "$backup_dir"
-printf '范围：codes/、objects/、simulation/、slides/、根目录项目文件；跳过依赖和缓存。\n'
+printf '范围：codes/、objects/、simulation/、slides/、robots_config/、whole_task/、根目录项目文件；跳过依赖和缓存。\n'
 if [[ $mode == 'pull' ]]; then
     printf '下载排除：slides/Co-optimize/data/（含小写 co-optimize）；保留本机已有内容。\n'
 fi

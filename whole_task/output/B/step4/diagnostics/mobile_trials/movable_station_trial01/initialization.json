@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "method": "common_floor_direction",
+    "common_direction_status": "strict_common_direction",
+    "reference_direction": [
+      -0.6990738891914186,
+      0.6021832533852214,
+      -0.3855788204675852
+    ],
+    "dispersion_objective": 1.3322676295501878e-15,
+    "minimum_upward_dot": 0.00043885067130178257,
+    "fixed_start_count": 0,
+    "iterations": 0,
+    "global_optimum_claimed": false,
+    "force_feasibility_claimed": false
+  },
+  "counts": {
+    "0": 32768,
+    "1": 32768,
+    "2": 32768,
+    "3": 32768
+  },
+  "construction": "original PopulationSoftSearch connected nominal core",
+  "extra_one_percent_padded_initialization_used": false
+}

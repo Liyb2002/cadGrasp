@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "id": "01_franka_panda",
+  "name": "Franka Panda",
+  "researched_on": "2026-10-16",
+  "robot_specification": {
+    "manufacturer": "Franka",
+    "model": "Panda / FER",
+    "dof": 7,
+    "reach_m": 0.855,
+    "reach_reference": "manufacturer_nominal_reach_not_a_spherical_workspace",
+    "rated_payload_kg": 3,
+    "maximum_payload_kg": null,
+    "supported_mounting": [
+      "upright"
+    ],
+    "joint_order": [
+      "J1",
+      "J2",
+      "J3",
+      "J4",
+      "J5",
+      "J6",
+      "J7"
+    ],
+    "joint_position_limits": {
+      "unit": "rad",
+      "ranges": [
+        [
+          -2.8973,
+          2.8973
+        ],
+        [
+          -1.7628,
+          1.7628
+        ],
+        [
+          -2.8973,
+          2.8973
+        ],
+        [
+          -3.0718,
+          -0.0698
+        ],
+        [
+          -2.8973,
+          2.8973
+        ],
+        [
+          -0.0175,
+          3.7525
+        ],
+        [
+          -2.8973,
+          2.8973
+        ]
+      ],
+      "provenance": "manufacturer_fci",
+      "applicability": "Reference intervals only; actual controller profile and mounting can impose additional limits."
+    }
+  },
+  "task_constraint": {
+    "frame": "world_z_up",
+    "direction_semantics": "tool_to_surface",
+    "working_direction_world": [
+      0.9819571897312283,
+      0.08765005939605813,
+      0.16756355398181094
+    ],
+    "cone_half_angle_deg": 10,
+    "surface_incidence_half_angle_deg": 10,
+    "direction_label_zh": "竖直向下",
+    "direction_label_en": "Vertical downward",
+    "scenario_zh": "robot_access 固定正面工位的小角度喷涂示意",
+    "scenario_en": "Small-angle spraying at the existing front workstation",
+    "provenance": "user_editable_estimate_not_ik_certified",
+    "estimate_rationale_zh": "保留 Panda 本体参数；工位方向改为原场景的正面方向，允许半角收紧至 10 度。动画只展示其中约 3 度的实际小幅路径，不声称整个锥均可达。",
+    "assumed_mounting": "upright_floor_or_table",
+    "tool_axis_roll": "unconstrained_by_this_direction_model",
+    "world_position_constraint": null,
+    "note_zh": "方向锥固定在用户世界坐标；平移或旋转工件不会自动旋转该锥。工具物理轴须由用户的 TCP 标定确定。"
+  },
+  "feasibility": {
+    "direction_only": true,
+    "ik_verified": false,
+    "base_pose_world": null,
+    "tcp_transform": null,
+    "unmodeled": [
+      "position-dependent orientation workspace",
+      "joint coupling and singularities",
+      "self/environment/tool collisions",
+      "payload center of mass and inertia",
+      "velocity acceleration and torque",
+      "continuous path feasibility",
+      "tool footprint standoff and hoses"
+    ]
+  },
+  "sources": [
+    {
+      "title": "Franka Panda datasheet, April 2019 (Franka publication)",
+      "url": "https://cdn2.hubspot.net/hubfs/2896172/Brochura-Franka-Emika.pdf",
+      "supports": [
+        "dof",
+        "reach_m",
+        "rated_payload_kg",
+        "mounting"
+      ],
+      "note": ""
+    },
+    {
+      "title": "Franka Control Interface: Limits for Panda",
+      "url": "https://support.franka.de/docs/control_parameters.html#limits-for-panda",
+      "supports": [
+        "joint_position_limits"
+      ],
+      "note": "FCI intervals are recorded in their original radians; these are not FR3 intervals."
+    }
+  ],
+  "figure": null,
+  "parent_config": "robots_config/01_franka_panda.json",
+  "parent_config_sha256": "2ff0b9649e17e204a90895e799df6f5d89fca5dc7c2033d06c75d97dde4df598",
+  "station_source": "slides/idea/data/robot_access/scene.json"
+}

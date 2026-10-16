@@ -1,0 +1,40 @@
+{
+  "video": "whole_task/idea/robot_access_spray.mp4",
+  "sha256": "180c5cf4c85a0566092d55f3b12e8692fb12a623721e6d95b437e610b4c85606",
+  "width": 1280,
+  "height": 800,
+  "frames": 192,
+  "duration_s": 8,
+  "fps": 24,
+  "no_audio": true,
+  "no_text_or_number_overlay": true,
+  "manufacturer_lettering_mesh_omitted": true,
+  "all_frames_decode": true,
+  "scene_source": "slides/idea/data/robot_access/scene.json",
+  "config": "whole_task/assets/robot_access_spray/config.json",
+  "motion_verification": {
+    "joint_limits_pass": true,
+    "joint_speed_limits_pass": true,
+    "max_joint_step_deg": 0.1723345265299445,
+    "max_joint_speed_rad_s": 0.07218731766751318,
+    "max_tool_deviation_deg": 2.620612255806956,
+    "max_surface_incidence_deg": 2.6206190267501457,
+    "max_center_ray_target_error_m": 2.746313261795858e-06,
+    "all_spray_rays_first_hit_front_region": true,
+    "ray_clipping_includes_fixture": true,
+    "checked_spray_rays": 19200,
+    "physics_or_full_scene_collision_certificate": false
+  },
+  "inputs": {
+    "whole_task/assets/robot_access_spray/config.json": "5bfb2b70651efe5f6251eb38928fb960297f32034821022332a05f36981a5a38",
+    "whole_task/assets/robot_access_spray/motion.json": "40a98f170d3834c7fa8ed7af2e6d0e6127c43e4fdeafd8d65b854ab36a5983a6",
+    "whole_task/assets/robot_access_spray/trajectory.npz": "7afc1698caf8e1828f3508a9a8e44c84be787b0d2d9c417443538db651b3e8aa",
+    "whole_task/assets/robot_access_spray/robot_meshes.npz": "9645b17f15afe99c376b853bb9cc09f09a17a82990a2f4d66e6798a9013c8f92",
+    "whole_task/code/render_robot_access_spray.py": "2188a88cbf9a3031625b2a2b17f757524c886b091c427fd8c31ec6c6fc0c5f84",
+    "whole_task/code/prepare_robot_access_spray.py": "29fd8b4cfc27d51f3c7e0817c4eb10437b8ec09d9d6599a45f689e33dd144b7b",
+    "whole_task/code/make_robot_access_spray.py": "ecb6ffcf86e567fa23495a85247931404a73d447ef71909c69da28547a9b6397",
+    "robots_config/arm_visuals.py": "863f62b1dc77d3aad9542e9b9b1dba7d8f8333019302fe93d6263ccf6ebffb95"
+  },
+  "actual_encoded_contact_sheet": "whole_task/assets/robot_access_spray/encoded_frames.png",
+  "scope": "Small saved-Panda kinematic path and geometric spray visualization; not a new pose/fixture solve or paint process certification."
+}

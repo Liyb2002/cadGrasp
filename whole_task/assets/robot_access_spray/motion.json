@@ -1,0 +1,116 @@
+{
+  "fps": 24,
+  "frames": 192,
+  "duration_s": 8.0,
+  "tool_length_m": 0.103,
+  "standoff_m": 0.052,
+  "nominal_axis_world": [
+    0.9819571897312283,
+    0.08765005939605813,
+    0.16756355398181094
+  ],
+  "target_world": [
+    0.684325667005005,
+    0.015230001295420301,
+    0.7000888587353185
+  ],
+  "robot_parts": [
+    {
+      "name": "link0_white",
+      "body": 0,
+      "color": "white"
+    },
+    {
+      "name": "link0_black",
+      "body": 0,
+      "color": "black"
+    },
+    {
+      "name": "link1_white",
+      "body": 1,
+      "color": "white"
+    },
+    {
+      "name": "link2_white",
+      "body": 2,
+      "color": "white"
+    },
+    {
+      "name": "link3_white",
+      "body": 3,
+      "color": "white"
+    },
+    {
+      "name": "link3_black",
+      "body": 3,
+      "color": "black"
+    },
+    {
+      "name": "link4_white",
+      "body": 4,
+      "color": "white"
+    },
+    {
+      "name": "link4_black",
+      "body": 4,
+      "color": "black"
+    },
+    {
+      "name": "link5_black",
+      "body": 5,
+      "color": "black"
+    },
+    {
+      "name": "link5_white",
+      "body": 5,
+      "color": "white"
+    },
+    {
+      "name": "link6_white",
+      "body": 6,
+      "color": "white"
+    },
+    {
+      "name": "link6_black",
+      "body": 6,
+      "color": "black"
+    },
+    {
+      "name": "link7_white",
+      "body": 7,
+      "color": "white"
+    },
+    {
+      "name": "link7_black",
+      "body": 7,
+      "color": "black"
+    }
+  ],
+  "source_scene": "slides/idea/data/robot_access/scene.json",
+  "source_scene_sha256": "bdd6fa53a764f96d997f09a986cc8c5206fddb392c859a8bf8c63d5fe081f986",
+  "parent_config_sha256": "2ff0b9649e17e204a90895e799df6f5d89fca5dc7c2033d06c75d97dde4df598",
+  "config_sha256": "5bfb2b70651efe5f6251eb38928fb960297f32034821022332a05f36981a5a38",
+  "source_mesh_hashes": {
+    "object.obj": "ff9880aec3ffdc50957bf48127b8e3db0aad24f98a19af83a2cfb6b25ef09049",
+    "fixture.obj": "90ffc6a87e675bd74228d1c0e46e7ec6d0f260745fc7825703398e05f33631f1",
+    "front_patch.obj": "d6b93ee22b6ad1a7bf97744d86aa27254525996564e6fc47ecf35969993e15fe",
+    "back_patch.obj": "0f4dd7184f5e9631c06ddaa79924600f79df87f70bc324b929b394df42ea7e84"
+  },
+  "verification": {
+    "joint_limits_pass": true,
+    "joint_speed_limits_pass": true,
+    "max_joint_step_deg": 0.1723345265299445,
+    "max_joint_speed_rad_s": 0.07218731766751318,
+    "max_tool_deviation_deg": 2.620612255806956,
+    "max_surface_incidence_deg": 2.6206190267501457,
+    "max_center_ray_target_error_m": 2.746313261795858e-06,
+    "all_spray_rays_first_hit_front_region": true,
+    "ray_clipping_includes_fixture": true,
+    "checked_spray_rays": 19200,
+    "physics_or_full_scene_collision_certificate": false
+  },
+  "scope": "Small saved-Panda kinematic path and geometric spray visualization; not a new pose/fixture solve or paint process certification.",
+  "lettering_mesh_omitted": "link5_1",
+  "lettering_replaced_with_blank_dark_plate": true,
+  "no_text_or_numbers_in_video": true
+}

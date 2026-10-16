@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "id": "01_franka_panda",
+  "name": "Franka Panda",
+  "researched_on": "2026-10-16",
+  "robot_specification": {
+    "manufacturer": "Franka",
+    "model": "Panda / FER",
+    "dof": 7,
+    "reach_m": 0.855,
+    "reach_reference": "manufacturer_nominal_reach_not_a_spherical_workspace",
+    "rated_payload_kg": 3,
+    "maximum_payload_kg": null,
+    "supported_mounting": [
+      "upright"
+    ],
+    "joint_order": [
+      "J1",
+      "J2",
+      "J3",
+      "J4",
+      "J5",
+      "J6",
+      "J7"
+    ],
+    "joint_position_limits": {
+      "unit": "rad",
+      "ranges": [
+        [
+          -2.8973,
+          2.8973
+        ],
+        [
+          -1.7628,
+          1.7628
+        ],
+        [
+          -2.8973,
+          2.8973
+        ],
+        [
+          -3.0718,
+          -0.0698
+        ],
+        [
+          -2.8973,
+          2.8973
+        ],
+        [
+          -0.0175,
+          3.7525
+        ],
+        [
+          -2.8973,
+          2.8973
+        ]
+      ],
+      "provenance": "manufacturer_fci",
+      "applicability": "Reference intervals only; actual controller profile and mounting can impose additional limits."
+    }
+  },
+  "task_constraint": {
+    "frame": "world_z_up",
+    "direction_semantics": "tool_to_surface",
+    "working_direction_world": [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    "cone_half_angle_deg": 25,
+    "surface_incidence_half_angle_deg": 10,
+    "direction_label_zh": "竖直向下",
+    "direction_label_en": "Vertical downward",
+    "scenario_zh": "台面上表面接触抛光",
+    "scenario_en": "Tabletop surface polishing",
+    "provenance": "user_editable_estimate_not_ik_certified",
+    "estimate_rationale_zh": "假定机器人直立安装在台面旁、工具从上方接近；25 度用于限制腕部倾斜与工位方向，仅是任务初值。",
+    "assumed_mounting": "upright_floor_or_table",
+    "tool_axis_roll": "unconstrained_by_this_direction_model",
+    "world_position_constraint": {
+      "type": "planar_disk",
+      "applies_to": "surface_points_world",
+      "center_world_m": [
+        0.5,
+        0.0,
+        0.3
+      ],
+      "outward_normal_world": [
+        -0.0,
+        -0.0,
+        1.0
+      ],
+      "radius_m": 0.12,
+      "normal_tolerance_m": 0.005,
+      "base_to_center_distance_m": 0.58309518948453,
+      "provenance": "estimated_work_window_not_ik_certified",
+      "estimate_rationale_zh": "工作面中心水平偏置 0.5 m、相对底座安装面高度 0.3 m；圆形工作窗口半径 0.12 m。按名义臂展预留余量选取的布局初值，不是最大可达面积。移动工作面后须重新评估窗口。"
+    },
+    "note_zh": "方向锥、底座与工作窗口固定在用户世界坐标；移动工件不会自动移动这些约束。TCP 定义在实际工具的工作端；当前工具长度与安装姿态为估计，须用实际标定替换。",
+    "tcp_to_surface_distance_m": {
+      "min": 0,
+      "nominal": 0,
+      "max": 0,
+      "measurement": "along_tool_axis_from_process_tcp_to_surface",
+      "provenance": "user_editable_process_estimate",
+      "rationale_zh": "接触抛光，TCP 定义在磨头接触面；离面距离为 0。"
+    }
+  },
+  "feasibility": {
+    "direction_only": false,
+    "ik_verified": false,
+    "base_pose_world": {
+      "position_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_matrix": [
+        [
+          1.0,
+          -0.0,
+          0
+        ],
+        [
+          0.0,
+          1.0,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "provenance": "estimated_upright_station_pose",
+      "note_zh": "位置为底座安装面中心；估计底座 +X 指向工件的水平投影，+Z 向上，未做实物标定。"
+    },
+    "tcp_transform": {
+      "translation_flange_m": [
+        0.0,
+        0.0,
+        0.12
+      ],
+      "rotation_flange_tcp": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "process_axis_tcp": [
+        0,
+        0,
+        1
+      ],
+      "provenance": "estimated_straight_tool_not_calibrated",
+      "note_zh": "假定直工具沿法兰 +Z，TCP 位于工作端（磨头接触面、探针尖端、针头、镜头前端或喷嘴）；实际夹具、工具及 TCP 须重新标定。"
+    },
+    "unmodeled": [
+      "position-dependent orientation workspace",
+      "joint coupling and singularities",
+      "self/environment/tool collisions",
+      "payload center of mass and inertia",
+      "velocity acceleration and torque",
+      "continuous path feasibility",
+      "calibrated tool footprint and hoses"
+    ],
+    "model_scope": "estimated_surface_window_standoff_and_direction_not_ik"
+  },
+  "sources": [
+    {
+      "title": "Franka Panda datasheet, April 2019 (Franka publication)",
+      "url": "https://cdn2.hubspot.net/hubfs/2896172/Brochura-Franka-Emika.pdf",
+      "supports": [
+        "dof",
+        "reach_m",
+        "rated_payload_kg",
+        "mounting"
+      ],
+      "note": ""
+    },
+    {
+      "title": "Franka Control Interface: Limits for Panda",
+      "url": "https://support.franka.de/docs/control_parameters.html#limits-for-panda",
+      "supports": [
+        "joint_position_limits"
+      ],
+      "note": "FCI intervals are recorded in their original radians; these are not FR3 intervals."
+    },
+    {
+      "title": "Universal Robots manual: Operating Space",
+      "url": "https://www.universal-robots.com/manuals/EN/HTML/SW10_15/Content/prod-usr-man/complianceG7/H_g5_sections/mechanical_interface_g5/workspace.htm",
+      "supports": [
+        "workstation_estimate_method"
+      ],
+      "note": "Explains position-dependent orientation restrictions, outer reach and the central restricted cylinder. Does not prescribe the station offsets or work-window radii used here, including for other brands."
+    }
+  ],
+  "figure": "figures/01_franka_panda.png"
+}

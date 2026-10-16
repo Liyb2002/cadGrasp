@@ -55,12 +55,26 @@ def worker(payload):
     C.save(out/'construction.json',dict(complete=True,history=construction,initial_core_loss_m3=core_loss))
     deleter=Deleter(mesh,value,proof,checks,validator,out)
     deleter.run(tuple(args.grids))
+    accepted_deletions=len(deleter.states)-1
+    pruning_final_material_cm3=deleter.checks['material_cm3']
+    # Keep the completed pruning result, then add only a small local finish.
+    from wrap_surface_repair import repair
+    save_mesh(deleter.mesh,out/'pruned_support.obj')
+    refined_mesh,refined_value,refined_proof,refined_checks,refinement=repair(
+        deleter.mesh,validator,out/'surface_reinforcement')
+    if refinement['changed']:
+        deleter.mesh,deleter.value,deleter.proof,deleter.checks=refined_mesh,refined_value,refined_proof,refined_checks
+        deleter.save('local_surface_expansion',refinement)
+        save_mesh(deleter.mesh,out/'support.obj')
+        state_record=json.loads((out/'states.json').read_text())
+        state_record.update(complete=True,additive_finishing_stage=True,original_pruning_prefix_unchanged=True)
+        C.save(out/'states.json',state_record)
     inputs.verify()
     for path,sha in inputs.protected.items():
         if C.digest(C.ROOT/path)!=sha:raise ValueError('Input changed: '+path)
     report=dict(complete=True,passed=True,schema='coopt_connected_wrap_delete_v1',
         object=args.object,id=args.case['id'],pose_count=args.case['pose_count'],
-        experiment=args.experiment,pipeline='connected_hull_wrap_then_progressive_deletion',
+        experiment=args.experiment,pipeline='connected_hull_wrap_then_progressive_deletion_then_local_surface_expansion',
         selected_step4_source=C.relative(data['selected']),selected_step4_experiment=args.case['experiment'],
         support='support.obj',support_sha256=C.digest(out/'support.obj'),
         initial_support='initial_support.obj',initial_support_sha256=C.digest(out/'initial_support.obj'),
@@ -70,9 +84,10 @@ def worker(payload):
         baseline_source=C.relative(data['selected']/'support.obj'),baseline_checks=baseline_checks,
         optional_complete_reference=C.relative(previous) if previous else None,
         initial_step4_core_loss_m3=core_loss,
-        accepted_deletions=len(deleter.states)-1,attempts=len(deleter.history),
+        accepted_deletions=accepted_deletions,attempts=len(deleter.history),
         ring_perimeter_protected=False,contact_material_frozen=False,layout_changed=False,
-        reconstruction_after_pruning=False,material_added_after_pruning_started=False,
+        reconstruction_after_pruning=False,material_added_after_pruning_started=refinement['changed'],
+        pruning_final_material_cm3=pruning_final_material_cm3,local_surface_reinforcement=refinement,
         step4_rerun=False,original_demands_per_pose=32768,seconds=time.monotonic()-began,
         provenance=dict(inputs=inputs.protected),
         executed_frozen_sources=getattr(sys,'wrap_executed_sources',{}))
@@ -89,7 +104,10 @@ def worker(payload):
     report['execution_source_snapshot']=args.source_snapshot
     np.savez_compressed(out/'force_certificate.npz',**{f'pose_{k}':v for k,v in deleter.proof['masks'].items()})
     report['artifacts']={name:C.digest(out/name) for name in
-        ['support.obj','initial_support.obj','states.json','deletions.json','force_certificate.npz']}
+        ['support.obj','initial_support.obj','pruned_support.obj','states.json','deletions.json',
+         'force_certificate.npz','surface_reinforcement/report.json']}
+    if refinement['changed']:
+        report['artifacts']['surface_reinforcement/added_material.obj']=C.digest(out/'surface_reinforcement/added_material.obj')
     C.save(out/'data/report.json',report)
     print('COMPLETE',args.case['id'],report['accepted_deletions'],report['seconds'],flush=True)
     return report
@@ -98,7 +116,10 @@ def worker(payload):
 if __name__=='__main__':
     payload=json.loads(Path(sys.argv[1]).read_text())
     try:
-        if payload.get('action')=='width_audit':
+        if payload.get('action')=='reinforce':
+            from wrap_reinforce_worker import worker as reinforce
+            reinforce(payload)
+        elif payload.get('action')=='width_audit':
             from wrap_width_audit import audit
             audit(payload)
         elif payload.get('action')=='audit':

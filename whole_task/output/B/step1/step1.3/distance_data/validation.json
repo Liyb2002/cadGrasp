@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "original_four_regions_unchanged": true,
+  "source_shape_unchanged": true,
+  "original_video_unchanged": true,
+  "source_triangle_reconstruction": true,
+  "connected_components": 1,
+  "euler_number": 1,
+  "unblocked_visibility_rays": 332,
+  "maximum_tool_cone_deg": 23.749999999999975,
+  "maximum_incidence_deg": 8.001816692969882,
+  "maximum_window_radius_mm": 25.910043368841304,
+  "maximum_window_depth_mm": 4.534403883140326,
+  "broader_ear_area_cm2": 7.345122770818284,
+  "base_to_processing_point_mm": 583.09518948453,
+  "tool_length_mm": 120.0,
+  "tool_to_surface_gap_mm": 0,
+  "actual_robot_ik_certified": false,
+  "exact_half_of_entire_ear_certified": false,
+  "step1_2_and_step2_still_empty": true
+}

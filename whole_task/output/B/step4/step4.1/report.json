@@ -1,0 +1,56 @@
+{
+  "status": "nominal_diagnostic",
+  "initialization": {
+    "method": "common_floor_direction",
+    "common_direction_status": "strict_common_direction",
+    "reference_direction": [
+      -0.6990738891914186,
+      0.6021832533852214,
+      -0.3855788204675852
+    ],
+    "dispersion_objective": 1.3322676295501878e-15,
+    "minimum_upward_dot": 0.00043885067130178257,
+    "fixed_start_count": 0,
+    "iterations": 0,
+    "global_optimum_claimed": false,
+    "force_feasibility_claimed": false
+  },
+  "additional_clearance_certified": false,
+  "numerical_recovery_trial": -1,
+  "construction_failures": [],
+  "counts": {
+    "0": 32768,
+    "1": 11160,
+    "2": 0,
+    "3": 10729
+  },
+  "geometry": {
+    "nominal_sweep_overlap_m3": 4.2246379041214774e-21,
+    "additional_clearance_certified": false
+  },
+  "volume_cm3": 110.1395158655386,
+  "directions_fixture": [
+    [
+      -0.6990738891914187,
+      0.6021832533852215,
+      -0.38557882046758524
+    ],
+    [
+      -0.6990738891914187,
+      0.6021832533852215,
+      -0.38557882046758524
+    ],
+    [
+      -0.6990738891914187,
+      0.6021832533852215,
+      -0.38557882046758524
+    ],
+    [
+      -0.6990738891914187,
+      0.6021832533852215,
+      -0.38557882046758524
+    ]
+  ],
+  "fixed_task_poses": true,
+  "full_fixture_accepted": false
+}

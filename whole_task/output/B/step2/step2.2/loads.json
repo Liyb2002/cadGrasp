@@ -1,0 +1,275 @@
+{
+  "schema_version": 1,
+  "object": "B",
+  "stage": "step2.2",
+  "computed_from": "current_step2.1_object_poses",
+  "policy": {
+    "schema_version": 1,
+    "force_direction_model": "fixed_world_needle_axis",
+    "maximum_processing_force_mg": 0.5,
+    "magnitude_source": "codes/precompute_objects/loads.py: K=0.5; inherited design assumption, not a calibrated spray force",
+    "direction_half_angle_deg": 0,
+    "force_direction_source": "step2.1.fixed_station.tool_to_surface_axis_world",
+    "gravity_source": "step2.1.fixed_station.world_gravity_m_s2",
+    "mass_and_object_com_source": "objects/{object}/meta.json",
+    "sample_count_per_pose": 32768,
+    "sample_seed": 20260907,
+    "random_generator": "PCG64",
+    "position_distribution": "surface_area_weighted_faces_and_uniform_triangle_area",
+    "magnitude_distribution": "uniform_0_to_K; closed endpoints retained in exact domain and endpoint arrays",
+    "selection_scope": "entire_selected_working_area_including_explicit_hole_fills",
+    "geometry_exception_policy": "keep_all_demands_and_flag_unresolved_geometry",
+    "visibility_ray_offset_m": 1e-05,
+    "ray_batch_size": 2048,
+    "reaction_target_order": [
+      "Fx",
+      "Fy",
+      "Fz",
+      "tau_x",
+      "tau_y",
+      "tau_z"
+    ],
+    "downstream_moment_scale": "inverse_maximum_current_world_mesh_extent",
+    "no_uplift_target_coordinate": 0,
+    "note_zh": "按当前 pose 现场计算支撑所需反力与反力矩；沿固定针轴施加 0–0.5mg 加工力，重力保持世界向下。45 度法向阈值不是加工力方向锥。保留包含补洞的完整选区，对不满足几何条件的载荷加标记。需求计算完成不代表夹具已平衡这些需求。"
+  },
+  "pose_count": 4,
+  "total_sample_count": 131072,
+  "poses": [
+    {
+      "id": "C01",
+      "folder": "C01",
+      "sample_count": 32768,
+      "work_face_count": 74,
+      "filled_face_count": 0,
+      "unresolved_source_face_count": 0,
+      "sample_geometry_review_count": 20,
+      "status": "provisional_geometric_exceptions",
+      "com_world_m": [
+        -0.07256738211922156,
+        -0.4843947105064814,
+        0.2577522001682653
+      ],
+      "mass_kg": 0.7352354441525804,
+      "weight_N": 7.2126597071368135,
+      "maximum_processing_force_N": 3.6063298535684067,
+      "maximum_required_moment_norm_Nm": 0.3697267447518616,
+      "example": {
+        "sample_index": 0,
+        "point_world_m": [
+          0.01295739267586229,
+          -0.490511116412978,
+          0.29167573283024223
+        ],
+        "processing_force_N": [
+          0.0,
+          -1.2040692872868586,
+          -1.2040692872868586
+        ],
+        "required_force_N": [
+          -0.0,
+          1.2040692872868586,
+          8.416728994423673
+        ],
+        "required_moment_Nm": [
+          -0.04821086029515154,
+          -0.1029777546328857,
+          0.1029777546328857
+        ],
+        "geometry_review_required": false
+      },
+      "continuous_endpoint_count": 50
+    },
+    {
+      "id": "C02",
+      "folder": "C02",
+      "sample_count": 32768,
+      "work_face_count": 322,
+      "filled_face_count": 22,
+      "unresolved_source_face_count": 22,
+      "sample_geometry_review_count": 2003,
+      "status": "provisional_geometric_exceptions",
+      "com_world_m": [
+        -0.031841343772986766,
+        -0.558141723313484,
+        0.2584114193862479
+      ],
+      "mass_kg": 0.7352354441525804,
+      "weight_N": 7.2126597071368135,
+      "maximum_processing_force_N": 3.6063298535684067,
+      "maximum_required_moment_norm_Nm": 0.24341346510437012,
+      "example": {
+        "sample_index": 0,
+        "point_world_m": [
+          0.0036472846600247295,
+          -0.4815524721173338,
+          0.2735227971941877
+        ],
+        "processing_force_N": [
+          0.0,
+          -1.2040692872868586,
+          -1.2040692872868586
+        ],
+        "required_force_N": [
+          -0.0,
+          1.2040692872868586,
+          8.416728994423673
+        ],
+        "required_moment_Nm": [
+          0.07402361919445419,
+          -0.0427307675441243,
+          0.0427307675441243
+        ],
+        "geometry_review_required": false
+      },
+      "continuous_endpoint_count": 193
+    },
+    {
+      "id": "C03",
+      "folder": "C03",
+      "sample_count": 32768,
+      "work_face_count": 648,
+      "filled_face_count": 96,
+      "unresolved_source_face_count": 96,
+      "sample_geometry_review_count": 4439,
+      "status": "provisional_geometric_exceptions",
+      "com_world_m": [
+        0.017972779281488584,
+        -0.5313767959209448,
+        0.26532279575936246
+      ],
+      "mass_kg": 0.7352354441525804,
+      "weight_N": 7.2126597071368135,
+      "maximum_processing_force_N": 3.6063298535684067,
+      "maximum_required_moment_norm_Nm": 0.2551459122485289,
+      "example": {
+        "sample_index": 0,
+        "point_world_m": [
+          0.021472337628359518,
+          -0.4674064958585358,
+          0.2806204956153676
+        ],
+        "processing_force_N": [
+          0.0,
+          -1.2040692872868586,
+          -1.2040692872868586
+        ],
+        "required_force_N": [
+          -0.0,
+          1.2040692872868586,
+          8.416728994423673
+        ],
+        "required_moment_Nm": [
+          0.05860518304092288,
+          -0.004213710724535663,
+          0.004213710724535663
+        ],
+        "geometry_review_required": false
+      },
+      "continuous_endpoint_count": 366
+    },
+    {
+      "id": "C04",
+      "folder": "C04",
+      "sample_count": 32768,
+      "work_face_count": 532,
+      "filled_face_count": 15,
+      "unresolved_source_face_count": 15,
+      "sample_geometry_review_count": 1088,
+      "status": "provisional_geometric_exceptions",
+      "com_world_m": [
+        -0.0018989163822877436,
+        -0.5265072586173518,
+        0.2741739688749905
+      ],
+      "mass_kg": 0.7352354441525804,
+      "weight_N": 7.2126597071368135,
+      "maximum_processing_force_N": 3.6063298535684067,
+      "maximum_required_moment_norm_Nm": 0.21275089215751342,
+      "example": {
+        "sample_index": 0,
+        "point_world_m": [
+          0.044577646519747736,
+          -0.49065480164289954,
+          0.2886827423699542
+        ],
+        "processing_force_N": [
+          0.0,
+          -1.2040692872868586,
+          -1.2040692872868586
+        ],
+        "required_force_N": [
+          -0.0,
+          1.2040692872868586,
+          8.416728994423673
+        ],
+        "required_moment_Nm": [
+          0.025699273755224093,
+          -0.05596100196899671,
+          0.05596100196899671
+        ],
+        "geometry_review_required": false
+      },
+      "continuous_endpoint_count": 306
+    }
+  ],
+  "old_fixed_pose_load_arrays_read": false,
+  "original_objects_and_slides_outputs_modified": false,
+  "force_and_moment_sampled_independently": false,
+  "gravity_retained": true,
+  "moment_origin": "per-pose world COM",
+  "input_sha256": {
+    "/home/yli581/Desktop/cadGrasp/whole_task/output/B/step1/step1.3/pose_coverage.json": "8cc26fc1ebd3d770b41b8b583ced237f03367b9da932130b3d35ae0b6ba3171b",
+    "/home/yli581/Desktop/cadGrasp/whole_task/output/B/step1/step1.1/config.json": "cc84d21e6cd8467944ca98e11a5abef92535699d8a51779b0905a544c5596bb3",
+    "/home/yli581/Desktop/cadGrasp/objects/B/mesh.stl": "91691a4e136ea6b36ebbf888df95a8d5ea9eb3be2a3fdc28dbb9c71d7066f72b",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step1/planning_workspace.json": "a426aed6d283571d41481b69bd68b6c8ed3e2b77b34bd219da622ba20bfcf450",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step1/initialization_targets.json": "bbd2bfa2e03183e35197cbe546dedbab64629ddfae9aff4d7688da1424945ea1",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step1/compose_working_areas.py": "a27e9d7851dfc2e86776c5cc7834bb9ee08fdde60214b3410c2e53193264ce15",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step1/render_working_areas_blender.py": "311b42d5e1769eaf9c215a34089d102259dd64fa0c8225412c865cdbef27cb22",
+    "/home/yli581/Desktop/cadGrasp/robots_config/arm_visuals.py": "38c70e9be7f0740aa34523be6e7b67fac924dd1ced8a229d11f80b0274910244",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step1/pose_coverage.py": "6ad56cc4fefe7a0a500e9a439f4555d4773d486f29b63ac14ef5a0dbe4a04cda",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step1/fill_working_holes.py": "d32992a21a5a52383171a9d09b47777174fb031b9c449c993840f88ebc475910",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step1/step1_3.py": "e7e17e03ed718ef60983475d92ca37a04700c83c33e4fabe33b0fbc5480da5b6",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step1/render.py": "431f8b3ad19e6225e6a885badc4d7d7a907b447c1bea4a5324361d67daadc134",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step1/common.py": "14d6be9ee79fa5ed7924cd29495dc13ea74bb31234ddf6ec4175c080ef847f2a",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step1/work_disks.py": "0bfc6d5a4b3609d638018eec505c4112978ff6fd948ce6959b43aa9609d046f5",
+    "/home/yli581/Desktop/cadGrasp/whole_task/output/B/step1/step1.3/pose_coverage.npz": "3f212f1d4f6ddeef1e6f6c64c7b020e8bd3be6e05c59d1346b38dff23beaa7c8",
+    "/home/yli581/Desktop/cadGrasp/whole_task/output/B/step1/step1.3/working_areas_overview.png": "4952af429296be92c34a1dbef4e0b2da626e21e3665d9c0be27d97554f8ff26c",
+    "/home/yli581/Desktop/cadGrasp/whole_task/output/B/step2/step2.1/object_poses.json": "8882e8baaddf219028f984273ef17b7975084e690090e4da6cfcc60e9991277c",
+    "/home/yli581/Desktop/cadGrasp/whole_task/output/B/step2/step2.1/object_poses.npz": "3f43177201298c68f481540b5003f7f7522d63399fe85f6846e41525af3b90c7",
+    "/home/yli581/Desktop/cadGrasp/objects/B/meta.json": "9cda4d05300a1028a14650926ee3b23642c5b2836321623863a70f8cd5fc1945",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step2/load_policy.json": "9f7dd36e45c45f890bf8a48ade28a4305f3f3b396e63fe41d7935ffda0c42d69",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step2/poses.py": "a4ad7b2b23c961eee840a5c5b5ca850cff7ffc43bb9f7020ed4e5dbfa59ce7db",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step2/transforms.py": "4bf71b307e90d7b07886d8f06e88493d4a4a4a797a1fe0f774783b55799536d7",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step2/step2_1.py": "d9ed92d38a592ca22e1e7f538aad54efebeb7b6169f58a7c7a88235ee0f4f4d7",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step2/wrenches.py": "d4f2780e5397be540cdcd7b5b205a6e7fdc04a4633b746516ef3292865632b40",
+    "/home/yli581/Desktop/cadGrasp/whole_task/step2/step2_2.py": "e064afcf2ba9b7cb4e53770bae08fd08f0e91752049ad91efaef385f3a0dcf53"
+  },
+  "artifact_sha256": {
+    "C01/needs.json": "c27c37bdf108da81ea08f28175ecc63f5604b621c7d89135a2a7c60bf56c0fd4",
+    "C01/samples.npz": "4f6263bfe3f91c77eea96219fbb7ed22f1e339b661b5946515ed421962c1535c",
+    "C01/forward.npz": "37278779cb40ae3f89ca1183fbab0056acbeb44ed4e909847e800e1aabae3d8f",
+    "C01/sample_metadata.json": "789455c00a7e5899cf6f8bb8cd7afd7daf69d28de8d3b094dcf97327653e3e4a",
+    "C02/needs.json": "5678311e5f1c40332558efce48d7bd76dc838fd668828b4fc05d748ea5cb3b22",
+    "C02/samples.npz": "eb3fbe97dc1e512a32a1489523f9044ca8533dfc8a5ff63e59c999228ece3acd",
+    "C02/forward.npz": "cc78bb3a5b328902b46b83191b8ff0c07059ea64205f1e3f63a3c6961c2d523c",
+    "C02/sample_metadata.json": "4e5b085ac563e5d8e9b42979ca3edc77eb741d8bc3077dd38f0c20fc0ad59e47",
+    "C03/needs.json": "d7679ea8b1065d1fc4fc153ebbffe91d5c9a7ee3362da858fc117dc8bd542d94",
+    "C03/samples.npz": "fa74a33d2957c499f663bb676d1d8f825efa7e389810db2b4dc07d3be9268b92",
+    "C03/forward.npz": "5a75606837468dd3f4256cb0ca507b374d39daf7f751aef03bf369a82a668b6d",
+    "C03/sample_metadata.json": "8b7f967e27210d76278115aa8ada102b359fa5a6176333f78537b2e6bb840bd9",
+    "C04/needs.json": "12e7c7e9c14a40da2551a6d7dac915f68e11612f5d5ad784a34b1d938f0b138d",
+    "C04/samples.npz": "963ac7edefe5aecfaf259154e4cdddeec6d3f9b13e0ec7f8348cdcdb71fdeb97",
+    "C04/forward.npz": "34775605f895c2cf61fdc447ee339a5e4b5cadff3f6b6a3fa44311f69eb76b70",
+    "C04/sample_metadata.json": "7cbaeea32b3445ff99824736ffc6e2985c964acd001b3a0db68fddd507ae5beb"
+  },
+  "pose_source": "/home/yli581/Desktop/cadGrasp/whole_task/output/B/step2/step2.1/object_poses.json",
+  "physical_properties_source": "/home/yli581/Desktop/cadGrasp/objects/B/meta.json",
+  "reference_implementations": [
+    "codes/precompute_objects/loads.py:demand",
+    "objects/r6_quadratic.py:QuadraticR6",
+    "slides/Co-optimize/helper_func/current_task.py",
+    "slides/Co-optimize/helper_func/legacy_kernel/step3_scheculer/passive_support.py:target"
+  ],
+  "scope": "mechanical demand generation and algebraic verification; not fixture equilibrium or robot execution certification"
+}

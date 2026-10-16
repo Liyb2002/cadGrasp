@@ -1,0 +1,21 @@
+{
+  "schema_version": 3,
+  "wrap_maximum_vertex_displacement_m": 0.005,
+  "work_access_model": "finite_segments_between_working_surface_and_head",
+  "boolean_volume_tolerance_m3": 1e-10,
+  "floor_height_world_m": 0.0,
+  "floor_contact_tolerance_m": 1e-09,
+  "contact_model": "frictionless_nonnegative_unbounded_normal_reactions",
+  "equilibrium_model": "legacy_shared_7d_no_uplift",
+  "force_diagnostics_gate_initialization": false,
+  "select_connected_component": false,
+  "exit_paths_included": false,
+  "construct_base": false,
+  "finite_tool_radius_included": false,
+  "note_zh": "直接连接当前 working area 的完整三角面与 Step1.3 金锥的针头侧顶点；线段仅到工作面为止，不向工作面后方或针头后方延伸。各 pose 只使用自己的区域，拉回共同材料系后用于共享包覆裁切。撤销独立 Step3.2。",
+  "head_endpoint_source": "step1.3.workspace.spatial_cone.apex_world_m",
+  "segment_parameter_range": [
+    0.0,
+    1.0
+  ]
+}

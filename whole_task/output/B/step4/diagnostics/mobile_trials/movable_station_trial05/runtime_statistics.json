@@ -1,0 +1,87 @@
+{
+  "schema": "step4-runtime-v1",
+  "scope": "349e998d4c573603ba77b2936413fde61c592bf1d9dd64d34c08da5ed0622f60",
+  "cache": {
+    "contact_core": {
+      "memory_hits": 0,
+      "disk_hits": 0,
+      "misses": 1,
+      "writes": 1,
+      "corrupt": 0,
+      "read_s": 0.0,
+      "write_s": 0.0023476830683648586
+    },
+    "pair_lock_predicate": {
+      "memory_hits": 0,
+      "disk_hits": 0,
+      "misses": 4,
+      "writes": 4,
+      "corrupt": 0,
+      "read_s": 0.0,
+      "write_s": 0.0011467640288174152
+    },
+    "sampled_force": {
+      "memory_hits": 0,
+      "disk_hits": 0,
+      "misses": 4,
+      "writes": 4,
+      "corrupt": 0,
+      "read_s": 0.0,
+      "write_s": 0.021394393406808376
+    },
+    "oracle_query": {
+      "memory_hits": 33,
+      "disk_hits": 0,
+      "misses": 3,
+      "writes": 3,
+      "corrupt": 0,
+      "read_s": 0.0,
+      "write_s": 0.001762698870152235
+    },
+    "floor_demand_hull": {
+      "memory_hits": 0,
+      "disk_hits": 0,
+      "misses": 8,
+      "writes": 8,
+      "corrupt": 0,
+      "read_s": 0.0,
+      "write_s": 0.0010955985635519028
+    },
+    "material_contacts": {
+      "memory_hits": 8,
+      "disk_hits": 0,
+      "misses": 12,
+      "writes": 12,
+      "corrupt": 0,
+      "read_s": 0.0,
+      "write_s": 0.004900328349322081
+    },
+    "polygon_force": {
+      "memory_hits": 0,
+      "disk_hits": 0,
+      "misses": 12,
+      "writes": 12,
+      "corrupt": 0,
+      "read_s": 0.0,
+      "write_s": 0.003581127617508173
+    },
+    "complete_force": {
+      "memory_hits": 0,
+      "disk_hits": 0,
+      "misses": 4,
+      "writes": 4,
+      "corrupt": 0,
+      "read_s": 0.0,
+      "write_s": 0.012066899333149195
+    }
+  },
+  "compute_seconds": {
+    "contact_core": 1.8153302180580795,
+    "oracle_enclosure": 0.7335942732170224,
+    "oracle_connected_geometry": 1.7183416271582246
+  },
+  "hot_bytes": 6664763,
+  "memory_budget_bytes": 67108864,
+  "elapsed_seconds_including_prior_fragments": 48.17251638695598,
+  "continued_from_checkpoint": false
+}

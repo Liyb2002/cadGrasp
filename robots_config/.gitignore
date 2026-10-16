@@ -1,0 +1,4 @@
+# The repository ignores data and images by default; these are maintained inputs.
+!.gitignore
+!*.json
+!figures/*.png

@@ -1,0 +1,6 @@
+!.gitignore
+!.gitkeep
+!*.json
+!*.npz
+!*.png
+!*.mp4

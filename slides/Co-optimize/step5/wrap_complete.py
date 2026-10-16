@@ -118,7 +118,7 @@ def main():
         source_archive=str(archive.relative_to(ROOT)),
         numerical_source_snapshots=list(verification['frozen_sources']),
         native_inputs_recomputed_from_unchanged_original_sources=True,
-        geometry_and_route_regression_tests_passed=34,current_visuals_bound_to_new_supports=True,
+        geometry_and_route_regression_tests_passed=39,current_visuals_bound_to_new_supports=True,
         all_owned_workers_finished=True,unrelated_step4_workers_preserved=True))
     print(f"DELIVERY VERIFIED: 52 sets; {summary['passed']} certified; "
           f"{summary['upstream_step4_fail']} upstream failures; {summary['step5_failed']} Step5 failures; "

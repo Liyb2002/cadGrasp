@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "stage": "step1.1",
+  "object": "B",
+  "mode": "fixed_example_of_user_input",
+  "selected_config": "04_kuka_lbr_med14_r820",
+  "source": "/home/yli581/Desktop/cadGrasp/robots_config/04_kuka_lbr_med14_r820.json",
+  "source_sha256": "cc84d21e6cd8467944ca98e11a5abef92535699d8a51779b0905a544c5596bb3",
+  "config_file": "config.json",
+  "config_sha256": "cc84d21e6cd8467944ca98e11a5abef92535699d8a51779b0905a544c5596bb3",
+  "figure": "result.png",
+  "figure_sha256": "d99eabc05d347719c302457b0e27713e2b113d61abe1b278e9099c0a950cdf4f",
+  "planning_performed": false
+}

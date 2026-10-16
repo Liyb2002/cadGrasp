@@ -45,3 +45,23 @@ blender -b --factory-startup --python-exit-code 1 --python slides/idea/code/rend
 上一版画面、实体与代码保存在 `data/history/before_white_closeup/`，不作为当前展示。
 
 此次改名与提速之前的 16 秒白底版本保存在 `data/history/before_selected_names_2x/`。原始几何和动画轨迹保持相同；`*_motion.json` 中的时间是 16 秒源动画时间，最终视频的对应时间为其一半。
+
+## 机器人单侧加工与背面遮挡
+
+选取已有结果 [`pose1+6+11+13+14+17`](../Co-optimize/output/B/pose1+6+11+13+14+17/step5.3/pose_11.png)。pose17 和 pose13 的原工作区中心相距 96.02 mm，平均外法向夹角 164.08°。把这两块真实工作区同时标在保存的 pose11 安装上：绿色为机器人当前对准的 pose17 工作区，橙色为背面的 pose13 工作区。蓝色使用当前认证实体 `wrap_surface_reinforced_all52_20261015_03/support.obj`，工件与支撑的相对变换保持原样，整套安装只绕重力方向转动并抬到工作台上。
+
+四张图均为 2400×1500、白底、无文字覆盖：
+
+- [机器人加工全景](vis/robot_access/01_robot_working.png)
+- [正面工作区近景](vis/robot_access/02_front_work_area.png)
+- [背面工作区近景](vis/robot_access/03_back_work_area.png)
+- [透明遮挡示意](vis/robot_access/04_blocked_access.png)：红色虚线是从当前工具安装点朝背面目标的直线，叉号标出首次被工件截住的位置。
+
+机器人使用原生尺寸的 Franka 网格、关节范围和正运动学，末端增加示意加工主轴。工具尖端与选中前表面三角形中心的偏差为 0.0016 mm；朝背面目标的直线确实先穿过工件。此处表现固定摆放下的单侧工具进入限制，未证明机械臂所有构型均无法绕到背面，也未把 pose11 下的示意加工当作 pose17 的原受力任务。原始求解结果、模型与既有视频保持不变。
+
+[场景与来源](data/robot_access/scene.json)、[检查](data/robot_access/verification.json)和可继续制作视频的 [Blender 场景](data/robot_access/robot_access.blend)保存在 `data/robot_access/`。
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python slides/idea/code/prepare_robot_access.py
+blender -b -t 12 --factory-startup --python-exit-code 1 --python slides/idea/code/render_robot_access.py
+```

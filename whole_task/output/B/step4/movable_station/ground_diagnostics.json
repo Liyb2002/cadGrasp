@@ -1,0 +1,154 @@
+{
+  "schema": "mobile_station_ground_diagnostics_v1",
+  "tests": [
+    {
+      "object_floor_friction_coefficient": 0.0,
+      "poses": [
+        {
+          "pose": "C01",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 50,
+          "endpoints_total": 50
+        },
+        {
+          "pose": "C02",
+          "samples_passed": 19772,
+          "samples_total": 32768,
+          "endpoints_passed": 192,
+          "endpoints_total": 193
+        },
+        {
+          "pose": "C03",
+          "samples_passed": 0,
+          "samples_total": 32768,
+          "endpoints_passed": 0,
+          "endpoints_total": 366
+        },
+        {
+          "pose": "C04",
+          "samples_passed": 25759,
+          "samples_total": 32768,
+          "endpoints_passed": 305,
+          "endpoints_total": 306
+        }
+      ],
+      "passed": false
+    },
+    {
+      "object_floor_friction_coefficient": 0.3,
+      "poses": [
+        {
+          "pose": "C01",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 50,
+          "endpoints_total": 50
+        },
+        {
+          "pose": "C02",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 193,
+          "endpoints_total": 193
+        },
+        {
+          "pose": "C03",
+          "samples_passed": 213,
+          "samples_total": 32768,
+          "endpoints_passed": 1,
+          "endpoints_total": 366
+        },
+        {
+          "pose": "C04",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 306,
+          "endpoints_total": 306
+        }
+      ],
+      "passed": false
+    },
+    {
+      "object_floor_friction_coefficient": 0.5,
+      "poses": [
+        {
+          "pose": "C01",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 50,
+          "endpoints_total": 50
+        },
+        {
+          "pose": "C02",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 193,
+          "endpoints_total": 193
+        },
+        {
+          "pose": "C03",
+          "samples_passed": 22610,
+          "samples_total": 32768,
+          "endpoints_passed": 1,
+          "endpoints_total": 366
+        },
+        {
+          "pose": "C04",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 306,
+          "endpoints_total": 306
+        }
+      ],
+      "passed": false
+    },
+    {
+      "object_floor_friction_coefficient": 1.0,
+      "poses": [
+        {
+          "pose": "C01",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 50,
+          "endpoints_total": 50
+        },
+        {
+          "pose": "C02",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 193,
+          "endpoints_total": 193
+        },
+        {
+          "pose": "C03",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 366,
+          "endpoints_total": 366
+        },
+        {
+          "pose": "C04",
+          "samples_passed": 32768,
+          "samples_total": 32768,
+          "endpoints_passed": 306,
+          "endpoints_total": 306
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "scope": "object balance only; fixed actual support geometry and all original targets",
+  "complete_support_sha256": "b6a77d7ee1df8151dba45e8a99e1e42a028e179593e0c5d910a7ec99f4c4f109",
+  "floor_hull_benchmark": {
+    "original_samples": {
+      "seconds": 0.26440228009596467,
+      "queries": 80
+    },
+    "continuous_endpoints": {
+      "seconds": 0.007614827249199152,
+      "queries": 80
+    }
+  },
+  "floor_projection_input_reduction_ratio": 143.248087431694
+}

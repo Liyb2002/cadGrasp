@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "id": "04_kuka_lbr_med14_r820",
+  "name": "KUKA LBR Med 14 R820",
+  "researched_on": "2026-10-16",
+  "robot_specification": {
+    "manufacturer": "KUKA",
+    "model": "LBR Med 14 R820",
+    "dof": 7,
+    "reach_m": 0.82,
+    "reach_reference": "manufacturer_nominal_reach_not_a_spherical_workspace",
+    "rated_payload_kg": 14,
+    "maximum_payload_kg": null,
+    "supported_mounting": [
+      "any"
+    ],
+    "joint_order": [
+      "J1",
+      "J2",
+      "J3",
+      "J4",
+      "J5",
+      "J6",
+      "J7"
+    ],
+    "joint_position_limits": {
+      "unit": "deg",
+      "ranges": [
+        [
+          -170,
+          170
+        ],
+        [
+          -120,
+          120
+        ],
+        [
+          -170,
+          170
+        ],
+        [
+          -120,
+          120
+        ],
+        [
+          -170,
+          170
+        ],
+        [
+          -120,
+          120
+        ],
+        [
+          -175,
+          175
+        ]
+      ],
+      "provenance": "repository_robot_model",
+      "applicability": "Reference intervals only; actual controller profile and mounting can impose additional limits."
+    }
+  },
+  "task_constraint": {
+    "frame": "world_z_up",
+    "direction_semantics": "tool_to_surface",
+    "working_direction_world": [
+      0.0,
+      -0.7071067811865476,
+      -0.7071067811865476
+    ],
+    "cone_half_angle_deg": 25,
+    "surface_incidence_half_angle_deg": 10,
+    "direction_label_zh": "向 -Y、向下，各 45 度",
+    "direction_label_en": "45 deg downward toward -Y",
+    "scenario_zh": "沿用项目 KUKA 模型的表面探测工位",
+    "scenario_en": "Surface probing with the repository KUKA model",
+    "provenance": "user_editable_estimate_not_ik_certified",
+    "estimate_rationale_zh": "复用现有仿真型号，但另外假定探头从 +Y 上方进入；该方向锥供本项目表面任务使用。",
+    "assumed_mounting": "upright_floor_or_table",
+    "tool_axis_roll": "unconstrained_by_this_direction_model",
+    "world_position_constraint": {
+      "type": "planar_disk",
+      "applies_to": "surface_points_world",
+      "center_world_m": [
+        0.0,
+        -0.5,
+        0.3
+      ],
+      "outward_normal_world": [
+        -0.0,
+        0.7071067811865476,
+        0.7071067811865476
+      ],
+      "radius_m": 0.1,
+      "normal_tolerance_m": 0.005,
+      "base_to_center_distance_m": 0.58309518948453,
+      "provenance": "estimated_work_window_not_ik_certified",
+      "estimate_rationale_zh": "工作面中心水平偏置 0.5 m、相对底座安装面高度 0.3 m；圆形工作窗口半径 0.1 m。按名义臂展预留余量选取的布局初值，不是最大可达面积。移动工作面后须重新评估窗口。"
+    },
+    "note_zh": "方向锥、底座与工作窗口固定在用户世界坐标；移动工件不会自动移动这些约束。TCP 定义在实际工具的工作端；当前工具长度与安装姿态为估计，须用实际标定替换。",
+    "tcp_to_surface_distance_m": {
+      "min": 0,
+      "nominal": 0,
+      "max": 0,
+      "measurement": "along_tool_axis_from_process_tcp_to_surface",
+      "provenance": "user_editable_process_estimate",
+      "rationale_zh": "接触探测，TCP 定义在探针尖端；离面距离为 0，不适用于非接触传感器。"
+    }
+  },
+  "feasibility": {
+    "direction_only": false,
+    "ik_verified": false,
+    "base_pose_world": {
+      "position_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_matrix": [
+        [
+          6.123233995736766e-17,
+          1.0,
+          0
+        ],
+        [
+          -1.0,
+          6.123233995736766e-17,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "provenance": "estimated_upright_station_pose",
+      "note_zh": "位置为底座安装面中心；估计底座 +X 指向工件的水平投影，+Z 向上，未做实物标定。"
+    },
+    "tcp_transform": {
+      "translation_flange_m": [
+        0.0,
+        0.0,
+        0.12
+      ],
+      "rotation_flange_tcp": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "process_axis_tcp": [
+        0,
+        0,
+        1
+      ],
+      "provenance": "estimated_straight_tool_not_calibrated",
+      "note_zh": "假定直工具沿法兰 +Z，TCP 位于工作端（磨头接触面、探针尖端、针头、镜头前端或喷嘴）；实际夹具、工具及 TCP 须重新标定。"
+    },
+    "unmodeled": [
+      "position-dependent orientation workspace",
+      "joint coupling and singularities",
+      "self/environment/tool collisions",
+      "payload center of mass and inertia",
+      "velocity acceleration and torque",
+      "continuous path feasibility",
+      "calibrated tool footprint and hoses"
+    ],
+    "model_scope": "estimated_surface_window_standoff_and_direction_not_ik"
+  },
+  "sources": [
+    {
+      "title": "KUKA LBR Med product overview",
+      "url": "https://www.kuka.com/sv-se/branscher/robots-used-in-medicine/kuka-solutions-for-medical-robots/lbr-med-medical-robot",
+      "supports": [
+        "dof",
+        "reach_m",
+        "rated_payload_kg",
+        "mounting"
+      ],
+      "note": ""
+    },
+    {
+      "title": "Repository KUKA LBR Med 14 R820 model, originally from LBR-Stack",
+      "url": "../codes/simulation/assets/lbr_med14_r820/config/joint_limits.yaml",
+      "supports": [
+        "joint_position_limits"
+      ],
+      "note": "Model limits, not independently certified manufacturer controller limits. Reuses the existing repository robot."
+    },
+    {
+      "title": "Universal Robots manual: Operating Space",
+      "url": "https://www.universal-robots.com/manuals/EN/HTML/SW10_15/Content/prod-usr-man/complianceG7/H_g5_sections/mechanical_interface_g5/workspace.htm",
+      "supports": [
+        "workstation_estimate_method"
+      ],
+      "note": "Explains position-dependent orientation restrictions, outer reach and the central restricted cylinder. Does not prescribe the station offsets or work-window radii used here, including for other brands."
+    }
+  ],
+  "figure": "figures/04_kuka_lbr_med14_r820.png"
+}

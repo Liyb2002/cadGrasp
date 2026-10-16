@@ -1,0 +1,89 @@
+{
+  "complete": true,
+  "presentation_only": true,
+  "states": [
+    {
+      "pose": "C01",
+      "direction_fixture": [
+        -0.6990738891914187,
+        0.6021832533852215,
+        -0.38557882046758524
+      ],
+      "direction_world": [
+        0.35142295509141874,
+        -0.1382782952862112,
+        0.9259487133138392
+      ],
+      "own_nominal_removed_cm3": 106.3561179320289,
+      "full_length_m": 0.6191451847553253
+    },
+    {
+      "pose": "C02",
+      "direction_fixture": [
+        -0.6990738891914187,
+        0.6021832533852215,
+        -0.38557882046758524
+      ],
+      "direction_world": [
+        0.1531624633511272,
+        0.9882009245241087,
+        0.0004388506713018785
+      ],
+      "own_nominal_removed_cm3": 106.3561179320289,
+      "full_length_m": 0.6191451847553253
+    },
+    {
+      "pose": "C03",
+      "direction_fixture": [
+        -0.6990738891914187,
+        0.6021832533852215,
+        -0.38557882046758524
+      ],
+      "direction_world": [
+        0.6339168665923618,
+        -0.7734010690837,
+        0.000438850671301789
+      ],
+      "own_nominal_removed_cm3": 106.3561179320289,
+      "full_length_m": 0.6191451847553253
+    },
+    {
+      "pose": "C04",
+      "direction_fixture": [
+        -0.6990738891914187,
+        0.6021832533852215,
+        -0.38557882046758524
+      ],
+      "direction_world": [
+        -0.9202931279954435,
+        0.391229301017256,
+        0.0004388506713018899
+      ],
+      "own_nominal_removed_cm3": 106.3561179320289,
+      "full_length_m": 0.6191451847553253
+    }
+  ],
+  "text_or_labels": false,
+  "wheel": "existing step41_render.draw_pose",
+  "support_source": "new Step3.1",
+  "own_red_cut_policy": "this pose's complete nominal body sweep from the immutable new Step3.1 seed",
+  "final_support_policy": "nominal complete-path geometry; additional 1% clearance unresolved",
+  "display_sweep_length_m": 0.1,
+  "mechanics_rerun": false,
+  "geometry_changed": false,
+  "provenance": {
+    "inputs": {
+      "whole_task/output/B/step3/report.json": "b240dc4f8ab256315839845a531af733638f5bb421570af5bd473267d497ff6b",
+      "whole_task/output/B/step4/step4.1/support.obj": "c92d696d13e3f293a9ea4710be43a191c7b64d4c15603b5edc5a83650e3770ea"
+    },
+    "code": {
+      "slides/Co-optimize/vis_func/whole_step4_render.py": "69aaba5a477b4d7991103de14c8d1c8d2d3ae70be0cd95376970d500f4938294",
+      "slides/Co-optimize/vis_func/step41_render.py": "a8cd4a52c15ec7de4ba96278bd0b3310e5b3a7c079b0e466cbb31251fa612a02"
+    }
+  },
+  "artifacts": {
+    "../exit_directions.png": "b93c2cfc545c29dc6d84aa82ac5de6b933590f4d7108a6df9882af36b02681f1",
+    "../exit_sweeps.png": "e0e8d6869673439b95bb8f44c888ca1f3fb88f549c959979d3c592aa38a18aed",
+    "../final_result.png": "c6d7f38cdbf7fb8159d1b0efbf80cc2d25a9b034aeb644146d90f9e51db2e480"
+  }
+}

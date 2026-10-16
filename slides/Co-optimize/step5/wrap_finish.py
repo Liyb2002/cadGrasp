@@ -15,6 +15,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--experiment',default=DEFAULT_EXPERIMENT)
     parser.add_argument('--jobs',type=int,default=4)
+    parser.add_argument('--audit-source-snapshot',type=Path,help='Explicit independently archived audit implementation')
     args=parser.parse_args()
     base=COOPT/'data/results/B';directory=base/'data'/('step5_'+args.experiment)
     summary=read(directory/'summary.json')
@@ -31,6 +32,7 @@ def main():
             return read(ROOT/row['output']/'data/independent_audit.json')
         p=directory/'payloads'/(row['id'].replace('/','__')+'.json')
         payload=read(p);payload.update(action='audit',cpus=sorted(os.sched_getaffinity(0))[-2:])
+        if args.audit_source_snapshot:payload['source_snapshot']=str(args.audit_source_snapshot.resolve())
         target=p.with_name(p.stem+'.audit.json');save(target,payload)
         log=directory/'logs'/(row['id'].replace('/','__')+'.audit.log')
         with log.open('w') as handle:
@@ -98,6 +100,10 @@ def main():
     authorized=read(authorized_path).get('changes',{}) if authorized_path.exists() else {}
     original_changed=[p for p,h in originals.items() if sha(ROOT/p)!=authorized.get(p,{}).get('after',h)]
     archives={Path(read(directory/'payloads'/(r['id'].replace('/','__')+'.json'))['source_snapshot']) for r in passed}
+    for row in passed:
+        audit_payload=directory/'payloads'/(row['id'].replace('/','__')+'.audit.json')
+        if audit_payload.exists():archives.add(Path(read(audit_payload)['source_snapshot']))
+    if args.audit_source_snapshot:archives.add(args.audit_source_snapshot.resolve())
     indices={str(archive.relative_to(ROOT)):read(archive/'index.json') for archive in archives}
     frozen_changed=[str(archive/p) for archive in archives for p,h in read(archive/'index.json').items()
                     if sha(archive/p)!=h]

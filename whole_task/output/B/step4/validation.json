@@ -1,0 +1,44 @@
+{
+  "status": "passed",
+  "report_sha256": "b4a5246d2b14f6ec7f62c8e831b80e9d4890c127af9bcce739a7207c8b0e9e27",
+  "stages": [
+    {
+      "stage": "step4.1",
+      "fixed_robot_world_poses_verified": true,
+      "maximum_work_overlap_m3": 2.1300789992398964e-22,
+      "maximum_object_overlap_m3": 1.4725063497338552e-22,
+      "maximum_exit_overlap_m3": 9.608528975301533e-21,
+      "full_exits_rebuilt": true,
+      "minimum_exit_end_gap_m": 0.42039127373024304,
+      "minimum_installed_floor_height_m": 0.17230180524168812,
+      "material_components": 4,
+      "actual_contact_force_counts": {
+        "0": 32768,
+        "1": 11160,
+        "2": 0,
+        "3": 10729
+      },
+      "full_original_demands_replayed": true
+    },
+    {
+      "stage": "step4.2",
+      "fixed_robot_world_poses_verified": true,
+      "maximum_work_overlap_m3": 2.2261084645027086e-22,
+      "maximum_object_overlap_m3": 4.051999651692048e-21,
+      "maximum_exit_overlap_m3": 1.0906530836679385e-20,
+      "full_exits_rebuilt": true,
+      "minimum_exit_end_gap_m": 0.4226434484099002,
+      "minimum_installed_floor_height_m": 0.17230180524168812,
+      "material_components": 1,
+      "actual_contact_force_counts": {
+        "0": 32768,
+        "1": 32768,
+        "2": 21108,
+        "3": 12807
+      },
+      "full_original_demands_replayed": true
+    }
+  ],
+  "full_fixture_accepted": false,
+  "search_status": "search_budget_exhausted"
+}

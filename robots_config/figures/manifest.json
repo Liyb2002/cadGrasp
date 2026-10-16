@@ -1,0 +1,71 @@
+{
+  "entries": [
+    {
+      "config": "01_franka_panda.json",
+      "config_sha256": "3759d888baba8d6c715098a89c701356132abb2cc7d0fee66e21d4faed4734c3",
+      "figure": "figures/01_franka_panda.png",
+      "figure_sha256": "ee7afa24c0f8851016a8ddd060edab685522703f3d86269f2197eda8701b0d46"
+    },
+    {
+      "config": "02_franka_fr3.json",
+      "config_sha256": "6f2b0b0db03b7dfd1722ba9a885766998add8f74cf831a0c175e1250c08c85f5",
+      "figure": "figures/02_franka_fr3.png",
+      "figure_sha256": "cb1921b86b6cb9f65568af9e82189294114b8ad6c42dc24b632c38e91990fddb"
+    },
+    {
+      "config": "03_kuka_iiwa7_r800.json",
+      "config_sha256": "126dbcd1f35743128a40ebd59db3b12edf06270492e8b1d06315b55972cd88cf",
+      "figure": "figures/03_kuka_iiwa7_r800.png",
+      "figure_sha256": "1f86bb90f15055fe415c2346caf627e07b8c030dc1a9c0d65983b00a1baed53f"
+    },
+    {
+      "config": "04_kuka_lbr_med14_r820.json",
+      "config_sha256": "cc84d21e6cd8467944ca98e11a5abef92535699d8a51779b0905a544c5596bb3",
+      "figure": "figures/04_kuka_lbr_med14_r820.png",
+      "figure_sha256": "8533daaceeb1c48c9b656a3dce485161cd3d9989f5cd54f3f87538b5b93f8426"
+    },
+    {
+      "config": "05_kuka_kr6_r900_2.json",
+      "config_sha256": "c1f69c0f0ef4a8b3143ee818497103dbe81d086cec6ff95c7f58030f7a98ae89",
+      "figure": "figures/05_kuka_kr6_r900_2.png",
+      "figure_sha256": "91ad9f53cc81ece86768de52df1b7a0fd8d69def300a7fb999ce375d1d51a5a5"
+    },
+    {
+      "config": "06_ur5e.json",
+      "config_sha256": "d3120782008f78e9103f41dfb450a2eb55d3eb2d85ea6bdc108cad46c6a5f7b4",
+      "figure": "figures/06_ur5e.png",
+      "figure_sha256": "ad82e6664d27b36defee9e170049673d107bbd22b3c17daa12be452b12a2280c"
+    },
+    {
+      "config": "07_ur10e.json",
+      "config_sha256": "f3658da6df193a6bc0357c1f27baf076a824fa9c32d96a6244e3ddaa761c31d5",
+      "figure": "figures/07_ur10e.png",
+      "figure_sha256": "920b7db63cf538bb65afac8f0bc6ebe1f973472e90d6a0ec8072e4e6aeb907b8"
+    },
+    {
+      "config": "08_abb_irb1200_5_90.json",
+      "config_sha256": "1c96266aaa83c5f62823b3d11a8cdadf1d426b8f7b43bfdac639e3ca9d1ddad4",
+      "figure": "figures/08_abb_irb1200_5_90.png",
+      "figure_sha256": "9ad0fe0a159758780bcd6910e15e88581aedb7ee319dfe3a3d771821dfc90a4f"
+    },
+    {
+      "config": "09_fanuc_crx10ia.json",
+      "config_sha256": "1ef0f69bf39aabca7f168f5cdfb0bc4a6241af6cb230fb5b2080dbf82bf0caa4",
+      "figure": "figures/09_fanuc_crx10ia.png",
+      "figure_sha256": "3beac12c10f38300418f49d53de43d7af5307503bb6286b74e85b430d94c1882"
+    },
+    {
+      "config": "10_abb_irb52_120.json",
+      "config_sha256": "5ef93b83305b238e5f9c1e7e0f18a08e2f193043b4682975e12c90c526bf1f71",
+      "figure": "figures/10_abb_irb52_120.png",
+      "figure_sha256": "d5e19b1a7a382bff7baadaeab777ff916febc80c2da11f5455137525f88b53b3"
+    }
+  ],
+  "overview": "figures/overview.png",
+  "renderer_sha256": "76c0c9a37475b128079de7888adb4c02d88c4c84800c2504c71501d0d04c6cc6",
+  "visual_style": "robot, assumed surface disk, direction cone, base-to-surface dimension; title, half-angle and one distance label",
+  "geometry_units": "metres; station, standoff, tool length and work disk follow configuration values; arm links remain illustrative",
+  "robot_geometry": "Parametric 6/7-axis illustrative geometry, not manufacturer CAD or an IK solution.",
+  "blender_renderer_sha256": "6e602ec14dd02fe3238b350b9d4a2601fd909e8fc1dc13620fde7ce5d074fbdf",
+  "graphics_helpers_sha256": "38c70e9be7f0740aa34523be6e7b67fac924dd1ced8a229d11f80b0274910244"
+}

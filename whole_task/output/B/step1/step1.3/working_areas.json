@@ -1,0 +1,979 @@
+{
+  "schema_version": 3,
+  "stage": "step1.3",
+  "object": "B",
+  "robot_config_id": "04_kuka_lbr_med14_r820",
+  "robot_name": "KUKA LBR Med 14 R820",
+  "config_snapshot": "../step1.1/config.json",
+  "config_sha256": "cc84d21e6cd8467944ca98e11a5abef92535699d8a51779b0905a544c5596bb3",
+  "shape_source": "/home/yli581/Desktop/cadGrasp/objects/B/mesh.stl",
+  "shape_sha256": "91691a4e136ea6b36ebbf888df95a8d5ea9eb3be2a3fdc28dbb9c71d7066f72b",
+  "shape_units": "m",
+  "geometry_frame": "original_object_coordinates",
+  "shape_input_only": true,
+  "historical_pose_or_work_area_inputs_used": false,
+  "requested_area_count": 4,
+  "working_area_count": 4,
+  "working_areas": [
+    {
+      "id": "A01",
+      "face_ids": [
+        476,
+        524,
+        700,
+        701,
+        703,
+        788,
+        789,
+        790,
+        791,
+        960,
+        961,
+        963,
+        1066,
+        1068,
+        1069,
+        1071,
+        4150,
+        4151,
+        4324,
+        4325,
+        4326,
+        4327,
+        4328,
+        4438,
+        4440,
+        4441,
+        4442,
+        4674,
+        4675
+      ],
+      "face_count": 29,
+      "name": "ear",
+      "label_en": "Ear",
+      "label_zh": "耳朵外侧",
+      "requested_site": {
+        "name": "ear",
+        "label_en": "Ear",
+        "label_zh": "耳朵外侧",
+        "bounds_object_m": [
+          [
+            -0.07,
+            0.158,
+            -0.061
+          ],
+          [
+            -0.015,
+            0.186,
+            -0.005
+          ]
+        ],
+        "normal_bounds": [
+          [
+            -1,
+            -1,
+            -1
+          ],
+          [
+            1,
+            1,
+            -0.45
+          ]
+        ]
+      },
+      "area_m2": 0.00023590429718643922,
+      "area_fraction": 0.004214715998079189,
+      "seed_face_id": 4151,
+      "normal_cap_axis_object": [
+        -0.40180838985432255,
+        -0.12260598200190004,
+        -0.9074788102319673
+      ],
+      "center_object_m": [
+        -0.02593543396020929,
+        0.17310058449705443,
+        -0.019236161140725017
+      ],
+      "window_normal_object": [
+        -0.40180838985432243,
+        -0.12260598200190019,
+        -0.9074788102319673
+      ],
+      "mean_surface_normal_object": [
+        -0.49172700605824254,
+        -0.08520865352231391,
+        -0.8665702723252808
+      ],
+      "centroid_object_m": [
+        -0.025391949088403826,
+        0.1725754880727469,
+        -0.01898414549280167
+      ],
+      "bounds_object_m": [
+        [
+          -0.03322815953254292,
+          0.1646895771957229,
+          -0.024156153373527563
+        ],
+        [
+          -0.018288725629222038,
+          0.1818295182427565,
+          -0.013983847614956938
+        ]
+      ],
+      "normal_spread_max_deg": 30.84980268462998,
+      "tool_deviation_max_deg": 23.749999999999975,
+      "incidence_max_deg": 7.099802684630057,
+      "connected_components": 1,
+      "sampled_outgoing_rays_clear": true,
+      "visibility_sample_count_per_face": 4,
+      "footprint_type": "circle_envelope_clipped_by_legal_curved_surface",
+      "footprint_polygon_sides": 256,
+      "minimum_projected_circle_fill": 0.9,
+      "projected_circle_fill": 0.9222007628296495,
+      "radius_m": 0.00869258280105507,
+      "local_capacity_radius_m": 0.009150087159005338,
+      "window_radius_m": 0.1,
+      "usable_window_radius_m": 0.095,
+      "screening_max_window_radius_m": 0.008692582801055143,
+      "screening_max_window_depth_m": 0.002420817664634532,
+      "projected_area_m2": 0.0002188917628011483,
+      "boundary_components": 1,
+      "euler_number": 1,
+      "screening_alignment": {
+        "rotation_world_object": [
+          [
+            0.4056036096202218,
+            0.8646538349669872,
+            -0.29641096055970845
+          ],
+          [
+            0.29641096055970845,
+            -0.4311817465958143,
+            -0.8521870944004339
+          ],
+          [
+            -0.8646538349669872,
+            0.2577907040206557,
+            -0.4311817465958143
+          ]
+        ],
+        "translation_world_object_m": [
+          -0.144854387590281,
+          -0.4340674490170582,
+          0.22465682446243296
+        ],
+        "role": "candidate_window_fit_only_not_an_optimized_pose"
+      },
+      "tcp_to_surface_distance_m": 0.0,
+      "tool_length_m": 0.12,
+      "processing_center_world_m": [
+        0.0,
+        -0.5,
+        0.3
+      ],
+      "base_to_processing_center_distance_m": 0.58309518948453,
+      "world_pose": null,
+      "pose_status": "to_be_optimized"
+    },
+    {
+      "id": "A02",
+      "face_ids": [
+        1388,
+        1389,
+        1390,
+        1391,
+        1500,
+        1501,
+        1502,
+        1503,
+        1616,
+        1617,
+        1618,
+        1619,
+        1725,
+        1726,
+        1727,
+        1780,
+        1781,
+        1782,
+        1783,
+        1792,
+        1793,
+        1794,
+        1795,
+        1876,
+        1877,
+        1878,
+        1879,
+        2064,
+        2065,
+        2066,
+        2067,
+        2132,
+        2133,
+        2134,
+        2135,
+        2216,
+        2217,
+        2218,
+        2219,
+        2289,
+        2290,
+        2291,
+        4264,
+        4265,
+        4266,
+        4267,
+        4268,
+        4269,
+        4575,
+        4910,
+        4911,
+        4912,
+        4913,
+        4914,
+        4915
+      ],
+      "face_count": 55,
+      "name": "leg",
+      "label_en": "Front leg",
+      "label_zh": "前腿",
+      "requested_site": {
+        "name": "leg",
+        "label_en": "Front leg",
+        "label_zh": "前腿",
+        "display_view_object": [
+          -1,
+          0.1,
+          0.4
+        ],
+        "bounds_object_m": [
+          [
+            -0.085,
+            0.048,
+            -0.015
+          ],
+          [
+            -0.04,
+            0.085,
+            0.045
+          ]
+        ],
+        "normal_bounds": [
+          [
+            -1,
+            -1,
+            -1
+          ],
+          [
+            -0.4,
+            1,
+            1
+          ]
+        ]
+      },
+      "area_m2": 0.0005610690136445403,
+      "area_fraction": 0.010024177499256213,
+      "seed_face_id": 1877,
+      "normal_cap_axis_object": [
+        -0.6625299840803751,
+        -0.7330138576516914,
+        -0.15409316884613763
+      ],
+      "center_object_m": [
+        -0.07741074884931247,
+        0.06967073182264964,
+        0.0065110798459500074
+      ],
+      "window_normal_object": [
+        -0.6625299840803752,
+        -0.7330138576516911,
+        -0.1540931688461373
+      ],
+      "mean_surface_normal_object": [
+        -0.7196378272479685,
+        -0.679568359498476,
+        -0.14250699057370153
+      ],
+      "centroid_object_m": [
+        -0.0765000360035001,
+        0.07050474970420731,
+        0.00672553929779477
+      ],
+      "bounds_object_m": [
+        [
+          -0.08526378137049052,
+          0.06133570739676772,
+          -0.006591711553475573
+        ],
+        [
+          -0.06648173540022173,
+          0.07950915074650737,
+          0.020449735677418524
+        ]
+      ],
+      "normal_spread_max_deg": 17.972185122824254,
+      "tool_deviation_max_deg": 17.97218512282421,
+      "incidence_max_deg": 1.2074182697257333e-06,
+      "connected_components": 1,
+      "sampled_outgoing_rays_clear": true,
+      "visibility_sample_count_per_face": 4,
+      "footprint_type": "circle_envelope_clipped_by_legal_curved_surface",
+      "footprint_polygon_sides": 256,
+      "minimum_projected_circle_fill": 0.9,
+      "projected_circle_fill": 0.9357691690375147,
+      "radius_m": 0.01361598064875836,
+      "local_capacity_radius_m": 0.014332611209219326,
+      "window_radius_m": 0.1,
+      "usable_window_radius_m": 0.095,
+      "screening_max_window_radius_m": 0.013615980648758423,
+      "screening_max_window_depth_m": 0.0034640394440862065,
+      "projected_area_m2": 0.0005449703225063416,
+      "boundary_components": 1,
+      "euler_number": 1,
+      "screening_alignment": {
+        "rotation_world_object": [
+          [
+            -0.17768101046093016,
+            -0.04605115651015973,
+            0.9830100454754569
+          ],
+          [
+            -0.9830100454754569,
+            -0.03843888884438401,
+            -0.17948176040687114
+          ],
+          [
+            0.04605115651015973,
+            -0.9981992500540592,
+            -0.038438888844383956
+          ]
+        ],
+        "translation_world_object_m": [
+          -0.01694645919620257,
+          -0.5722488581575133,
+          0.37336040544137006
+        ],
+        "role": "candidate_window_fit_only_not_an_optimized_pose"
+      },
+      "tcp_to_surface_distance_m": 0.0,
+      "tool_length_m": 0.12,
+      "processing_center_world_m": [
+        0.0,
+        -0.5,
+        0.3
+      ],
+      "base_to_processing_center_distance_m": 0.58309518948453,
+      "world_pose": null,
+      "pose_status": "to_be_optimized"
+    },
+    {
+      "id": "A03",
+      "face_ids": [
+        1400,
+        1402,
+        1403,
+        1512,
+        1516,
+        1517,
+        1518,
+        1519,
+        1638,
+        1640,
+        1641,
+        1642,
+        1643,
+        1812,
+        1813,
+        1815,
+        1884,
+        1885,
+        1886,
+        1887,
+        1896,
+        1897,
+        1898,
+        1899,
+        1957,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026,
+        2027,
+        2074,
+        2084,
+        2085,
+        2086,
+        2087,
+        2088,
+        2089,
+        2090,
+        2091,
+        2160,
+        2161,
+        2162,
+        2163,
+        2169,
+        2369,
+        2370,
+        2371,
+        2436,
+        2437,
+        2438,
+        2439,
+        2520,
+        2521,
+        2522,
+        2523,
+        2528,
+        2529,
+        2530,
+        2531,
+        2532,
+        2533,
+        2534,
+        2535,
+        2584,
+        2585,
+        2586,
+        2587,
+        4206,
+        4207,
+        4304,
+        4305,
+        4306,
+        4307,
+        4308,
+        4309,
+        4740,
+        4741,
+        4742,
+        4743,
+        4744,
+        4745,
+        4812,
+        4814,
+        4816,
+        4817,
+        4880,
+        4881,
+        4882,
+        4883,
+        4884,
+        4885
+      ],
+      "face_count": 93,
+      "name": "back",
+      "label_en": "Back",
+      "label_zh": "后背",
+      "requested_site": {
+        "name": "back",
+        "label_en": "Back",
+        "label_zh": "后背",
+        "display_view_object": [
+          1,
+          0.2,
+          0.5
+        ],
+        "bounds_object_m": [
+          [
+            -0.005,
+            0.102,
+            -0.035
+          ],
+          [
+            0.05,
+            0.138,
+            0.045
+          ]
+        ],
+        "normal_bounds": [
+          [
+            0.05,
+            0.35,
+            -1
+          ],
+          [
+            1,
+            1,
+            1
+          ]
+        ]
+      },
+      "area_m2": 0.0010132067900963109,
+      "area_fraction": 0.018102166507829358,
+      "seed_face_id": 2088,
+      "normal_cap_axis_object": [
+        0.7271886592688878,
+        0.6862814606949296,
+        0.014642763986072893
+      ],
+      "center_object_m": [
+        0.032003650752206646,
+        0.11696450226008892,
+        0.010414037543038527
+      ],
+      "window_normal_object": [
+        0.7271886592688873,
+        0.6862814606949295,
+        0.014642763986073117
+      ],
+      "mean_surface_normal_object": [
+        0.7254050536683847,
+        0.688124256973013,
+        -0.01650803070346794
+      ],
+      "centroid_object_m": [
+        0.030839684466441385,
+        0.11594552846929257,
+        0.011194548487647326
+      ],
+      "bounds_object_m": [
+        [
+          0.01732045179103874,
+          0.10132244880631347,
+          -0.006882464978843927
+        ],
+        [
+          0.041813597955662814,
+          0.1279968517742746,
+          0.028478978233030416
+        ]
+      ],
+      "normal_spread_max_deg": 30.168217434456274,
+      "tool_deviation_max_deg": 23.749999999999975,
+      "incidence_max_deg": 6.418217434456252,
+      "connected_components": 1,
+      "sampled_outgoing_rays_clear": true,
+      "visibility_sample_count_per_face": 4,
+      "footprint_type": "circle_envelope_clipped_by_legal_curved_surface",
+      "footprint_polygon_sides": 256,
+      "minimum_projected_circle_fill": 0.9,
+      "projected_circle_fill": 0.9421524214471212,
+      "radius_m": 0.018101347346385167,
+      "local_capacity_radius_m": 0.019054049838300176,
+      "window_radius_m": 0.1,
+      "usable_window_radius_m": 0.095,
+      "screening_max_window_radius_m": 0.01810134734638526,
+      "screening_max_window_depth_m": 0.0046362503503778515,
+      "projected_area_m2": 0.0009697264513364839,
+      "boundary_components": 1,
+      "euler_number": 1,
+      "screening_alignment": {
+        "rotation_world_object": [
+          [
+            0.6464339729741937,
+            -0.6774785862059791,
+            -0.35092147813598934
+          ],
+          [
+            0.35092147813598934,
+            0.6724112858827634,
+            -0.6517032904630308
+          ],
+          [
+            0.6774785862059791,
+            0.29813726343722413,
+            0.6724112858827634
+          ]
+        ],
+        "translation_world_object_m": [
+          0.062207207969990366,
+          -0.5830921572612524,
+          0.23644421893629927
+        ],
+        "role": "candidate_window_fit_only_not_an_optimized_pose"
+      },
+      "tcp_to_surface_distance_m": 0.0,
+      "tool_length_m": 0.12,
+      "processing_center_world_m": [
+        0.0,
+        -0.5,
+        0.3
+      ],
+      "base_to_processing_center_distance_m": 0.58309518948453,
+      "world_pose": null,
+      "pose_status": "to_be_optimized"
+    },
+    {
+      "id": "A04",
+      "face_ids": [
+        1470,
+        1594,
+        1849,
+        1984,
+        1985,
+        1986,
+        1987,
+        1988,
+        1989,
+        1990,
+        1991,
+        2052,
+        2053,
+        2054,
+        2055,
+        2056,
+        2057,
+        2058,
+        2059,
+        2112,
+        2113,
+        2114,
+        2115,
+        2124,
+        2125,
+        2126,
+        2127,
+        2192,
+        2193,
+        2195,
+        2260,
+        2261,
+        2262,
+        2263,
+        2336,
+        2337,
+        2338,
+        2339,
+        2392,
+        2393,
+        2394,
+        2395,
+        2476,
+        2624,
+        2625,
+        2626,
+        2627,
+        2668,
+        2671,
+        2748,
+        2749,
+        2750,
+        2751,
+        2760,
+        2761,
+        2762,
+        2763,
+        2764,
+        2765,
+        2766,
+        2767,
+        2852,
+        2853,
+        2855,
+        2856,
+        2857,
+        2858,
+        2859,
+        2932,
+        2933,
+        2934,
+        2935,
+        3024,
+        3025,
+        3026,
+        3027,
+        3120,
+        3121,
+        3122,
+        3123,
+        3340,
+        3341,
+        3342,
+        3343,
+        3348,
+        3349,
+        3350,
+        3351,
+        4011,
+        4015,
+        4018,
+        4019,
+        4020,
+        4034,
+        4037,
+        4166,
+        4208,
+        4209,
+        4210,
+        4211,
+        4212,
+        4295,
+        4384,
+        4386,
+        4388,
+        4389,
+        4682,
+        4683,
+        4746,
+        4747,
+        4748,
+        4900,
+        4901,
+        4902,
+        4903,
+        4905
+      ],
+      "face_count": 116,
+      "name": "base",
+      "label_en": "Base underside",
+      "label_zh": "底座底面",
+      "requested_site": {
+        "name": "base",
+        "label_en": "Base underside",
+        "label_zh": "底座底面",
+        "bounds_object_m": [
+          [
+            -0.07,
+            0.033,
+            -0.035
+          ],
+          [
+            0.035,
+            0.044,
+            0.045
+          ]
+        ],
+        "normal_bounds": [
+          [
+            -1,
+            -1,
+            -1
+          ],
+          [
+            1,
+            -0.75,
+            1
+          ]
+        ]
+      },
+      "area_m2": 0.0011353287239569318,
+      "area_fraction": 0.020284022771142544,
+      "seed_face_id": 2262,
+      "normal_cap_axis_object": [
+        -0.033777058158541956,
+        -0.9978741303665899,
+        0.055734462294678766
+      ],
+      "center_object_m": [
+        0.00903850857866928,
+        0.03489256712297598,
+        0.02423488286634286
+      ],
+      "window_normal_object": [
+        -0.033777058158541935,
+        -0.9978741303665896,
+        0.05573446229467879
+      ],
+      "mean_surface_normal_object": [
+        0.0025400486052162647,
+        -0.998367013272241,
+        0.057068861587980614
+      ],
+      "centroid_object_m": [
+        0.009459171343538606,
+        0.036349163693437596,
+        0.023581534441400345
+      ],
+      "bounds_object_m": [
+        [
+          -0.010169565204964282,
+          0.03459535680388404,
+          0.004864074595294694
+        ],
+        [
+          0.028359059179831957,
+          0.03934429958462715,
+          0.04352615972817363
+        ]
+      ],
+      "normal_spread_max_deg": 31.683796943388476,
+      "tool_deviation_max_deg": 23.749999999999975,
+      "incidence_max_deg": 7.933796943388486,
+      "connected_components": 1,
+      "sampled_outgoing_rays_clear": true,
+      "visibility_sample_count_per_face": 4,
+      "footprint_type": "circle_envelope_clipped_by_legal_curved_surface",
+      "footprint_polygon_sides": 256,
+      "minimum_projected_circle_fill": 0.9,
+      "projected_circle_fill": 0.9184989073291265,
+      "radius_m": 0.019314858548603042,
+      "local_capacity_radius_m": 0.020331430051161097,
+      "window_radius_m": 0.1,
+      "usable_window_radius_m": 0.095,
+      "screening_max_window_radius_m": 0.019314858548603105,
+      "screening_max_window_depth_m": 0.004325428747937988,
+      "projected_area_m2": 0.0010763858428608462,
+      "boundary_components": 1,
+      "euler_number": 1,
+      "screening_alignment": {
+        "rotation_world_object": [
+          [
+            0.9965821841733385,
+            -0.029422019029583645,
+            0.07718999277445847
+          ],
+          [
+            -0.07718999277445847,
+            -0.6644844402051605,
+            0.7433048726738671
+          ],
+          [
+            0.029422019029583645,
+            -0.7467226885005287,
+            -0.6644844402051605
+          ]
+        ],
+        "translation_world_object_m": [
+          -0.009851697280459317,
+          -0.494130656179322,
+          0.3418928429342326
+        ],
+        "role": "candidate_window_fit_only_not_an_optimized_pose"
+      },
+      "tcp_to_surface_distance_m": 0.0,
+      "tool_length_m": 0.12,
+      "processing_center_world_m": [
+        0.0,
+        -0.5,
+        0.3
+      ],
+      "base_to_processing_center_distance_m": 0.58309518948453,
+      "world_pose": null,
+      "pose_status": "to_be_optimized"
+    }
+  ],
+  "angular_budget": {
+    "inset_fraction": 0.05,
+    "inset_kind": "angular_radius",
+    "tool_cone_half_angle_deg": 25.0,
+    "incidence_half_angle_deg": 10.0,
+    "working_tool_cone_half_angle_deg": 23.75,
+    "working_incidence_half_angle_deg": 9.5,
+    "full_normal_cap_half_angle_deg": 35.0,
+    "working_normal_cap_half_angle_deg": 33.25
+  },
+  "shape_area_m2": 0.055971576090524264,
+  "shape_face_count": 5000,
+  "selected_area_fraction": 0.05262508277630731,
+  "unselected_area_fraction": 0.9473749172236927,
+  "selection_method": "one compact local footprint per requested site, clipped by normal/depth/visibility constraints in a fixed world station; radius and angle inset 5%",
+  "region_request_source": "/home/yli581/Desktop/cadGrasp/whole_task/step1/B_working_regions.json",
+  "region_request_sha256": "eb0c490cbc29a86edde0f9422b73a1bcceaa4a4674b1577360513617fc099b2b",
+  "minimum_projected_circle_fill": 0.9,
+  "fixed_workstation": true,
+  "fixed_distance_definition": "robot base to processing-window reference center; object COM is not fixed",
+  "reference_normal_pairwise_deg": [
+    [
+      0.0,
+      60.26967929318762,
+      112.93090122778897,
+      85.10445805595714
+    ],
+    [
+      60.26967929318762,
+      0.0,
+      170.78503121447466,
+      41.81980330323175
+    ],
+    [
+      112.93090122778897,
+      170.78503121447466,
+      1.2074182697257333e-06,
+      135.11858006431902
+    ],
+    [
+      85.10445805595714,
+      41.81980330323175,
+      135.11858006431902,
+      8.537736462515939e-07
+    ]
+  ],
+  "mean_normal_pairwise_deg": [
+    [
+      0.0,
+      57.63826568923353,
+      113.64258630387765,
+      88.03056714108324
+    ],
+    [
+      57.63826568923353,
+      0.0,
+      170.86026273200574,
+      48.048754185274966
+    ],
+    [
+      113.64258630387765,
+      170.86026273200574,
+      0.0,
+      133.32218449243197
+    ],
+    [
+      88.03056714108324,
+      48.048754185274966,
+      133.32218449243197,
+      0.0
+    ]
+  ],
+  "candidate_seed_limit_per_round": 96,
+  "visibility_candidates_evaluated": 359,
+  "work_window": {
+    "type": "planar_disk",
+    "applies_to": "surface_points_world",
+    "center_world_m": [
+      0.0,
+      -0.5,
+      0.3
+    ],
+    "outward_normal_world": [
+      -0.0,
+      0.7071067811865476,
+      0.7071067811865476
+    ],
+    "radius_m": 0.1,
+    "normal_tolerance_m": 0.005,
+    "base_to_center_distance_m": 0.58309518948453,
+    "provenance": "estimated_work_window_not_ik_certified",
+    "estimate_rationale_zh": "工作面中心水平偏置 0.5 m、相对底座安装面高度 0.3 m；圆形工作窗口半径 0.1 m。按名义臂展预留余量选取的布局初值，不是最大可达面积。移动工作面后须重新评估窗口。"
+  },
+  "standoff": {
+    "min": 0,
+    "nominal": 0,
+    "max": 0,
+    "measurement": "along_tool_axis_from_process_tcp_to_surface",
+    "provenance": "user_editable_process_estimate",
+    "rationale_zh": "接触探测，TCP 定义在探针尖端；离面距离为 0，不适用于非接触传感器。"
+  },
+  "spatial_inset_fraction": 0.05,
+  "computation_source_sha256": {
+    "step1_3.py": "689b8b7aab67231f9171af04df2c6d483d24c386fe7e1e1def22abb8c8fa175c",
+    "work_disks.py": "0bfc6d5a4b3609d638018eec505c4112978ff6fd948ce6959b43aa9609d046f5",
+    "render.py": "431f8b3ad19e6225e6a885badc4d7d7a907b447c1bea4a5324361d67daadc134",
+    "common.py": "14d6be9ee79fa5ed7924cd29495dc13ea74bb31234ddf6ec4175c080ef847f2a"
+  },
+  "world_pose_selected": false,
+  "planning_performed": false,
+  "spatial_workspace_applied": true,
+  "work_window_is_user_estimate_not_ik_certificate": true,
+  "scope": "Compact candidates at the requested sites fit the same fixed work window under saved screening alignments. Surface areas vary with curvature; optimized poses, IK, full tool collisions, continuous paths and support remain to be solved.",
+  "arrays": "working_areas.npz",
+  "figures": [
+    "working_areas.png",
+    "area_01.png",
+    "area_02.png",
+    "area_03.png",
+    "area_04.png"
+  ],
+  "artifact_sha256": {
+    "working_areas.npz": "e52d018e9648f4ee5b886dd7cfb767a58a827f4c55eec3d9dc4332327ba47977",
+    "working_areas.png": "8d8dd24baa7da6da41e8d5658f6324efde8336c495b259a2de8901be837d91ad",
+    "area_01.png": "651ee3aad84dd0f0fd4807b63dd60612e56ce0b3820d33bbfb861761e2ea31ed",
+    "area_02.png": "27f808b503923a40f4c88dd3b4413ae2bc9d7b37f2fcdbc81185f72ebb1345fa",
+    "area_03.png": "1a8f85b9d7d5fbe7a8e06c9e9d75e45cc4a4df344e501d0816a8ccb3017c2edd",
+    "area_04.png": "bc974dcdfc4f286932c50ab0d8cf646b5c2b954fe9a0633c1630c4d41181dd0f"
+  }
+}

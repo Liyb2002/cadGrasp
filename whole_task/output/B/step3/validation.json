@@ -1,0 +1,121 @@
+{
+  "status": "passed",
+  "report_sha256": "b240dc4f8ab256315839845a531af733638f5bb421570af5bd473267d497ff6b",
+  "continuous_work_overlap_m3": 6.844754132753795e-22,
+  "object_overlap_m3": 3.0683768514287036e-22,
+  "contacts_rebuilt_from_serialized_boundary": true,
+  "all_current_inputs_bound": true,
+  "execution_access_checked_per_pose": true,
+  "segment_parameter_range": [
+    0.0,
+    1.0
+  ],
+  "poses": [
+    {
+      "pose": "C01",
+      "all_original_load_count": 32768,
+      "force_status": "pass",
+      "force_replayed": true,
+      "work_access": {
+        "pose": "C01",
+        "own_installation_checked": true,
+        "head_world_m": [
+          0.0,
+          -0.41514718625761426,
+          0.38485281374238567
+        ],
+        "work_face_count": 74,
+        "own_world_access_overlap_m3": 2.2620014856426095e-21,
+        "own_world_access_clear": true,
+        "segment_parameter_range": [
+          0.0,
+          1.0
+        ],
+        "full_working_triangles_included": true,
+        "extends_beyond_surface": false,
+        "extends_behind_head": false
+      },
+      "serialized_contact_generators_verified": true
+    },
+    {
+      "pose": "C02",
+      "all_original_load_count": 32768,
+      "force_status": "pass",
+      "force_replayed": true,
+      "work_access": {
+        "pose": "C02",
+        "own_installation_checked": true,
+        "head_world_m": [
+          0.0,
+          -0.41514718625761426,
+          0.38485281374238567
+        ],
+        "work_face_count": 322,
+        "own_world_access_overlap_m3": 9.656175598699027e-23,
+        "own_world_access_clear": true,
+        "segment_parameter_range": [
+          0.0,
+          1.0
+        ],
+        "full_working_triangles_included": true,
+        "extends_beyond_surface": false,
+        "extends_behind_head": false
+      },
+      "serialized_contact_generators_verified": true
+    },
+    {
+      "pose": "C03",
+      "all_original_load_count": 32768,
+      "force_status": "pass",
+      "force_replayed": true,
+      "work_access": {
+        "pose": "C03",
+        "own_installation_checked": true,
+        "head_world_m": [
+          0.0,
+          -0.41514718625761426,
+          0.38485281374238567
+        ],
+        "work_face_count": 648,
+        "own_world_access_overlap_m3": 5.389241993291239e-22,
+        "own_world_access_clear": true,
+        "segment_parameter_range": [
+          0.0,
+          1.0
+        ],
+        "full_working_triangles_included": true,
+        "extends_beyond_surface": false,
+        "extends_behind_head": false
+      },
+      "serialized_contact_generators_verified": true
+    },
+    {
+      "pose": "C04",
+      "all_original_load_count": 32768,
+      "force_status": "pass",
+      "force_replayed": true,
+      "work_access": {
+        "pose": "C04",
+        "own_installation_checked": true,
+        "head_world_m": [
+          0.0,
+          -0.41514718625761426,
+          0.38485281374238567
+        ],
+        "work_face_count": 532,
+        "own_world_access_overlap_m3": 6.885319069993396e-22,
+        "own_world_access_clear": true,
+        "segment_parameter_range": [
+          0.0,
+          1.0
+        ],
+        "full_working_triangles_included": true,
+        "extends_beyond_surface": false,
+        "extends_behind_head": false
+      },
+      "serialized_contact_generators_verified": true
+    }
+  ],
+  "initialization_verified": true,
+  "full_fixture_accepted": false
+}

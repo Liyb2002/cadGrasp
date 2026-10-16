@@ -229,8 +229,8 @@ class Movies:
             if R.digest(R.ROOT/path)!=sha or R.digest(self.data/'executed_sources'/path)!=sha:
                 raise ValueError('Render source changed: '+path)
         old=self.boxes[0];shrinks=0
-        for bounds in self.boxes[1:]:
-            if np.max(old[0]-bounds[0])>1e-8 or np.max(bounds[1]-old[1])>1e-8:
+        for state,bounds in zip(self.states[1:],self.boxes[1:]):
+            if state['operation']!='local_surface_expansion' and (np.max(old[0]-bounds[0])>1e-8 or np.max(bounds[1]-old[1])>1e-8):
                 raise ValueError('Blue-solid BBX expanded')
             shrinks+=int(np.prod(bounds[1]-bounds[0])<np.prod(old[1]-old[0])-1e-12);old=bounds
         if self.frames[2]:
@@ -241,6 +241,7 @@ class Movies:
             initial_source_sha256=self.report['initial_support_sha256'],final_source_sha256=self.report['support_sha256'],
             video01_endpoint_equals_video02_start=True,video02_final_equals_actual_step5=True,
             checkpoints=len(self.states),actual_support_bbx_shrink_steps=shrinks,
+            local_surface_reinforcement_checkpoints=sum(s['operation']=='local_surface_expansion' for s in self.states),
             all_original_force_masks_checked=True,no_pruning_interpolation=True,
             hidden_final_retention_mask_used=False,closed_rings_protected=False,
             text=0,video01_original_scatter_layout_restored=True,
@@ -253,7 +254,7 @@ class Movies:
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--experiment',default='wrap_balanced_all52_20261015_02')
+    parser.add_argument('--experiment',default='wrap_surface_reinforced_all52_20261015_03')
     selection=parser.add_mutually_exclusive_group()
     selection.add_argument('--only-first',action='store_true',help='Restore 01 while preserving 02 byte-for-byte')
     selection.add_argument('--only-second',action='store_true',help='Render 8-second box-free 02 while preserving 01 byte-for-byte')
