@@ -44,6 +44,8 @@ class FiniteAccess(SurfaceSegments):
 
 class ComputedInputs(Model):
     def __init__(self, poses=None, name='B', output_root=DEFAULT_OUTPUT, **kwargs):
+        from whole_task.step3.input_state import require_joint_initialization
+        require_joint_initialization()
         self.name = name
         self.output_root = Path(output_root).resolve()
         folder = self.output_root/name/'step3'
@@ -74,7 +76,7 @@ class ComputedInputs(Model):
         self.epsilon = self.extent*1e-7
         self.floors = []
         for k, task in enumerate(self.tasks):
-            task.inputs = [self.output_root/name/f'step2/step2.2/{self.poses[k]}/needs.json']
+            task.inputs = [Path(p) for p in loads['input_sha256']]
             # Compatibility-only point for legacy constructors; actual floor
             # columns below come exclusively from the computed world mesh.
             task.floor = np.r_[task.domain.com[:2], 0.]
@@ -147,7 +149,7 @@ class TaskModel(OracleModel, ComputedMeasure, ComputedInputs):
     def validate_placement(self, layout, k):
         U=installed_state(self.native,layout,layout.hosts[k]) @ layout.placements[k]
         if not np.allclose(U,self.native[k],atol=1e-10,rtol=0):
-            raise ValueError('Candidate moves the Step2 robot work pose; couple fixture installation and seat instead')
+            raise ValueError('Candidate moves the reference robot work pose; couple fixture installation and seat instead')
 
     def floor_signature(self, layout, k):
         self.validate_placement(layout,k)

@@ -9,7 +9,7 @@ import numpy as np
 import trimesh
 from scipy.spatial.transform import Rotation
 
-from whole_task.step2.transforms import rigid_transform, points
+from whole_task.common.transforms import rigid_transform, points
 from .initialize import build_seed, supply, validate_policy
 from .legacy import kernel as K
 from .work_access import SurfaceSegments, RegisteredWorkVolumes

@@ -397,6 +397,16 @@ def select_compact_working_areas(output_root=DEFAULT_OUTPUT, object_name="B", co
 
 def select_working_areas(output_root=DEFAULT_OUTPUT, object_name="B", count=4,
                          inset_fraction=.05, shape_path=None):
+    config_path = Path(output_root)/object_name/'step1/step1.1/config.json'
+    if config_path.exists():
+        config = json.loads(config_path.read_text())
+        if config.get('working_tool', {}).get('model') in ('fixed_length_needle_in_bounded_spherical_sector', 'needle_spherical_sector_surface_intersection'):
+            if count != 4 or shape_path is not None:
+                raise ValueError('Rigid-needle display uses four examples of the selected object shape')
+            from .run_needle import run
+            selection = json.loads((config_path.parent/'selection.json').read_text())
+            run(output_root, object_name, selection['source'], inset_fraction)
+            return json.loads((config_path.parent.parent/'step1.3/pose_coverage.json').read_text())
     from .pose_coverage import select_pose_coverage
     return select_pose_coverage(output_root, object_name, count, inset_fraction, shape_path)
 
@@ -415,5 +425,7 @@ def main():
                           angular_budget=report["angular_budget"]), indent=2))
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    # Public execution uses the current bounded-translation model.
+    from .plan_reach import main as current_main
+    current_main()

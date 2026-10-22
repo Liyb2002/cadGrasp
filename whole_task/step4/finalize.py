@@ -20,7 +20,7 @@ from whole_step4_render import NominalBuilder
 from whole_search.common import unpack_solid
 from connected_core import largest_material_component
 from material_force import certify_material_contacts
-from whole_task.step2.wrenches import endpoint_demands
+from whole_task.common.wrenches import endpoint_demands
 
 
 def finalize(folder):

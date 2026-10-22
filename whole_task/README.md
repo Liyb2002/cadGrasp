@@ -1,448 +1,275 @@
-# 小方向喷涂
+# Whole task：正方体工作窗口、姿态与支撑
 
-[播放视频](idea/robot_access_spray.mp4) · [预览](idea/robot_access_spray.png)
+## 当前版本：固定六 task 预览
 
-复用 `slides/idea/data/robot_access` 的原工件、蓝色支撑、工位和真实 Panda 网格。无文字、数字或声音。先展示全景，再拉近喷头；喷雾始终朝向正面的一小块区域。
+先用 ±X、±Y、±Z 六种落桌姿态，最终 task 数量另行求解。报告保持 `task_count_mode = fixed_six_pose_preview_not_optimized`，不把六个输入姿态当作已优化的最终数量。
 
-使用 [Franka Panda 配置](../robots_config/01_franka_panda.json)的本体参数，另存 [该工位配置](assets/robot_access_spray/config.json)：方向取自原场景，允许半角收紧至 10°。实际动画最大偏转约 2.62°，没有声称整个方向锥可达。
+## 工作空间：边长取物体最长边的一半
 
-逐帧检查原生 IK／FK、关节位置和速度限位、喷头方向与表面入射角；19,200 条喷雾射线均先命中原正面工作区，检查包括蓝色支撑遮挡。喷雾是示意效果，没有重新求解工件姿态或共享支撑，也没有认证喷涂工艺、动力学或完整场景碰撞。
-
-```bash
-.venv/bin/python whole_task/code/prepare_robot_access_spray.py
-.venv/bin/python whole_task/code/make_robot_access_spray.py
-```
-
-轨迹、工位参数、视频检查和来源在 `assets/robot_access_spray/`；渲染帧使用临时目录，编码与完整解码检查完成后清理。原 `robot_access` 图片、模型和场景文件保持原样。
-
-## Step1：机器人输入与候选工作区
-
-Step1 生成并规划工作区域；Step2.1 将区域对应的物体摆放写成正式的位姿数据，并复核几何条件；Step2.2 根据当前 pose 计算成对的力／力矩需求；Step3 初始化共享包覆并检查接触载荷；Step4 后续设计可装卸、连通且能落地的 fixture。当前 `step1_2.py` 仍为空。Step1.3 输出可重叠的连通候选池及四个示例，尚未选择完整覆盖方案，也不要求固定 6–10 个区域。机器人运动验收与 fixture 验收另行完成。
-
-`step1/step1_1.py` 固定读取 04 KUKA LBR Med 配置：向 -Y 斜向下 45°，方向锥半角 25°。原配置快照位于 `output/B/step1/step1.1/`。原配置中的薄圆盘是早期工位估计；当前 Step1.3 采用 `step1/planning_workspace.json` 中的固定金锥与三维工作球。
-
-### 固定作业范围
-
-- 工作球：读取配置的窗口中心 `[0, -0.5, 0.3] m` 与半径 100 mm，内缩 5% 后为 95 mm，不施加旧圆盘的 ±5 mm 薄层限制。
-- 空间金锥：轴线为配置的工具到表面方向，半角 25°。参考顶点从球心沿轴线反向退回“工具长度 + 标称离面距离”，当前为 120 mm，得到 `[0, -0.4151471863, 0.3848528137] m`。这是新增的工位参考假设，不是机器人实际移动法兰的位置。
-- 所有候选共用同一球心、锥顶和锥轴。锥向前延伸并由工作球限制长度；选区使用内缩 5% 后的 23.75° 空间半角。每个原始三角形的全部顶点必须同时在球内和锥内。
-- **针头方向及滚转固定，只允许平移**，所有候选与区域内全部点使用同一世界朝向。局部曲面内法线相对固定针轴采用 45°，预留余量后为 42.75°。金锥的 25° 此时只限制空间位置，不表示针头会在锥内摆动。
-
-另保留固定方向下的四点射线遮挡与法兰到基座的粗略距离检查，法兰到基座的估计上限为 779 mm，该大范围不画在图中。由于针轴固定，局部法向偏角也就是表面入射角。用户已选择 45° 版本，明确替换源配置中的 10° 接触探针入射限制，覆盖关系存入报告；源 robot JSON 与 Step1.1 快照仍记录原输入。工具长度 120 mm、离面距离 0 mm 不变。实验只验证几何条件，不把斜入射的涂层质量视为已经通过。
-
-### 候选生成与连通性
-
-默认 `step1/step1_3.py` 调用 `pose_coverage.py`，读取 `objects/B/mesh.stl` 的原始 5,000 面形状，保留原面编号。先采样物体朝向，按局部法向条件找连通片，再将连通片的面积加权中心作为平移参考，对齐到固定工作球中心。经过空间、局部法向、固定针轴遮挡和法兰范围筛选后，再按原网格共享边拆成连通候选。每个点的针轴在世界坐标中都等于输入主方向，遇到遮挡不会另选针头朝向。
-
-原始候选通过 45° 法向、位置、固定针轴遮挡和法兰粗筛，每个候选只有一块连通曲面。按用户要求，展示区域随后执行下面的初始化补洞；其余小片仍保留为其他候选，后续完整覆盖规划需处理它们。候选之间允许重叠，不消耗或永久分配面；不使用耳朵、腿等部位边界，也不裁成圆盘。有限平移与朝向采样只提供几何候选，没有全局最优或完整覆盖保证。
-
-四个示例按 45° 计算选区及补洞，统一显示为一种颜色。橙色对准耳面，绿色从兔子正前方对准嘴部；蓝色和紫色沿用原 45° 种子候选的对齐。`planning_workspace.json` 的 `display_target_overrides` 保存耳朵／嘴巴的原网格面编号及网格哈希，将面中心对齐金锥的参考工作中心，针头也指向此面。瞄准点仅定位工位，选区取包含该面的几何合格连通分量，再补洞，不使用部位边界裁切。其余候选池按当前 45° 限制生成。四个展示候选不代表四轮完成任务。`pose_coverage.json` 记录候选池未覆盖的原面编号及各面积；临时对齐由 Step2 正式导出为初始 pose。后续还需结合真实 IK、完整工具／机械臂／支撑碰撞和连续路径决定最终工作 pose。几何连通也不等于已经存在可执行路径。
-
-### 超过 270° 包围的缺口补入
-
-`fill_working_holes.py` 在垂直固定针轴的平面上，投影原 45° 选区的边界。对每个未选原面，以其面中心为观察点，计算能遇到这些边界线段的方向所占的圆周角度；用圆周区间并集计量，重叠方向不重复计数。严格超过 270° 才提出补入。计算只做一轮，参照原始 45° 区域，避免反复填充造成范围继续扩张。
-
-补入仍需满足原空间位置和法兰距离范围，并与原区域沿网格共享边连通。投影已被选中三角形覆盖的其他表面不作为可见缺口；孤立背面不会仅因投影重合而被并入。这个判据是基于面中心投影的初始化规则，不是精确曲面拓扑或工具轨迹证明。
-
-**补入允许越过原法向／采样遮挡筛选，但必须明确记录例外。** `raw_face_ids` 保存原始几何候选，`filled_face_ids` 保存补入面，`face_ids` 是最终初始化选区。报告分别给出补入面的包围角、法向不满足项、遮挡不满足项和面积，全部补入面都标记为需要 Step2 验证。初始选区面积与已通过几何筛选的面积分开统计，不能把补洞解释成实际已经能完成喷涂。
-
-### 输出与验证
-
-当前四个示例：橙色耳面 8.21 cm²（总表面积的 1.47%），绿色嘴部及相连前侧 37.40 cm²（6.68%），蓝色 76.60 cm²（13.69%），紫色 66.48 cm²（11.88%）。兔子总表面积为 559.72 cm²，四块去重合计 33.71%。这里统计的是表面积，包含初始化补洞，不是体积分割或已完成喷涂的面积。
-
-```bash
-.venv/bin/python -m whole_task.step1.run
-.venv/bin/python -B -m unittest whole_task.step1.test_fill_working_holes whole_task.step1.test_pose_coverage whole_task.step1.test_step1 robots_config.test_constraints -v
-.venv/bin/python -B -m whole_task.step1.validate_pose_coverage
-```
-
-当前结果位于 `output/B/step1/step1.3/`：
-
-- [工作区合成图](output/B/step1/step1.3/working_areas_overview.png)：唯一图片，无文字，四组配对视图。左侧为最终初始化区域，右侧为相同选区的临时摆放、固定方向针头、金锥与延长线。采用 45° 区域并补入符合 >270° 包围规则的缺口，同一区域统一着色。**虚线工作球已从图中移除**，其 95 mm 空间约束仍用于筛选。四幅针头同向，只能平移；台面为 500 × 400 mm，仅为展示，尚未设计支撑。
-- `pose_coverage.json`／`pose_coverage.npz`：输入和产物哈希、原网格、原始候选池、每区原始面／补入面／最终面掩码、包围角、几何筛选例外、临时对齐及固定 TCP 姿态。
-- `pose_coverage_validation.json`：原始候选逐点几何验收，最终选区空间范围与连通性检查，>270° 补洞规则复算及各补入面的未通过项核对。补入部分明确保留待后续验证状态。
-- `visualization_validation.json`：固定金锥参数一致、针头同向、统一着色、没有工作球，以及唯一图片和输入／产物哈希检查。
-
-输入配置更新后先刷新 Step1.1。渲染使用临时目录，只保留合成图。旧紧凑选区和距离分析数据属于历史基线，不作为当前模型；过时的图像和旧模型诊断不参与验收。
-
-初始化目标保存在 `step1/initialization_targets.json`。区域数量服从完整覆盖和工作质量。Stage2 后续还需验收关节余量、奇异性、腕部姿态与连续运动；真实“画得稳”不能仅由这个几何模型认证。
-
-## Step2.1：固定工位下的初始物体 pose
-
-这里保存的是最初确认的摆放快照。最新执行约定允许机器人平移工作窗口，保持针头朝向和局部范围；Step4 可以选择接地或托起高度，并在执行时固定兔子质心的水平位置。最终执行变换见下文 Step4 的 `execution.json`，不覆盖这份初始输入。
-
-当前实现将 Step1.3 已有的四个 `screening_alignment` 正式写成物体摆放数据。选区、颜色顺序、物体位置和朝向均沿用已确认的示例：橙色耳面、绿色嘴部、蓝色与紫色原区域。Step2.1 完成位姿表达、输入绑定和几何复核，没有重新优化摆放。
-
-### 固定量与待求量
-
-世界坐标系 `W` 为 Z 向上；物体坐标系 `O` 直接采用原 STL 坐标，不额外居中、缩放或旋转。定义工位坐标系 `S`，原点为固定工作中心 `c = [0, -0.5, 0.3] m`，其 +Z 沿固定针轴 `a = [0, -1/√2, -1/√2]`，滚转采用 Step1.3 已保存的参考旋转。机器人基座、金锥和工作球也都留在世界坐标系中。
-
-每块区域对应一个物体位姿：
+工作空间为正方体。计算 +X 参考物体的世界 AABB，取最长边的一半作为三轴共同边长：
 
 ```text
-T_WO,i = [ R_i  t_i ]       p_world = R_i p_object + t_i
-         [  0    1  ]       n_world = R_i n_object
-
-T_SO,i = inverse(T_WS) T_WO,i
-T_NO,i = inverse(T_WN) T_WO,i
+object_size = object_AABB.max - object_AABB.min
+cube_edge = 0.5 * max(object_size.x, object_size.y, object_size.z)
+work_size = (cube_edge, cube_edge, cube_edge)
+c = center_of_robot_facing_object_face
+n = outward_normal_of_that_face
+work_center = c - 0.5 * cube_edge * n
+bounds = (work_center - 0.5 * work_size, work_center + 0.5 * work_size)
 ```
 
-`T_A_B` 将 B 系坐标映射到 A 系；矩阵按列向量定义。NumPy 中点按行保存时使用 `p @ R.T + t`。`N` 是针头的固定参考 TCP 坐标系，四块区域共用同一个 `T_WN`。变量是各区的 `T_WO,i`。当前已有合格原始候选的摆放，因此直接以它们作为初始解；后续 pose 优化仍可调整 `R_i, t_i`，再复核整个区域。
+参考物体世界 AABB 尺寸为 119.086 × 154.786 × 153.007 mm，因此当前工作空间为 **77.393 × 77.393 × 77.393 mm 的正方体**。靠机械臂的面仍与物体框 +Y 面共中心，正方体由此朝物体内部延伸。三轴采用同一边长；对于窄物体，正方体允许超出物体 AABB 的较窄轴范围。六个姿态共用固定世界工作窗口。
 
-标称离面距离为 `s` 时，参考针尖在 `q_ref = c - s a`；当前 `s = 0`，所以 `q_ref = [0, -0.5, 0.3] m`。参考法兰由工具 TCP 变换反推，当前为 `[0, -0.4151471863, 0.3848528137] m`。`T_WN` 是统一的工位参考，不代表已经给出了覆盖曲面的运动。
-
-**“固定工位”与“针尖作业时完全静止”需要区分。** Step1.3 的几何模型采用固定方向、针头可平移，对表面点 `p_world` 的 TCP 位置为 `q(p) = p_world - s a`。如果要求针尖位置也完全固定，则需让物体在作业中移动，把不同表面点依次送到针前；单个静态物体 pose 和单个静态接触针尖只定义一个接触位置。当前 Step2 导出静态摆放及固定针头参考系，尚未选择由哪一方完成区域内扫描，也未生成扫描轨迹。金锥仍是空间工作范围，不能当成静止针头的喷雾覆盖形状。
-
-### 位姿复核与 fixture 接口
-
-`step2/poses.py` 读取 Step1.3 的 JSON／NPZ 与原网格，核对输入、源代码和产物哈希；逐区复核共享边连通、三角形全顶点空间范围、42.75° 法向限制、四点射线遮挡和法兰粗略范围。原始候选面必须继续通过；补洞面保留原面编号，并分别输出通过部分和未解决部分，不会因为正式导出了 pose 而自动变成可执行面。
-
-| 区域 | 初始化选区面积 | 仍未通过全部几何筛选的补入面 |
+| 轴 | 最小值 mm | 最大值 mm |
 |---|---:|---:|
-| 橙色耳面 | 8.21 cm² | 0 |
-| 绿色嘴部 | 37.40 cm² | 22 |
-| 蓝色 | 76.60 cm² | 96 |
-| 紫色 | 66.48 cm² | 15 |
+| X | -38.697 | 38.697 |
+| Y | -710.000 | -632.607 |
+| Z | 260.414 | 337.807 |
 
-每个 pose 输出 `T_WO`、逆变换、相对工位／针头参考系的变换、平移、`xyzw` 顺序四元数，以及该 pose 下的世界顶点和面法向。世界重力固定为 `[0, 0, -9.81] m/s²`，物体系重力按 `R_i.T @ g_world` 更新。供后续 fixture 初始化使用的区域编号保存在 `fixture_input.working_face_ids_to_keep_accessible` 中；支撑接触尚未选择。
+**可加工面 = 给定角度可达的物体表面 ∩ 正方体内的物体表面。** 位置限制作用在表面加工点／针尖 TCP，头部和针根可在框外。针长 100 mm、针半径 2 mm、头半径 20 mm，名义方向 `(0, −0.7071, −0.7071)`，方向锥半角 25°。射线、针、头、IK、关节、连杆和桌面避碰均重新检查。
 
-当前状态是 **initial pose**。耳面通过上述四点／面几何检查；其余三块保留补洞例外，后续需要调整 pose、区域或作业方式。Step2.2 的更密集采样还会逐点记录遮挡。真实 IK、机械臂／完整工具／支撑碰撞、连续轨迹、喷涂质量与 fixture 力学条件仍待验收。`executable_working_pose_verified` 保持为 `false`。
+当前仍按原始三角面保守离散：三个顶点与质心都在正方体内，且该面认证通过才计入可加工区域。跨框三角面暂不裁切；不补入未认证面，不丢弃可加工小块。工作框以三维线段绘制，物体遮住后方棱线；参考物体大框不画。
 
-### 运行与输出
+参数见 [reach_policy.json](step1/reach_policy.json)，工位与正方体数据见 [setup.json](output/B/step1/step1.1/setup.json)。
 
-```bash
-.venv/bin/python -B -m whole_task.step2.step2_1
-.venv/bin/python -B -m whole_task.step2.validate
-.venv/bin/python -B -m unittest whole_task.step2.test_poses -v
-```
+## 重算结果
 
-输出位于 `output/B/step2/step2.1/`：
+兔子总表面积 **559.72 cm²**。本轮六个实际 task 共 **2,456 面、288.57 cm²，占 51.56%**；此前为 41.49%。重复分配面数和面积均为 0，全部已分配面均属于所属姿态的认证交集。
 
-- [object_poses.json](output/B/step2/step2.1/object_poses.json)：固定工位、四个物体位姿、区域编号、几何复核、fixture 初始化接口与输入／产物哈希。
-- [object_poses.npz](output/B/step2/step2.1/object_poses.npz)：变换矩阵、原始及世界坐标几何、选区／补洞／几何通过掩码。
-- [validation.json](output/B/step2/step2.1/validation.json)：坐标变换、源摆放与选区不变、固定工位、例外面和输出绑定检查。
-
-Step1.2 的完整覆盖规划仍为空；Step2 当前处理这四个示例，四个 pose 不等于整只兔子的完成方案。Step1 输入或选区更新后，先重新生成 Step1，再运行 Step2。
-
-## Step2.2：按当前 pose 计算力／力矩对
-
-`step2/step2_2.py` 直接读取 Step2.1 当前输出的 `T_WO` 和选区，将作用点、质心和力臂变换到世界系后现场计算。物体换 pose 后重新生成需求，不查找旧的预设姿态载荷表。核心接口为 `wrenches.build_domain(mesh, pose, station, physical, policy)`，后续 pose 优化也可在更新几何审查后调用它。
-
-### 力学约定
-
-沿用 [旧载荷生成器](../codes/precompute_objects/loads.py) 的支撑需求符号、`K = 0.5` 幅值上限及每区 32,768 个样本。质量与物体系质心读取 [objects/B/meta.json](../objects/B/meta.json)：质量约 0.73524 kg，重量约 7.21266 N。加工力上限为 `0.5 mg ≈ 3.60633 N`；这里 `mg` 是物体重量单位，不是毫克。这是继承的设计载荷假设，尚非喷涂实测力，集中配置在 [load_policy.json](step2/load_policy.json)。
-
-当前针轴固定，因此加工力沿世界系工具到表面的方向 `a = [0, -1/√2, -1/√2]`，幅值 `λ ∈ [0, 0.5]`。旧模型允许加工力围绕局部法向变化；当前方向域收缩为固定针轴，方向半角为 0°。45° 是曲面法向筛选阈值，25° 金锥是空间范围，均不作为加工力摆动角。
-
-在以 `mg` 为力单位、米为长度单位的约定下：
-
-```text
-q = R q_object + t              当前作用点
-c = R COM_object + t            当前质心
-P = λ a                        加工力
-g = [0, 0, -1]                  重力
-
-b = (F_need, τ_need)
-  = (-(P + g), -(q - c) × P)    fixture 需要施加给物体的支撑反力／反力矩
-```
-
-一对中的力与力矩来自同一个作用点和同一个加工力，不能独立采样或重新配对。力矩绕当前世界质心计算，重力作用于质心，所以其质心力矩为零。两个块均乘实际重量得到 N、N·m。另存物体系质心力矩，以及绕世界原点的力矩 `τ_origin = τ_COM + c × F_need`，避免后续混用参考点。
-
-这是每个静态 pose 下的准静态需求，不包含扫描加速度、独立加工偶矩或 fixture 自重。物体平移时，质心力矩不变；物体旋转时，针轴和重力保持世界方向，力臂随物体更新，必须重算。若以后用运动中的物体完成扫描，也应针对扫描中的各个 pose 更新需求。
-
-### 连续需求与采样
-
-每个选中三角形用 `q = v0 + u(v1-v0) + v(v2-v0)` 参数化，`u ≥ 0, v ≥ 0, u+v ≤ 1`。按 [R6 编译公式](../objects/r6_quadratic.py) 从当前几何直接生成：
-
-```text
-b = B_f (1, P, uP, vP)          B_f 为 6×10
-b = A_f (1, λ, uλ, vλ)          A_f 为固定针轴下的 6×4 限制
-```
-
-这两个矩阵来自解析公式，不由样本拟合；`WrenchDomain.forward()` 与 `jacobian()` 提供连续计算及对 `(u,v,λ)` 的导数。需求仍是六维力／力矩向量，但固定针轴后每个面的参数域最多三维。
-
-采样使用 PCG64、种子 20260907；按面积选择面，在三角形上均匀取点，幅值在 `0–0.5 mg` 均匀取样。包含补洞的完整选区均参与计算，几何例外以标记保留；不通过遮挡筛选删除载荷。因此这些数据表达完整请求选区的机械需求，不能把它们全部解释为已经可以作业的点。
-
-另外保存纯重力需求和每个选中顶点处的最大加工力需求。任意三角形内部点、任意合法幅值都满足精确恒等式：
-
-```text
-b(q,λ) = (1-λ/K) b_gravity + (λ/K) Σ_j bary_j b(vertex_j,K)
-```
-
-对一个固定的凸支撑反力可行集，能平衡这些端点就足以平衡整个连续需求域。这里仅生成并核验端点表达，尚未求解 fixture；这一性质也不证明工具可达。
-
-### 当前结果与 Step3／Step4 接口
-
-四区共 **131,072 对**，最大加工力均为 3.60633 N。表中最大力矩按连续域端点计算，参考点为各 pose 的物体质心。
-
-| 区域 | 配对样本数 | 最大需求力矩范数 | 需几何复核的样本数 |
+| task | 完整可加工面积 | 去重后实际面积 | 实际面数 |
 |---|---:|---:|---:|
-| C01 橙色耳面 | 32,768 | 0.36973 N·m | 20 |
-| C02 绿色嘴部 | 32,768 | 0.24341 N·m | 2,003 |
-| C03 蓝色 | 32,768 | 0.25515 N·m | 4,439 |
-| C04 紫色 | 32,768 | 0.21275 N·m | 1,088 |
+| +X | 75.54 cm²（13.50%） | 46.34 cm²（8.28%） | 384 |
+| +Y | 45.12 cm²（8.06%） | 28.77 cm²（5.14%） | 277 |
+| +Z | 66.25 cm²（11.84%） | 55.96 cm²（10.00%） | 490 |
+| -X | 67.90 cm²（12.13%） | 44.36 cm²（7.92%） | 354 |
+| -Y | 85.15 cm²（15.21%） | 73.45 cm²（13.12%） | 631 |
+| -Z | 48.40 cm²（8.65%） | 39.70 cm²（7.09%） | 320 |
 
-复核标记包含 Step2.1 未通过的面及逐个采样点发现的遮挡。橙色在四点／面检查中通过，但密集采样仍发现 20 个遮挡点；全部原始需求保留，并未据此改变已确认选区。
+`reach`／`task_reach` 是各姿态完整候选区 `R_i`，候选间允许重叠；`face_task` 和报告 `face_ids` 是下游实际使用的互斥任务 `A_i`。所有当前可加工交集的并集均已分配。
 
-[四个 pose 的加工力方向图](output/B/step2/step2.2/force_directions.png) 直接读取 `samples.npz` 的作用点和 `force_push_mg`。红色箭头指向工作面，表示针头对物体的加工力；箭头统一显示长度，不编码力的大小，也不表示各点同时受力。四格使用相同世界视角与比例，针头沿同一固定轴向，在每个 pose 展示一个扫描位置，长度采用配置的 120 mm。运行 `.venv/bin/python -B -m whole_task.step2.render_forces` 可重绘；各格原图和采样编号保存在 `step2.2/force_directions/`，数值载荷文件保持不变。
+## 图、视频与验收
 
-参照 `slides/Co-optimize/helper_func/current_task.py`，提供 `scale = [1,1,1,1/L,1/L,1/L]`，其中 `L` 为该 pose 下整个物体世界包围盒的最大边长。`targets_scaled = need_wrench * scale`；配合旧支撑求解器的 no-uplift 等式，第七个需求坐标补零，得到 `targets_7d`。各行代表不同工况，需要分别可平衡，不是同时施加后求和。未来支撑接触列也必须使用相同质心、重量归一化与力矩缩放。
+- [find_tasks：完整可加工候选区与正方体](idea/find_tasks.png) · [针沿三维边界描一圈](idea/find_tasks.mp4)
+- [Step1.1：工位](output/B/step1/step1.1/station.png)
+- [Step1.2：互斥分区](output/B/step1/step1.2/areas.png) · [逐 task](output/B/step1/step1.2/overview.png)
+- [Step1.3：放大的六个 working poses](output/B/step1/step1.3/working_poses.png)
+- [已分配](output/B/step1/step1.3/covered.png) · [未分配](output/B/step1/step1.3/uncovered.png) · [面积数据](output/B/step1/step1.3/coverage.json)
+- [计划](data/B/step1_reach/plan.json) · [磁盘复验](data/B/step1_reach/validation.json) · [三维框独立核对](data/B/step1_reach/box_3d_audit.json)
 
-```python
-from whole_task.step2.loads_adapter import load_task
+**3,293 组面片／姿态通过独立复验，54 项相关测试通过。** 验收检查三轴等长、边长为参考物体最长边的 1/2、共面中心与向内位置、逐姿态 XYZ 掩码、认证轴、实际 FK 加工点和互斥分配。
 
-task = load_task("C01")
-targets = task.targets           # N×6，已归一化并缩放
-targets_7d = task.targets_7d      # N×7，最后一列为零
-nodes = task.forward_nodes([0, 1, 2])  # 从连续公式复算指定样本
-```
-
-此接口已核对旧 no-uplift 目标转换。旧 `Co-optimize` 入口仍绑定预设 pose 路径及局部力锥域，不能直接读取当前目录；新的 Step3 通过这里的接口接入，并计算当前 pose 的接触候选与真实物体地面条件。Step2.2 本身只生成需求，需求独立于是否落地；完整 fixture 可行性仍由后续步骤求解。
-
-### 运行与输出
+find_tasks 展示 +X 完整候选区：**626 面、13.50%**。针在 10 秒、240 帧内沿完整三维边界闭合描边，覆盖全部 82 条边、433.01 mm；顶点相接的边界分支也全部保留并描过。每帧重新检查表面首次命中、针／头、方向锥、正方体内加工点、IK 和 KUKA。working poses 按完整物体与正方体取景，显示去重后的实际任务。
 
 ```bash
-# 重建 Step2.1 和 Step2.2
-.venv/bin/python -B -m whole_task.step2.run
-
-# 已有当前 Step2.1 时，单独重算／验收 Step2.2
-.venv/bin/python -B -m whole_task.step2.step2_2
-.venv/bin/python -B -m whole_task.step2.validate_loads
-.venv/bin/python -B -m unittest whole_task.step2.test_poses whole_task.step2.test_wrenches -v
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B -m whole_task.step1.run
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B -m whole_task.step1.find_tasks_figure
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B -m whole_task.step1.find_tasks_video
 ```
 
-输出位于 `output/B/step2/step2.2/`：
+本轮按要求重跑 Step1。旧 Step1 图和结果已替换，旧 keepout 图已清理；Step2–5 的数值结果仍基于此前长方体，尚未按正方体重建。`whole_task_2/` 保留另一份实验状态。旧版 115 张图的清理记录见 [清单](data/figure_cleanup_20261021.json)。
 
-- [loads.json](output/B/step2/step2.2/loads.json)：当前四个 pose 的统计、实际力／力矩示例、物理参数与输入／产物哈希。
-- 各 `C01/`–`C04/` 下的 `needs.json`：当前 pose 的连续需求域、完整几何、固定针轴和质心。
-- `samples.npz`：原始配对需求、SI 需求、作用点、加工力、源面编号、连续参数、几何标记及供求解器使用的缩放目标。
-- `forward.npz`：逐面 `B_f`、`A_f` 和连续域端点需求；`sample_metadata.json` 记录单位、顺序、采样和接口约定。
-- [validation.json](output/B/step2/step2.2/validation.json)：全部 131,072 行的力／力矩平衡、矩阵复算、单位／坐标换算、端点恒等式与遮挡标记复核。最大归一化平衡残差约 `1.11e-16`。
+---
 
-读取接口会核对当前 pose、选区、网格、质量、策略和生成代码的哈希；变化后旧载荷会被拒绝，需重算。13 项 Step2 测试通过，覆盖旧 R6 矩阵对照、平移／旋转、配对符号、单位、解析导数、端点表达及保留补洞例外。需求生成完成不等于 fixture 已能支撑这些工况。
+# 以下为旧输入下的 Step2–5 历史记录
 
-## Step3：共享支撑初始化
+## Step2 与 Step3 初始化：6 个 task 共用一块 base（2026-10-21）
 
-[step3/run.py](step3/run.py) 是可重复运行的算法入口。输入来自当前 Step2 的 pose、working area 和全部成对载荷；默认使用当前所有 pose，也可用 `--poses` 选择子集。几何和载荷更新后重新运行，不能沿用旧结果。当前四个 pose 的文件是这一算法的运行实例。
+Step3 直接读取六个输入姿态 `+X、+Y、+Z、−X、−Y、−Z` 各自的 `task_reach`，与 Step1.3 的粉色区域一致。区域允许重叠，六个 task 全部保留；不使用 Step1.2 的不重复面分区来删除姿态。每个 task 的针轴和 KUKA 关节角来自该姿态自己的 `reach` 认证，包围补入面参与受力，但不因此获得工具可达认证。
 
-复用 [Co-optimize 当前流程](../slides/Co-optimize/README.md) 的包覆偏移、实体 Boolean、实际接触面提取、七维支撑列和全需求 LP 分类。按当前任务约定，将工作面到针头侧的有限空间直接用于 Step3.1 裁切，**取消独立 Step3.2 及其旧图**。旧 `step3.3` 属于历史地面围边初始化，当前主流程已把底座构造移到后续阶段，本步骤不调用它。
+每个 task 生成一个 5 mm 薄壳座位，六个座位用脚和同一块水平底板连成**一个完整 base**。主图上排展示六只兔子分别放在六个座位上，粉色为对应 task 区域；下排展示同一块空 base。图中没有文字。相邻座位间隔 8 cm，以避开相邻座位对腕部的干涉；六件薄壳合计 861.925 cm³，完整 base 为 2,162.715 cm³。整块 base 在连接、序列化及必要的同禁区重切后，重新检查成对受力、工具、KUKA 和连续退出；不放宽验收容差。
 
-### Step3.1：共同注册、贴合包覆与有限工作空间裁切
+Step2 导出这六个姿态在 Step3 中实际使用的成对力／力矩，每个 task 保存 32,768 个样本，总计 196,608 对，另存 25,542 个连续力锥外包目标。所需反力和力矩为 `[-g-P, -(q-COM)×P]`，关于当前世界坐标系中的质心计算；完整关联关系保存在数组中。
 
-共同材料坐标系 `F` 初始取原始物体坐标系 `O`。第 `i` 个任务中，初始物体相对支撑的座位变换 `Q_i = I`，支撑安装变换 `T_i = T_WO,i`。所有物体在 `F` 中完全重合，同一包覆随各任务的原 pose 安装。显示注册到首个 pose 时，原生世界坐标到参考世界的变换是 `T_WO,0 inverse(T_WO,i)`。
+- Step3 新初始化：一个 6-task base（旧图已删除） · [base.obj](output/B/step3/base.obj)
+- [Step3 报告](data/B/step3_tool_membranes/report.json) · [独立磁盘复验](data/B/step3_tool_membranes/validation.json)
+- Step2：力与力矩图（旧图已删除） · [受力域与数组索引](data/B/step2/report.json) · [成对映射复验](data/B/step2/validation.json)
 
-对整张网格生成贴合包覆，保留原算法的 **5 mm 顶点外移上限**；每个面法向厚度未必精确等于 5 mm。扣除物体内部，再扣除当前 working area 与针头侧端点之间的有限连线体积。
-
-**执行 pose i 时，仅要求支撑避开该 pose 自己的工作面到针头侧的空间。** 记当前工作面为 `A_i_world`，固定针头侧端点为 `h_world`：
-
-```text
-V_i_world = union over p in A_i_world { (1-t) h_world + t p : 0 ≤ t ≤ 1 }
-(T_i S) intersect V_i_world = empty
-```
-
-连线两端分别在针头侧端点与工作面上，**到工作面就截止**。为直接沿用已有设置，`h_world` 取 Step1.3 金锥的顶点 `workspace.spatial_cone.apex_world_m`，当前坐标为 `(0, -0.4151471863, 0.3848528137) m`。这是本步骤访问包络的针头侧起点；Step1/2 中随接触点平移的实际 TCP 与它是不同变量。该定义不修改实际工具固定姿态或 Step2.2 的施力方向。
-
-[work_access.py](step3/work_access.py) 对当前每个完整工作三角面 `(v0, v1, v2)` 构造四面体 `conv{h, v0, v1, v2}`，再取这些四面体的并集。因此整个面都受到保护，未选中的区域不会因为对整个区域求凸包而自动补满。补洞面及 Step2 中的几何例外完整保留。若端点与某个面共面，代码明确报告体积构造未解决，不把数值退化当作受力失败。
-
-要让同一个刚性支撑 `S` 依次服务全部任务，把每个任务自己的禁区经自己的安装变换拉回共同材料系后，用于初始壳子的裁切：
-
-```text
-V_i_material = inverse(T_i) V_i_world
-V_initial_material = union_i V_i_material
-initial_support = fitted_wrap - object_interior - V_initial_material
-```
-
-这个材料系并集仅用于构造共享支撑；执行第 i 个任务的世界系检查仍只使用 `V_i_world`。后续座位、安装变换或 working area 改变时，必须重新构造对应约束。25° 空间角与 45° 法向阈值继续由 Step1/2 决定选区，本步骤直接连接已有选区，不再按角度扩大禁区。
-
-当前模型尚未加入工具半径、法兰或机械臂实体；它实现的是上述工作面—针头侧有限连线包络。
-
-### 实际接触面与载荷诊断
-
-包覆以精确浮点 OBJ 导出后重新读取，从真实内侧边界与原物体三角面求交得到接触三角形，并排除工作面。对每个实际保留的接触顶点，原算法的无摩擦、非负、无幅值上限法向反力列为：
-
-```text
-n = inward surface normal in world
-q = actual contact point in world
-w_contact = (n, (q - COM_world) × n)
-```
-
-使用每个任务自身的质心、重量归一化及力矩尺度。保留原七维 no-uplift 等式与一个共享非负 slack；对每条完整六维力／力矩需求分别求非负接触反力分配，各工况不同时施加。
-
-物体地面反力仅来自当前世界 pose 中实际位于地面的网格点。当前四个物体最低点为 0.177–0.202 m，均离开世界 `z=0` 地面，因此全部没有物体地面反力，仍保留不上抬 slack。后续支撑本身如何落地尚未求解。若物体以后接地，则沿用旧核的四射线摩擦模型；其系数 64 是原模型的充分摩擦假设，并非材料实测参数。
-
-逐区检查全部 32,768 个原始需求，不降采样、不去掉几何例外。额外检查 Step2.2 的连续固定轴需求端点；同一个凸接触反力集合若能平衡全部端点，则能平衡该工作区域的整个连续载荷域。沿用原版 LP 容差，数值求解异常记为 `unresolved`。
-
-### 当前初始化结果
-
-四个任务合计 1,576 个去重工作面。扣除有限工作禁区后，初始包覆材料约 **216.50 cm³**，实际接触三角形 **3,956 个**，接触面积约 **370.83 cm²**。
-
-| Pose | 原始配对载荷通过数 | 连续域端点通过数 |
-|---|---:|---:|
-| C01 橙色耳面 | 32,768 / 32,768 | 50 / 50 |
-| C02 绿色嘴部 | 32,768 / 32,768 | 193 / 193 |
-| C03 蓝色 | 32,768 / 32,768 | 366 / 366 |
-| C04 紫色 | 32,768 / 32,768 | 306 / 306 |
-
-实际导出包覆与完整工作禁区的交叠约 `6.84e-22 m³`，与物体内部交叠约 `3.07e-22 m³`，均低于 `1e-10 m³` Boolean 验收容差。另将实际导出支撑分别安装到四个世界 pose，与各自独立重建的有限禁区求交，并重提接触面、复算全部载荷，检查通过。
-
-**通过的是初始接触模型。** 当前包覆有 10 个正体积边界分量，尚未选择连通材料主体；本阶段允许所有保留分量提供接触反力，和旧 Step3 一致。Step4 需要处理退出／装入路径、连通主体、共同支撑和真实地面承载，并对留下的实际接触重新检查全部需求。Step2 的工具可达例外不会因力学诊断通过而消失。`full_fixture_accepted` 保持 `false`；初始化的受力失败也不直接拒绝后续布局搜索。
-
-[更新后的 Step3.1 图](output/B/step3/step3.1/overview.png) 按 C01、C02、C03、C04 从左到右、从上到下显示同一个蓝色包覆在四个原 pose 中的状态；彩色部分为当前任务工作面，灰色为物体。图中无文字，几何来自实际保存的结果。
-
-### 运行、产物和后续接口
+旧版 Step3 图已删除，发布目录只保留这张新的完整 base 图。
 
 ```bash
-.venv/bin/python -B -m whole_task.step3.run
-.venv/bin/python -B -m whole_task.step3.run --poses C01 C02 C03 C04
-.venv/bin/python -B -m whole_task.step3.validate --recheck-force
-.venv/bin/python -B -m unittest whole_task.step3.test_initialization -v
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -m whole_task.step3.run --workers 6
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -m whole_task.step3.tool_membranes --validate-only
+PYTHONPATH=. OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python whole_task/data/B/step2/export_loads.py
 ```
 
-输出在 `output/B/step3/`：
+## 新 Step4：哪些 task 共用一个座位（2026-10-21）
 
-- [report.json](output/B/step3/report.json)：共同注册、任务安装变换、有限禁区定义、材料及接触统计、每区诊断和输入／源码／产物哈希。
-- `step3.1/registered_object.obj`、[wrapped_support.obj](output/B/step3/step3.1/wrapped_support.obj)：共同材料系中的原物体及实际初始包覆。
-- `step3.1/contacts.npz`：真实接触三角形、对应原网格面编号和工作面排除集合。
-- 各 `step3.1/C01/`–`C04/` 的 `force.json`、`coverage.npz`：全部载荷及端点的通过掩码、实际七维接触反力列和地面状态。
-- [step3.1/work_access.json](output/B/step3/step3.1/work_access.json)、`work_access.npz`：固定针头侧端点、逐 pose 工作面编号、四面体单元、安装变换和线段参数范围 `[0, 1]`；直接由 Step1/2 输入得到。
-- `step3.1/visualization.json`：四格图的 pose、相机及颜色约定；[validation.json](output/B/step3/validation.json) 保存逐 pose 自有禁区、实际导出网格和全部输入的验证。
+`step4/seats.py`。支撑坐标系就用兔子坐标系，一个"座位"就是兔子在支撑里的一个固定位置。几个 task 共用一个座位时，它们共用同一块 5 mm 薄壳：Step3 的外层减去每个成员的"针 ∪ 头 ∪ KUKA"禁区和退出扫掠。所以共用座位的体积一定不超过成员里最小的那一块，合并门槛 V(AB) ≤ ρ(V(A)+V(B)) 只要 ρ ≥ 0.5 就自动满足。真正决定能不能合并的，是薄壳还能不能托住每个成员的全部载荷、让 KUKA 和退出都通过，并且能立在桌上。
 
-12 项测试覆盖有限线段两端截止、完整三角面与倾斜工作面的截止位置、未选空隙保留、各 pose 禁区独立、共同针头侧端点的刚体变换、空选区、共面退化诊断、真实空中／地面反力、实际包覆裁切及过期输入拒绝。原 `slides/Co-optimize` 算法与历史结果保持原样。Step4 改变朝向或针轴时必须重新计算需求；若只把物体、作用点和质心一起平移，则质心力矩严格不变，可原样复用 Step2.2 需求，但必须重新检查接地状态及实际机器人工位范围。
+- **转角**：每个 task 可以绕针轴转 ψ（底座固定，KUKA 在该转角下重新解 IK，禁区按 `turned_keepout` 重新生成）。转动会让"重力在兔子身上的方向"沿一个锥面移动。两个 task 的锥面相交时，在交点处两者重力方向相同，共用座位时就是支撑同一面朝下，只需在桌上绕竖直轴转一下。所以每个 task 的候选转角是 0 和"与别的 task 锥面相交"的那些角度。兔子上相邻的两个面都恰好相交于一点（立方体棱的方向），相对的面不相交。20 个候选转角里，只有 −X 转 135° 时 KUKA 够不到所有面。
+- **逐层搜索**：从单个 task 开始，一组 task 只有在它的所有子集都可行时才去试（成员越多，薄壳被切得越多，所以可行性是单调的）。每个成员在每个可行转角下，对这组的薄壳做完整验收（32,768 对载荷 + 连续外包、逐面连续退出、禁区、KUKA 精确检查）。然后按"朝下面最少、转角最少"的顺序挑转角组合，把这个座位做成**能自己站在桌上的一件**：薄壳、最低处一根立柱、一块盖住立柱和每个成员压力凸包的底板（外扩 15 mm），对所有成员再完整验收一次，并要求压力凸包落在接地面内。
+- 之所以把底板也放进座位一起验收：manifold 做任何布尔运算，都会在整张网格上合并短边，第一版只验收了光薄壳，连起来以后 −Y 丢了一个 0.26 mm² 的接触碎片，第 859 号载荷就过不去了。并过一次以后接触不再改变，所以 Step4 验收的就是最终会用到的网格。
 
-## Step4：装卸退出与支撑联合搜索
+结果（46 秒，转角认证有缓存）：6 个单独座位都可行；12 对相邻面都能共用座位，3 对相对面不能（只靠重力就托不住）；8 个"三个面共用"的组合都不可行——三个面的禁区和退出把薄壳切得只剩一个角，无摩擦接触托不住。12 对里 10 对能做成单独站立的一件（+X/−Y 体积最小，0.12，但站不住）。合并比为 0.26–0.33，远低于 0.6。
 
-当前入口是 [run_mobile.py](step4/run_mobile.py)，使用原版完整 `PopulationSoftSearch`，并采用用户更新后的工位约定。旧版固定整个世界 pose 的入口和失败试跑保留在下方作历史对照。
+## 新 Step4–5：三个座位连成一整件，1 个 pose（2026-10-21）
 
-### 物体居中，支撑换位置，工作臂平移
+`step4/join.py` 先选组合：用可行的座位把 6 个 task 各覆盖一次。每个座位转到让朝下方向尽量重合，算出整件需要几个 pose（翻面才算换 pose；在桌上绕竖直轴转、平移都不算）。排序依次看 pose ≤ 3、座位最少、薄壳最少。选中的是 **{+Z, −Y}、{+X, +Y}、{−X, −Z}**，每个座位的两个 task 转角分别是 (0°, 180°)、(−135°, 90°)、(−135°, −90°)，两个 task 之间支撑在桌上转 180°。三个座位朝下方向相同，所以**整件只有 1 个 pose**，永远同一面朝下。
 
-每个任务的物体**朝向**、针轴、working area、金锥角度和局部工作范围保持不变。机器人可以平移其工作窗口，物体高度由算法选择：最低点接地时有真实地面反力；悬空时取消该反力。搜索仍使用原版的物体座位 `Q_i` 与支撑安装 `T_host(i)`，允许每个座位独立调整，不再强制 `T_host(i) Q_i` 等于原 Step2 的完整世界变换。
+排座位：三个座位沿 x 排成一排，兔子都在 y = 0 上。对每一种先后顺序、每个座位转不转半圈，找相邻两座的最小间距，条件有三条：各自的站立件都不碰对方的禁区和退出扫掠；薄壳之间至少隔 2 mm（各座位只靠立柱和底板相连，验收过的接触面不受影响）；不相邻的座位也要两两满足。同一时间只有一个座位上有兔子，所以座位可以靠得很近，三个座位中心相距一共 148 mm。
 
-执行时将兔子**质心的 XY** 固定到工位中心 `[0,-0.5] m`，高度保留搜索结果。设搜索中的物体位姿为 `U_i=T_host(i)Q_i`，`D_i` 是把其质心水平移回中心的纯平移，则：
+`step5/joined.py` 把三块底板合成一块（取凸包，厚 8 mm），然后对 6 个 task 在整件上逐个完整验收：
 
-```text
-U_i_execute = D_i U_i
-T_i_execute = D_i T_host(i)
-T_i_execute Q_i = U_i_execute
-```
+| task | 座位 | 转角 | 载荷 | 连续外包 | KUKA 碰撞面 |
+|---|---|---:|---:|---:|---:|
+| +Z | +Z/−Y | 0° | 32,768/32,768 | 3,217/3,217 | 0 |
+| −Y | +Z/−Y | 180° | 32,768/32,768 | 1,777/1,777 | 0 |
+| +X | +X/+Y | −135° | 32,768/32,768 | 2,257/2,257 | 0 |
+| +Y | +X/+Y | 90° | 32,768/32,768 | 1,633/1,633 | 0 |
+| −X | −X/−Z | −135° | 32,768/32,768 | 2,017/2,017 | 0 |
+| −Z | −X/−Z | −90° | 32,768/32,768 | 2,833/2,833 | 0 |
 
-支撑、物体和该任务工作窗口一起执行相同的水平平移，地面仍为 `z=0`；全部相对接触、装卸通道、有限工作禁区及质心力矩不变。即使两个任务共享搜索 host，其实际执行支撑平移也可以不同。作业时物体静止，针保持固定方向扫描；不要求针尖停在一个点。不同工作区的位置随物体朝向变化，因此工作窗口还会作相应水平调整，机器人基座始终固定。
+逐面连续退出、和兔子及禁区不重叠、放在桌上时压力凸包落在接地面内，全部通过。从磁盘复验时由保存的座位重建整件，和存盘实体的对称差为 0，再完整验收一遍也通过。**整件 803.7 cm³**，其中薄壳 295.8 cm³（Step3 六个单独薄壳是 1,035.5 cm³，连在一起是 1,450.1 cm³），立柱和底板 507.8 cm³。外形 44 × 19 cm，接地面积 634 cm²。底板要盖住每个 task 在推力下的压力中心范围，所以大，也是体积的大头；改成稀疏的脚可以省掉大部分底板材料，但接地范围（凸包）不会变。
 
-[mobile.py](step4/mobile.py) 在内存中建立接地参考位姿，把最低**真实网格顶点**作为物体地面接触点，绝不以质心投影代替。每个候选按实际离地高度启用／关闭四射线地面反力。沿用原版无摩擦、单侧、无幅值上限的支撑法向反力，以及地面摩擦系数 64 的模型假设；这不是材料实测参数。上游 Step1–3 文件与全部 Step2.2 载荷样本保持不变，并逐条验证平移前后需求相同。
+门槛 ρ 的影响：ρ 从 0.31 到 1，结果完全相同；ρ = 0.3 时变成 4 个座位（523.8 cm³ 薄壳），ρ = 0.25 时变成 6 个座位。这个模型里收紧门槛不会让搜索更快，只会把好的合并刷掉。搜索本身是穷举，不是随机。
 
-执行窗口仍为原 95 mm 局部球与 23.75° 空间锥，局部法向阈值 42.75°，针轴仍严格为 `[0,-1/√2,-1/√2]`。所有工作面顶点的实际法兰位置重新检查固定基座的 779 mm 估计范围；不是放大机器人工作能力。当前四个执行状态最远法兰距基座约 447–495 mm。源配置中的固定世界窗口被上述用户约定明确覆盖，只在此 Step4 分支生效。
+- [整件](output/B/step5/joined.png)：上排是每个座位放着兔子（粉色是该座位两个 task 的区域），下排只有支撑。· 使用（旧图已删除）：6 个 task 各一幅，支撑转好、滑到工位，KUKA 用认证过的关节角夹着针，停在该 task 中间的认证面上。按"机械臂跟着兔子升降"的约定，在认证高度画。
+- [座位搜索](data/B/step4_seats/sets.json) · [排座位](data/B/step4_join/report.json) · [整件报告](data/B/step5_joined/report.json) · [复验](data/B/step5_joined/validation.json) · [support.obj](data/B/step5_joined/support.obj)
 
-### 原版搜索与加速
+**使用视频** `step5/joined_video.py` → [joined.mp4](output/B/step5/joined.mp4)（无字，2000×1000，24 fps，约 93 s）。左边是近景，从能看到针所涂各面的方向拍工位；右边是全景，能看到桌子、支撑、立柱和 KUKA。场景约定：桌子固定，KUKA 站在立柱上，只沿竖直方向升降。按座位顺序做 6 个 task：
+- **做一个 task**：支撑在该 task 的安装位（绕竖直轴转好，座位对准工位），KUKA 降到这个 task 的高度。针依次走过该 task 的认证面：每个停点的针尖落在面心，沿该面的认证轴；停点之间沿针轴退一点再过去。浅粉是还没涂的，深粉是涂过的，涂过的一直留着。
+- **同一座位换 task**：针沿针轴退开，KUKA 升高，支撑在桌上转 180°，KUKA 再降下来。
+- **换座位**：支撑滑离工位到上料位。兔子沿认证过的退出方向（逆针方向）离开座位，飞到下一个座位上方，沿那个座位的退出方向反向放进去，然后支撑滑回工位。
 
-恢复 32 个槽位、最多 12 轮、独立换座、成组换座、较大座位分离、全局退出方向、接触引导平移和高度修复；直接调用原版搜索，不使用旧 `StationSearch` 缩减后的提案。首次完整实体通过便停止，不为凑迭代次数继续运行。
+关节角由逐帧的最小变化跟踪（阻尼最小二乘）得到；每段动作分配的帧数，保证回放时每个关节都不超过 KUKA 限速的 90%。每一帧都做检查，不只检查停点：
+- KUKA 连杆凸包对支撑、兔子、桌子，用 step1.arm 的精确三角形测试；
+- 针和头（外接棱柱）对支撑和桌子；
+- 针对兔子，按 Step1 reach 的规则：针线不进入兔子，针身在针尖后 r(1+tan φ) 之外不碰兔子；停点本身是 Step1 认证过的接触；
+- 兔子移动时对支撑，用精确布尔运算。
 
-固定针轴使每个连续需求都能表示为“纯重力 + 工作面顶点处最大加工力”的凸组合。所有需求的竖直反力严格为正，因此其地面压力中心也在这些端点压力中心的凸包中。地脚 Oracle 改用 **915 个端点**，代替每次投影 131,072 个随机样本：输入减少约 **143 倍**，并覆盖整个连续载荷域。这里减少的是压力包围计算输入；受力搜索及最终验收仍保留全部 131,072 个原始样本。测试在多个离地高度验证端点包围包含全部样本。
-
-相同布局的接触主体、反力列、地脚查询和接触多边形结果复用原版精确输入缓存；源文件与物理输入参与缓存身份，成功后清理运行缓存。纯平移直接复用已核对的质心载荷，不重新采样。运行报告分别记录加载、搜索和总耗时；模型由悬空改为允许接地带来的可行性改善，不冒充代码加速。
-
-本次独立计时 80 次“压力投影 + 凸包”，原样本方式约 0.264 秒，连续端点方式约 0.0076 秒，**这一局部操作约快 35 倍**。这不是整条流水线的加速倍数。
-
-### 实体通过之后还要过独立验收
-
-[complete_gate.py](step4/complete_gate.py) 在搜索宣布成功**之前**检查实际导出的完整实体。原版空间 witness 的包含检查之外，再直接重建每个 pose 的有限工作体积、物体内部和完整装卸扫掠，逐项求交。仅裁除实际非法材料、重选连通主体，并重新检查接触载荷、连续域端点、地面压力包围和执行居中关系；修复失败则拒绝候选，让原搜索继续。
-
-这是实际试跑发现的问题：原版标记成功的一份完整实体仍与蓝色有限工作通道交叠约 `0.01644 cm³`。新门槛没有放宽 `1e-10 m³` 容差。核心接触主体及最终实体分别保存、分别重提真实接触面，旧的反力证书不能代替修复后的证书。
-
-本分支采用原版**当前 Step4.2 完整实体构造**的名义全程装卸扫掠规则。旧固定工位入口的额外 1% 膨胀净空初始化不再是本分支前置步骤，报告明确记为 `extra_one_percent_padded_initialization_used=false`；这里没有声称获得额外 1% 制造净空。完整机械臂 IK、工具实体碰撞与连续运动仍未认证；Step2 补洞面的几何例外继续保留。
-
-### 当前结果和复现
-
-四个姿态均选择接地。接地初始化本身已能通过，因此在初始化阶段完成了完整实体构造，无须进一步 PSO 迭代。实际接触主体约 **107.25 cm³**，带地脚的完整单一连通实体约 **114.22 cm³**。
-
-最新冷启动约 **53.28 秒**，其中加载约 4.91 秒、搜索和实体构造验收约 41.17 秒，剩余时间用于最终导出与复核。独立重新读取结果后，实体、全部载荷、有限工作区、完整装卸扫掠和执行变换再次通过；14 项适配测试通过。
-
-| Pose | 完整实体上的原始需求 | 连续域端点 |
-|---|---:|---:|
-| C01 橙色耳面 | 32,768 / 32,768 | 50 / 50 |
-| C02 绿色嘴部 | 32,768 / 32,768 | 193 / 193 |
-| C03 蓝色 | 32,768 / 32,768 | 366 / 366 |
-| C04 紫色 | 32,768 / 32,768 | 306 / 306 |
-
-另对同一个完整实体检查物体接地摩擦敏感性：把原系数 64 降到 **1.0**，四个 pose 的全部样本和端点仍通过；降到 **0.5** 时蓝色仅 22,610 / 32,768 样本、1 / 366 端点通过，其余三组通过。该附加检查只改变物体—地面的反力锥，不是完整支撑—地面摩擦或实物材料认证；说明接地确实帮助了求解，但不能假设地面完全无摩擦。
-
-- [四个居中执行姿态](output/B/step4/movable_station/execution_overview.png)：同一件实际支撑、各自工作面、同向针头、金锥和地面，无文字，统一相机和比例。
-- [完整支撑模型](output/B/step4/movable_station/step4.2/complete_support.obj)、[接触主体](output/B/step4/movable_station/step4.2/support.obj)、[搜索布局](output/B/step4/movable_station/step4.2/layout.npz)。
-- [执行变换](output/B/step4/movable_station/execution.json)：每个 pose 的物体／支撑世界矩阵、质心、工作窗口、针头侧端点、接地状态和法兰范围。
-- [结果报告](output/B/step4/movable_station/report.json)、[独立验收](output/B/step4/movable_station/validation.json)、[搜索统计](output/B/step4/movable_station/step4.2/search_summary.json)、[地面摩擦敏感性及压力凸包计时](output/B/step4/movable_station/ground_diagnostics.json)。
+检查没通过的动作会依次加大让位量（抬针高度、后退距离、升高、飞行弧高）再试。最终 2238 帧全部通过：后退 6 cm、升高 5 cm 就够了，全程没有 IK 重启。见 [video.json](data/B/step5_joined/video.json)。
 
 ```bash
-# 已有结果不覆盖；新实验指定新的 tag。
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B -m whole_task.step4.run_mobile --tag mobile_new
-.venv/bin/python -B -m whole_task.step4.validate_mobile whole_task/output/B/step4/mobile_new
-.venv/bin/python -B -m whole_task.step4.render_mobile whole_task/output/B/step4/mobile_new
-.venv/bin/python -B -m whole_task.step4.inspect_ground whole_task/output/B/step4/mobile_new
-.venv/bin/python -B -m unittest whole_task.step4.test_mobile whole_task.step4.test_station -v
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -m whole_task.step4.keepout          # 禁区
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -m whole_task.step4.seats --workers 16  # 转角 + 座位
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -m whole_task.step4.join --workers 20   # 选组合 + 排座位（--rho）
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -m whole_task.step5.joined             # 连成一整件 + 验收 + 复验 + 出图
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -m whole_task.step5.joined_video       # 使用视频（逐帧检查）
 ```
 
-当前结果验证的是这四个示例的共同支撑，不代表四个区域覆盖整只兔子。Step1.2 的完整覆盖规划仍待实现。
+下面"当前结果（Step4 v3）"及以后是旧的 13 个锥形工作区的结果，保留为历史；`output/B/step4/overview.png` 和 `output/B/step5/` 里的 `hulls_and_support.png`、`result.mp4`、`robot_use.mp4` 也是旧的。
 
-## Step4 旧固定工位试跑（历史对照）
+## 当前结果（2026-10-20，Step4 v3）
 
-入口为 [step4/run.py](step4/run.py)，复用 `slides/Co-optimize` 当前 Step4 的共同／相近退出方向初始化、装卸实体扫掠、接触与全需求分类、连通主体、地脚空间 Oracle 和完整实体构造／验收内核。当前 Step2 输入通过 [adapter.py](step4/adapter.py) 接入，不读取旧的 `objects/B/poses` 载荷。
+Step1–3 不变：13 个工作区域，13 个独立的 5 mm 薄壳初始化，共 **2062.312 cm³**。Step4 v3 只有一种高阶操作——**把一件已验收的支撑刚体地放到另一件上，保留合法且省料的并集**：Rotational reuse 在 SO(3) 中采样整件旋转，Juxtaposition 只平移；用 LP 让所有安装地面相容，在真实构造上精确评分并局部细化，再完整验收；合并门槛仍为 **V(AB) ≤ 0.75×(V(A)+V(B))**。ground oracle 与 Step5 使用同一个落地模型（薄壳切平面落地、保持座位的绕针轴转角、同一个地脚可用空间函数），所以 Step4 接受的支撑都能被 Step5 落地。步长、重叠和网格尺度都相对物体尺寸给出。详见 [PROCESS.md](PROCESS.md)。
 
-### 固定机器人作业 pose 的适配
+从 Step3 冷启动约 77 分钟，结果为 **一件支撑支持全部 13 个 task**：Step4 薄壳 **241.732 cm³**（v1 为两组 437.847 cm³），12 次合并的最大父体积比 0.7487；Step5 真实稀疏地脚 279.803 → **253.380 cm³**。全部 13 个 task 的 425,984 对原始载荷、35,437 个连续目标、原始面棱柱连续退出、实际接地面和薄壳直接贴地通过磁盘复验。作为对照，同一次运行合并前的最优两组（9+4）Step4 为 322.862 cm³、Step5 为 322.700 cm³，一组小 21.5%；两组方案同样完整跑过 Step5 与双臂视频，见 `data/B/step5_v3_two_set/`（`robot_use.mp4`）。
 
-Step2 给出的每个实际物体世界变换 `U_i` 保持固定。支撑安装为 `T_h`，物体座位为 `Q_i`，每个候选必须满足：
+[Step4 图](output/B/step4/overview.png) · [Step5 图](output/B/step5/hulls_and_support.png) · [转台视频](output/B/step5/result.mp4) · [双臂使用视频](output/B/step5/robot_use.mp4) · [Step4 冻结状态](data/B/step4_v3_one_set/report.json) · [Step5 最终状态](data/B/step5_v3_one_set/report.json) · [Step5 独立复验](data/B/step5_v3_one_set/validation.json) · [新旧算法对照](data/B/step4_algorithm_v2_comparison.json)
 
-```text
-T_host(i) Q_i = U_i_from_step2
-Q_i = inverse(T_host(i)) U_i_from_step2
-```
+双臂视频：**地面固定不动**，每个安装的切地平面就是工作台面。Franka Panda 负责装卸——把支撑从台面停放位装到工位、按每个 task 的保存安装转动空支撑（转角过大时放回台面换手再转）、沿保存的退出方向反向插入兔子、加工后沿退出方向取出；KUKA LBR Med 14 负责加工——针轴方向全程固定、只平移，每个安装先把针头平移到该安装的高度（一组方案比参考位置低 130–241 mm，两组方案 136–261 mm），沿工作区描边并填涂，装卸期间摆开。Step4/Step5 的证书只依赖相对位置（每个安装以自己的切地平面为局部 z=0，工具点随之平移），所以“地面不动、工作臂升降”与此前“针头不动、升降台”是同一组约束，支撑与体积不变。视频是保存几何上的运动学演示，不是整臂扫掠碰撞或动力学证书；工作臂与支撑、台面的采样干涉统计写在报告里。
 
-移动支撑安装位置时，所有使用该安装状态的座位同时反向调整；换 host 时重新求座位，保留该任务实际世界退出方向。这样可以搜索一件支撑上的不同座位，同时保留既定机器人作业位置、working area 和 Step2.2 全部配对载荷。旧算法允许直接移动物体世界位置的提案不能原样使用。
-
-工作禁区在接触筛选、主体裁切和地脚 Oracle 中统一使用 Step3 的有限工作面—针头侧连线体积。即使旧函数传入远端截断长度，也不会把它延长为射线或改成局部法向锥。物体、工作禁区、装卸路径各自通过当前座位与安装变换变换；每个执行状态仍只检查自己的工作面。
-
-### Step4.1
-
-从当前 Step3.1 的实际包覆和所有原始注册座位开始。直接复用共同／相近合法退出方向初始化；沿完整退出路径裁切，保证物体最后完全脱离。沿用原数值核的 1% 物体最大尺寸净空及实际接触核例外。原始方向出现数值构造问题时，尝试原实现的微小向上／切向方向扰动；这些是几何恢复候选，不是放宽碰撞容差。
-
-对原接触核布尔式作等价简化：因接触核已位于名义扫掠之外，且膨胀扫掠包含名义扫掠，先构造 `(seed - padded_sweeps) union protected_core`，保留原全部实际交叠、接触与导出验收。每个精确候选仍沿用 180 秒数值预算；超时只记为未解决。
-
-保存实际 `support.obj`、`layout.npz`、逐 pose 原始载荷掩码，以及 `exit_directions.png`、`exit_sweeps.png`、`final_result.png`。构造完成与受力通过分别记录。
-
-### Step4.2
-
-[search.py](step4/search.py) 沿用旧 `PopulationSoftSearch` 的持续槽位、按失败载荷比例选择任务、全需求公共正权指导、PSO 个体／群体最好解、离散探索和完整实体验收。默认 32 个槽位、最多 12 轮，首次完整实体通过即停止。当前原位初始化不预先指定 Juxtapose 身份。
-
-适配后的离散提案换 host／恢复座位，连续提案按 `0.25/0.25/0.25` 更新 PSO 座位平移并配合安装位置补偿。另保留方向提案；局部调整搜索当前两个主要失败任务的 2°／8° 方向扰动和有限的座位—安装联动平移。每次都用全部任务评价。这里是固定工位问题下的原算法适配，并非允许工件任意世界平移的逐字复制。
-
-每个候选先只保留一个真实连通接触主体，删除的孤块不提供反力。全部 32,768 个原始需求／pose 参与分类；临近可行和最终输出再从真实接触多边形顶点复算。地脚 Oracle 通过后才构造完整支撑，最终必须同时通过完整实体连通、封闭、工件／工作区／装卸避让、地面需求包围和全部原始受力检查。运行完但没有成品时标记搜索预算耗尽，不宣称问题无解。
+运行入口不变：
 
 ```bash
-.venv/bin/python -B -m whole_task.step4.run
-.venv/bin/python -B -m whole_task.step4.run --nominal-diagnostic --rounds 3 --population 8
-.venv/bin/python -B -m whole_task.step4.validate
-.venv/bin/python -B -m unittest whole_task.step4.test_station -v
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -m whole_task.step4.run \
+  --workdir whole_task/data/B/step4_v3_families --rounds 10 --samples 32 --workers 20 --target-groups 1
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -m whole_task.step5.grounded_feet \
+  --workdir whole_task/data/B/step5_v3_one_set --workers 2
 ```
 
-输出位于 `output/B/step4/`，根 `report.json` 给出本次状态和来源绑定，`step4.2/search/` 记录实际搜索过程。八项适配测试覆盖未经补偿的任务移动拒绝、联动平移、换 host、多任务共用安装、有限禁区的截断语义、针头侧端点保持、注册座位严格恒等，以及接触核净空的等价布尔简化。
+以下为 2026-10-19 及更早的说明，保留为历史。
 
-`--nominal-diagnostic` 是显式试验模式：检查真实物体的完整装卸扫掠并进行后续搜索，但不声称额外 1% 净空已经通过。当前高面数模型上，原实现的精确接触核／净空布尔验证超过每候选 180 秒；原方向与微小向上方向的日志保存在 `output/B/step4/diagnostics/`。等价布尔简化也未在该预算内完成。诊断模式的根报告始终保持 `full_fixture_accepted=false`，即使后续找到了满足名义碰撞和受力的候选；完整验收必须另行完成未解决的检查。
+当前 Step3 使用 **13 个独立的 5 mm 薄壳**初始化，总材料 **2062.312492 cm³**；连接 baseline 仅作对照。Step4 从这份初始化启动 32 个 sample，Juxtaposition 与 Rotational reuse 各半，基础梯度修复后验算整组。新的合并门槛为 **V(AB) ≤ 75% × (V(A)+V(B))**；合法子组跨 sample 保存，通过完整覆盖重新探索成员组合，避免早期分组锁死。**ground oracle** 保证整件支撑在每个安装中不穿地，并有同一个连通、避开工作区和连续退出的合法空间，可构造包住各 task 压力需求凸包的地脚。Step5 构造真实稀疏地脚、减材并复验。详见 [PROCESS.md](PROCESS.md)。
 
-### 本次试跑结果
+先前 **540.331 cm³** 的无地面解缺少这些约束，不能直接视为本轮合法成品；本轮冷启动状态位于 `data/B/step4_ground_membrane_families/`，发布以 `data/B/step4_active.json` 为准。可见结果保持 Step3 两张图、Step4 一张图，数据和证书放在 data 下。以下共用平板、垫高和旧 Step3.1 / Step3.2 的描述保留为历史。
 
-本次显式运行 `--nominal-diagnostic --rounds 3 --population 8`：8 个槽位、3 轮，共 693 次候选预评估、41 次全部原始载荷分类、10 次实际接触多边形复核。两次候选 LP 数值未解决均保留诊断并拒绝该候选。搜索约 317 秒；额外净空的失败尝试与最终导出修复另有记录。**未找到四个任务均通过的完整支撑**，状态为 `search_budget_exhausted`。
+当前结果为 **2 组，分别支持 9 个／4 个 task**。Step4 薄壳为 **437.847356 cm³**，冻结文件和代码未改。新的 Step5 按每个姿态的薄壳最低点定义接地平面，保持物理针头位置固定，在保留物体座位的前提下修复安装转角，再长出包住压力需求凸包的真实稀疏地脚。含脚材料 **514.200165 → 449.655425 cm³（−12.55%）**，两件分别 **353.281262／96.374163 cm³**；220 次删除提案中接受 56 次。全部 13 个 task 的 **425984 对原始载荷、35437 个连续目标**、工作区、原非凸连续退出、实际接地面和薄壳直接贴地检查通过磁盘复验。脚垫以非零面积共面三角片验收，单个贴地点不能代替脚垫。当前数据位于 `data/B/step5_ground_contact_final/`，旧固定地面和长脚结果仅作历史对照。
 
-| Pose | 最终实际接触的原始载荷通过数 | 通过率 | 连续域端点 |
-|---|---:|---:|---:|
-| C01 橙色耳面 | 32,768 / 32,768 | 100% | 50 / 50 |
-| C02 绿色嘴部 | 32,768 / 32,768 | 100% | 193 / 193 |
-| C03 蓝色 | 21,108 / 32,768 | 64.4% | 1 / 366 |
-| C04 紫色 | 12,807 / 32,768 | 39.1% | 305 / 306 |
+[Step4 图](output/B/step4/overview.png) · [Step5 唯一结果图](output/B/step5/hulls_and_support.png) · [16 秒转一圈视频](output/B/step5/result.mp4) · [最终状态](data/B/step5_ground_contact_final/report.json) · [独立复验](data/B/step5_ground_contact_final/validation.json)。图和视频显示保存的最终实体，周围为全部原始压力点与凸包；每组右侧只展示 4 个使用姿态，无文字和坐标轴。Step5 的可见 output 仅保留这张图和视频，没有旧结果子目录。
 
-这些百分比是载荷通过比例，不能解释成工作面积比例。蓝色目前仅纯重力端点通过，其 365 个最大工艺力顶点需求均未通过；紫色的 305 个最大工艺力顶点通过，但纯重力端点失败。因此这个候选尚不能稳定完成整组任务。
+## Step3.1：同一块平板上的一排倒模
 
-同一个连通支撑主体约 **197.204 cm³**，当前使用 3 个安装状态：C02/C03 共用一个安装状态，C01、C04 各自安装；全部实际物体世界 pose 保持 Step2 输入。主体受力未整体通过，尚未进入地脚连通空间和完整带底座实体构造；地面压力包围的初筛通过不能代替这些检查。
+当前输入是前 13 个 task（W01–W13），不是 13 个预先固定的最终 pose。独立 Step2 已删除。Step3.1 从每个 task 在 **Step1.2 的参考工作姿态**出发，只允许绕原金锥轴旋转，并把兔子、对应头部及倒模一起平移。所有针头统一到 **220.677 mm** 高度，工作方向一致，沿 X 排开，物体之间互不接触。较低的工位在倒模下垫高 **0–134.069 mm**；不再强行让每只兔子的最低点都落在板面。粉色区域必须始终在原 100 mm／25° 金锥内，不能为了放稳而任意翻转物体。姿态后续仍可在合法范围内调整。
 
-导出复核发现近重合座位的矩阵舍入会导致布尔小交叠。将数学上相同的座位表示为严格相同的变换（最大调整 `2.22e-16`），从原输入重建主体，再仅裁除约 **0.001946 cm³** 的非法材料；未放宽容差。实际导出主体重新通过封闭、单一连通分量、物体／有限工作禁区／完整名义退出路径及安装地面检查，受力计数保持上表。最大名义退出交叠约 `1.09e-20 m³`；额外 1% 净空仍未认证。修正前的运行源码、原始主体、布局和报告保留在 `diagnostics/before_export_conditioning/`，不将它们视为通过几何验收的结果。
+平板厚 **8 mm**。每个座位沿兔子的外形向外包覆 **5 mm**，再用对应高度的垫台接到同一块平板上，扣除兔子内部和这个 task 自己的工作禁区，形成负形倒模。13 个座位共用一块连续平板；只有高度差需要垫高。工作禁区仍是 Step1 的 100 mm／25° 球扇形，加现有针和头部代理的留空；保留原有 13 个工作面集合。
 
-- [退出方向图](output/B/step4/step4.1/exit_directions.png)、[装卸扫掠图](output/B/step4/step4.1/exit_sweeps.png)。
-- [当前支撑主体及四个工作区域](output/B/step4/step4.2/overview.png)：橙／绿／蓝／紫为各自工作面，蓝色实体为同一个支撑主体。这里是诊断候选，尚无完整底座。
-- [report.json](output/B/step4/report.json)、[validation.json](output/B/step4/validation.json)、[搜索记录](output/B/step4/step4.2/search/search_summary.json)。验证通过表示保存的几何与失败／通过计数得到复核，`full_fixture_accepted` 仍为 `false`。
+[Step3.1 总览图](data/B/step3_connected_output_legacy/step3.1/overview.png) 从上到下依次显示：
 
-[finalize.py](step4/finalize.py) 可以从已保存的诊断布局重新规范变换、裁切并复核实际接触，无须重跑搜索。常规新运行已在导出时调用相同的保守裁切逻辑；若导出验证仍无法满足原容差，明确报未解决，不发布通过结论。
+1. 13 只兔子按合法工作姿态放在垫高后的座位上；所有灰色头部等高，粉色为工作区，金线为各自的 Step1 球扇形。垫台采用实际支撑的一部分，已扣掉工作禁区。
+2. 兔子就位后的仿形倒模，同时显示相同的金锥和头部位置。
+3. 同一份实际支撑去掉兔子后的空模。
+
+[逐 task 工作姿态图](data/B/step3_connected_output_legacy/step3.1/working_poses.png) 单独放大 13 个物体与金锥的关系，保留已确认的局部工作姿态作为参考，名义针方向全部一致；这张近景保留垫高前的参考板面，实际安装高度与垫台以 overview 为准。近景和总览的物体／头部相对姿态完全相同。这里仅画板面局部及物体，不画倒模，以便看清粉色选区。金锥表示 100 mm／25° 几何范围，不是已经规划的接触轨迹。
+
+三排使用相同姿态、排布与相机；第三排只是隐藏兔子以展示内腔，**不表示已经存在退出路径**。Step3.1 保存开槽前的初始化；退出开槽和检查见下面的 Step3.2。
+
+[报告](data/B/step3_connected_output_legacy/step3.1/report.json)、[独立复核](data/B/step3_connected_output_legacy/step3.1/validation.json)、[整体支撑模型](data/B/step3_connected_output_legacy/step3.1/support.obj) 与 `initialization.npz` 保存完整实体、13 个当前姿态、工作区及接触证据。工作机器人不用横跨这一排：这是初始化材料布局，执行某个 task 时将其座位移到工作工位；执行时针头高度保持统一，通过各座位底下的垫高补齐高度差。
+
+入口 [step3/run.py](step3/run.py)，实现 [run_independent.py](step3/run_independent.py)、[independent_geometry.py](step3/independent_geometry.py)。力／力矩在当前 pose 下即时计算：作用力方向在机器人名义世界方向的 25° 锥内，幅值为 0–0.5 mg；关于质心的需求为 `(-g-P, -(q-COM)×P)`。从实际导出的整体支撑重新提取接触，检查每个 task 的 32,768 个原始载荷及连续力锥保守外包，不使用预先固定的 Step2 载荷表。
+
+[validate_independent.py](step3/validate_independent.py) 独立重建全部接触、受力和工作禁区，逐面核对粉色集合与 Step1 完全相同，并检查每个粉色三角面的全部顶点在金锥内，同时检查共用平板、针头等高、垫台高度、互不相交、单一连通支撑及实际底面压力包围。布尔容差保持 `1e-10 m³`，受力容差保持 `2e-9`。接触模型沿用无摩擦、单侧、无幅值上限的法向反力，平板按刚性安装处理；未认证整臂轨迹或材料强度。
+
+当前 **13 / 13 task 通过**，实际整体支撑通过 **425,984 / 425,984 原始载荷**与 **35,677 / 35,677 连续外包目标**。平板和全部倒模是同一个封闭连通实体，针头高度均为 220.677 mm；垫高后重新检查实际底面压力包围，不能沿用垫高前的地面力矩。
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
+  .venv/bin/python -B -m whole_task.step3.run --workers 4
+
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
+  .venv/bin/python -B -m whole_task.step3.validate_independent
+```
+
+## Step3.2：每个 task 独立退出，最终整体验收
+
+入口 [run_exit.py](step3/run_exit.py)，参数见 [exit_policy.json](step3/exit_policy.json)，流程说明见 [PROCESS.md](PROCESS.md)。每个 task 独立选择上半球退出方向 `d_i` 与长度 `L_i`，不再强制所有 task 共用方向或位移。先尝试反工作方向，失败则优先做 2°、5°、10° 的小幅调整，再扩展到其它上半球方向。结果以第一个满足全部条件的初始化为准，暂不优化体积、占地或退出距离。
+
+所有 Step3.1 的物体姿态、金锥、垫台和工作面保持。对各个 task，用整只原始非凸物体沿 `p_i(t)=p_i(0)+t*L_i*d_i, 0≤t≤1` 连续平移的扫掠从支撑中减材。扫掠由初始实体及全部正向源三角面的平移棱柱构成，保留凹处可用接触，不使用整个兔子的凸包或离散姿态替代连续路径。工作头先撤开，再退出物体；终点整只物体高于最终支撑至少 15 mm。
+
+每个候选挖槽后，从实际局部支撑重新提取接触，检查全部配对载荷。局部通过后，把全部退出槽合并扣除，再对**最终导出的实际整体支撑重新检查所有 task**：连续退出无碰撞、工作面和工作空间留空、物体内部留空、支撑封闭且接地连通、没有增加 Step3.1 外的材料、全部力／力矩要求以及实际底面压力中心均通过。某个 task 失败就调整该 task 的方向、重建整体并复验所有 task；局部通过不能代替整体验收。实现见 [exit_search.py](step3/exit_search.py)。
+
+浮点布尔残差仅通过重复扣除原来的禁区和原始面棱柱处理，不放宽容差；保留接地外边界并扣除其内部空腔，避免丢弃浮块后遗留孤立负边界。连续碰撞检查逐个重建原始面棱柱，其交叠体积之和为整个连续扫掠交叠的保守上界，每个 task 不超过 `1e-10 m³`。最终载荷全部从当前实际接触重算，不沿用开槽前证书。
+
+[Step3.2 总览图](data/B/step3_connected_output_legacy/step3.2/overview.png) 从上到下显示开槽后就位、空支撑与各 task 自己的退出箭头、全部物体完全退出。实际执行逐个 task 进行。各个方向可以恰好相同，但不存在强制相同的约束。
+
+[独立复验](data/B/step3_connected_output_legacy/step3.2/validation.json) 从磁盘重建几何与接触，只有全部通过才发布 [报告](data/B/step3_connected_output_legacy/step3.2/report.json)、[完整支撑](data/B/step3_connected_output_legacy/step3.2/support.obj)、`initialization.npz` 与 [搜索记录](data/B/step3_connected_output_legacy/step3.2/search_trace.json)。审查包含每个 task 的 32,768 对原始载荷及连续力锥保守外包目标。力仍在机器人名义工作方向的 25° 锥内，关于质心的力／力矩配对不变。合法性范围沿用 Step3.1 的几何与准静态接触模型。
+
+本轮 13 / 13 task 的最终整体审查与磁盘独立复验全部通过：425,984 / 425,984 对原始载荷、35,677 / 35,677 个连续力锥外包目标。13 个 task 均独立接受初始反工作方向，无需微调；各自退出长度为 247.453–437.054 mm。37 项相关数学、几何与失败后重试测试通过。当前是合法、尚未优化的初始化。
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
+  .venv/bin/python -B -m whole_task.step3.run_exit
+
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 \
+  .venv/bin/python -B -m whole_task.step3.validate_exit
+```
+
+## 后续阶段
+
+Step4 当前入口是 [step4/run.py](step4/run.py)，从 Step3.2 的 initialization 开始，每个 task 初始单独成组。随机选择两个组，用 Juxtaposition 或 Rotational reuse 提议合并，再用三个基本操作的梯度修复；只重新验收新组，其他组在几何保持条件下沿用已有证书。失败保留此前合法结果。操作定义、视频和运行方式见 [PROCESS.md](PROCESS.md)。可见的 `output/B/step4/` 只保留一张 `overview.png`，新算法的完整状态与磁盘复验存入 `data/B/step4_group_merges/`；`data/B/step4_active.json` 指定当前已发布的合法结果。
+
+旧 Step4 的其它实验入口仍是历史模型，不是当前默认流程。这些历史优化入口与当前 Step5 分开；当前成品见文首链接。旧视频曾发现工作臂与支撑碰撞，不作为整臂避碰证书。
+
+此前已发布的 Step4 结果：实际体积 **48,517.432 → 4,437.642 cm³（−90.85%）**，比上一版水平结果 **6,284.111 cm³** 再小 **29.38%**。最终 **W04 平放、W09 将同一整件支撑侧立 90°**，两者在支撑内的物体座位完全重合，并共用材料坐标中的退出方向。18 次接受的修改均严格减小体积；最终 13 / 13 task 的原始载荷、连续力锥、实际底面、工作范围和完整退出通过独立磁盘复验。28 项操作与验收测试通过。[唯一总览图](output/B/step4/overview.png) 展示空支撑、整件侧立安装及全部实际用法；[Rotational reuse 演示](operations/rotational_reuse.mp4) 改用 W06 与 W08，展示同一件从头到尾形状不变的双窗口薄壳依次支持两个工作区域：针头固定，取出物体后转动空壳，再按第二个 task 的 pose 放回；最终设计的完整证据在 `data/B/step4_standing/`。
+
+`output/B/step3/continuous13` 与 `output/B/step4/continuous13` 是此前单朝向方案的历史输出，已按要求删除，当前不再保留这些历史对照目录。
+
+当前 Step4 默认算法使用 32 条从 Step3 initialization 开始的持续分支，每轮 16 次 Juxtaposition、16 次 Rotational reuse。均匀随机选两个组及组内代表 task，移除距离评分与距离分组。一次成功合并减少一个独立组：`ABC + DEF → ABCDEF`，完整验收 ABCDEF，未参与组的证书在几何不受影响时复用。随后继续随机选组；不使用 PSO。每条分支相对自己的父状态下降，另存全局最优。实现见 [group_acceptance.py](step4/group_acceptance.py)、[population_search.py](step4/population_search.py) 和 [gradient_repair.py](step4/gradient_repair.py)，运行 `python -m whole_task.step4.run --rounds 32 --samples 32 --repair-rounds 1 --workers 4`。
+
+此前从旧 Step4 热启动的实验发布了 **3,920.704 cm³** 的合法解，比 **4,437.642 cm³** 减少 **11.65%**。冻结证据在 `data/B/step4_pose_neighbours_best/`，当时的 13 个 task 全部通过磁盘重放。当前从 Step3 重启的分组算法已完成首个合法合并：W02/W09，13 → 12 组，**48,517.432 → 44,463.462 cm³**，这条分支的 13 个 task 通过独立磁盘复验，65 项相关测试通过；首步冻结证据在 `data/B/step4_group_merges_first_verified/`。32 分支继续搜索，当前可见图仍保留此前较小的合法结果；发布状态以 `data/B/step4_active.json` 为准。
+
+
+## 此前长方体工作框下的 keepout（历史）
+
+旧 keepout 图已清理。以下数值来自此前长方体工作框，尚未按本次正方体重算。当时按 **1,970 个互斥认证面、7,880 组保存关节角**重算。输入直接来自已复验的 Step1 `face_task`、每个 task 自己的 pose、针轴与关节角；不读取旧 Step3 初始化。表面点在向内工作框内，工具、针根和连杆禁区可延伸到框外。
+
+针与头沿每个面的认证轴构造；KUKA 逐连杆按连杆中心网格分组取碰撞凸包。网格边长仍为物体对角线的 12%，近重复点合并网格为 1 µm，包含性容差为 2 µm。本次最大包含性残差 **0.833 µm**；六个 task 的 KUKA 禁区与兔子及外侧 5 mm 薄层交叠均为 0。
+
+| task | 认证面 | 保存姿态 | KUKA 凸体 | 针 + 头 cm³ | KUKA cm³ | 合计 cm³ |
+|---|---:|---:|---:|---:|---:|---:|
+| +X | 352 | 1,408 | 146 | 5,183.5 | 58,767.3 | 59,517.8 |
+| +Y | 264 | 1,056 | 187 | 6,880.2 | 67,227.6 | 67,841.2 |
+| +Z | 375 | 1,500 | 117 | 4,748.6 | 56,072.6 | 56,865.6 |
+| -X | 297 | 1,188 | 333 | 10,510.3 | 88,837.7 | 89,690.3 |
+| -Y | 476 | 1,904 | 272 | 9,923.0 | 77,356.9 | 78,347.8 |
+| -Z | 206 | 824 | 123 | 4,773.1 | 63,983.4 | 64,582.5 |
+
+独立磁盘复验从当前 Step1 关节角重建针／头、KUKA 和组合实体，与存盘几何逐项比较对称差，通过 `1e-10 m³` 体积容差。图中蓝色为固定工作框，橙色为针／头禁区，紫色为 KUKA 禁区，禁区以 45% 不透明度叠加。头部延伸仅在显示时缩至 70%，完整数据与验收使用原尺寸。这里只覆盖保存的加工姿态。
+
+[数据报告](data/B/step4_keepout/report.json) · [独立复验](data/B/step4_keepout/validation.json) · [图像输入记录](data/B/step4_keepout/figure.json)。当时 52 项相关测试通过。Step2、Step3 支撑初始化、Step4 座位搜索／合并和 Step5 的数值结果尚未按此版本重建，下面仅为历史记录。
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B -m whole_task.step1.reach_render
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python -B -m whole_task.step4.keepout --workers 6
+```
+

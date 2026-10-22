@@ -1,7 +1,0 @@
-{
-  "step3_report_sha256": "b240dc4f8ab256315839845a531af733638f5bb421570af5bd473267d497ff6b",
-  "original_direction_timeout_seconds": 180,
-  "observed_elapsed_seconds": 194,
-  "status": "numerical_evaluation_unresolved",
-  "global_infeasibility_claimed": false
-}

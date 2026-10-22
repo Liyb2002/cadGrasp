@@ -9,6 +9,8 @@ from whole_task.step1.common import DEFAULT_OUTPUT, sha256, write_json
 from .initialize import register, supply
 from .work_access import RegisteredWorkVolumes, SurfaceSegments, read_source_cone
 from .legacy import kernel as K
+from whole_task.common.wrenches import endpoint_demands
+from whole_task.common.force_cone import certificate_description
 
 
 def validate_pose_access(pose, task, transform, support, access, tolerance):
@@ -89,7 +91,10 @@ def validate_directory(folder, recheck_force=False):
         full, floor = supply(task, transform, triangles, sources, policy)
         record = json.loads((folder/f"step3.1/{pose}/force.json").read_text())
         assert record["floor"] == floor
+        assert record['continuous_cover'] == certificate_description(task.domain)
         with np.load(folder/f"step3.1/{pose}/coverage.npz") as saved:
+            expected_targets = K.U.target(endpoint_demands(task.domain)['endpoint_need_wrench']*task.scale)
+            np.testing.assert_allclose(saved['endpoint_targets_7d'], expected_targets, atol=1e-13, rtol=0)
             np.testing.assert_array_equal(full, saved["supply_7d"])
             assert len(saved["mask"]) == len(task.targets)
             assert int(saved["mask"].sum()) == record["covered_samples"]
@@ -123,6 +128,13 @@ def main():
     parser.add_argument("--object", default="B")
     parser.add_argument("--recheck-force", action="store_true")
     args = parser.parse_args()
+    from whole_task.step1.common import ROOT
+    membranes=ROOT/'whole_task/data'/args.object/'step3_membranes'
+    if (membranes/'report.json').exists():
+        from .run_membranes import validate
+        result=validate(membranes)
+        print('STEP3 MEMBRANE VALIDATION',result['status'],result['independent_fixture_count'])
+        return result
     result = validate_directory(args.output_root/args.object/"step3", args.recheck_force)
     print(json.dumps(result, indent=2))
 

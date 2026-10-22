@@ -1,6 +1,2 @@
-!.gitignore
-!.gitkeep
-!*.json
-!*.npz
-!*.png
-!*.mp4
+# Follow the repository-root source/Markdown allowlist.
+# Configuration, data and generated results stay local; do not re-include them here.

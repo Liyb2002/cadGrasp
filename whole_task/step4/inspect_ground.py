@@ -13,7 +13,7 @@ import numpy as np
 from .mobile import MobileTaskModel
 from whole_task.step1.common import DEFAULT_OUTPUT,write_json,sha256
 from whole_task.step3.legacy import kernel as K
-from whole_task.step2.wrenches import endpoint_demands
+from whole_task.common.wrenches import endpoint_demands
 from whole_search.model import Layout
 from whole_search.classify import classify
 from material_force import certify_material_contacts

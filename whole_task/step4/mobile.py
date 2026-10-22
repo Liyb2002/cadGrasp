@@ -1,6 +1,6 @@
 """Original Co-optimize freedoms with a vertically translating work window.
 
-Step2 data stay immutable. Translating a task, its application points and COM
+Per-task reference data stay immutable. Translating a task, its application points and COM
 together leaves every paired COM wrench unchanged. Search uses grounded native
 frames; positive seat heights automatically disable object-floor reactions.
 """
@@ -10,7 +10,7 @@ import numpy as np
 
 from .adapter import ComputedInputs, ComputedMeasure, ComputedOracle, TaskModel
 from whole_task.step1.common import DEFAULT_OUTPUT
-from whole_task.step2.wrenches import WrenchDomain, endpoint_demands
+from whole_task.common.wrenches import WrenchDomain, endpoint_demands
 from whole_task.step3.legacy import kernel as K
 from whole_search.model import Model
 from oracle_search import OracleModel
@@ -19,7 +19,10 @@ from fixture_state import installed_state
 
 
 class MobileInputs(ComputedInputs):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, station=None, **kwargs):
+        if station is None:
+            from whole_task.step3.input_state import require_joint_initialization
+            require_joint_initialization()
         super().__init__(*args, **kwargs)
         self.source_native = self.native.copy()
         self.source_heights = np.array([t.domain.mesh.bounds[0, 2] for t in self.tasks])
@@ -44,7 +47,7 @@ class MobileInputs(ComputedInputs):
             # Check all saved samples, including provisional work faces.
             task.forward_nodes(np.arange(len(task.targets)))
         self.states = [(task, self.native[k], self.mesh) for k, task in enumerate(self.tasks)]
-        self.station = json.loads((self.output_root/self.name/'step2/step2.1/object_poses.json').read_text())['fixed_station']
+        self.station = station
         reach = self.station['workspace']['base_reach_estimate']
         self.reach_center = np.asarray(reach['center_world_m'])
         self.reach_radius = float(reach['usable_radius_m'])
@@ -68,13 +71,14 @@ class MobileInputs(ComputedInputs):
 
 
 class ContinuousFloorOracle(ComputedOracle):
-    """Exact continuous pressure envelope with far fewer projection inputs.
+    """Conservative continuous pressure envelope for the local force cones.
 
-Every demand is a convex combination of gravity and maximum-force vertex
-loads. Since Fz>0, its pressure center is the same convex combination with
+Every demand lies in the triangle-corner x outer-force-polytope hull.
+Since Fz>0, its pressure center is the same convex combination with
 weights renormalized by Fz. Endpoint pressure hulls therefore contain the
 entire continuous task, including all saved samples, at ANY translated COM.
-Only the floor-envelope inputs change; force classification keeps all 32768.
+Outer targets may exceed the true cone slightly; containment is sufficient,
+not an exact feasibility equivalence. Force classification keeps all samples.
 """
     def __init__(self, model):
         super().__init__(model)

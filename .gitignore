@@ -1,4 +1,6 @@
-# Ignore everything by default. Keep directories traversable for the allowlist.
+# Only source code, Markdown and Git ignore rules belong in this repository.
+# Data/configuration (including JSON/NPZ), images, videos, models and logs stay local.
+# Keep directories traversable so source files can be allowed at any depth.
 *
 !*/
 
@@ -57,15 +59,21 @@
 !*.geom
 !*.comp
 
-# Keep this policy itself under version control.
-!/.gitignore
+# Track ignore rules at every level; child rules must not allow data or outputs.
+!.gitignore
 
 # Dependencies, caches and local tooling are never project source.
 **/.git/
 **/.venv/
+**/.venv*/
 **/venv/
+**/venv-*/
+**/venv_*/
 **/env/
 **/node_modules/
+**/.cache/
+**/.conda/
+**/.mamba/
 **/__pycache__/
 **/.pytest_cache/
 **/.mypy_cache/
@@ -73,9 +81,26 @@
 **/.tox/
 **/.nox/
 **/.ipynb_checkpoints/
+**/.rsync-partial/
+**/build/
+**/dist/
 /.agents/
 /.codex/
 /.aws/
 
-# Local numerical runs and their execution snapshots.
-/slides/Co-optimize/baseline_no_pso/runs/
+# Generated results and intermediate data, including any copied code/Markdown.
+**/output/
+**/outputs/
+**/legacy_output/
+**/results/
+**/data/
+**/steps_data/
+**/runs/
+**/cache/
+**/caches/
+**/snapshots/
+**/source_snapshots/
+**/*executed_sources*/
+**/historical_render_sources/
+**/final_audit_sources/
+/slides/Co-optimize/seperate_base_support_proof/recovery/

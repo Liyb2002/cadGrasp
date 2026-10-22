@@ -15,11 +15,14 @@ def read_source_cone(output_root, object_name):
     """Reuse the existing head-side endpoint; do not extend or rebuild its cone."""
     root = Path(output_root)/object_name
     step1 = json.loads((root/"step1/step1.3/pose_coverage.json").read_text())
-    step2 = json.loads((root/"step2/step2.1/object_poses.json").read_text())
-    cone = step1["workspace"]["spatial_cone"]
-    if cone != step2["fixed_station"]["workspace"]["spatial_cone"]:
-        raise ValueError("Step2 station cone differs from current Step1.3; refresh Step2")
-    return dict(cone)
+    workspace = step1['workspace']
+    if 'spatial_cone' in workspace:
+        return dict(workspace['spatial_cone'])
+    return dict(apex_world_m=workspace['reference_head_front_world_m'],
+        axis_world=workspace['nominal_axis_world'],
+        half_angle_deg=workspace['half_angle_deg'],
+        reference_radius_m=workspace['needle_length_m'])
+
 
 
 class SurfaceSegments:

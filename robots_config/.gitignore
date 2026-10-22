@@ -1,4 +1,2 @@
-# The repository ignores data and images by default; these are maintained inputs.
-!.gitignore
-!*.json
-!figures/*.png
+# Follow the repository-root source/Markdown allowlist.
+# Configuration, data and generated results stay local; do not re-include them here.

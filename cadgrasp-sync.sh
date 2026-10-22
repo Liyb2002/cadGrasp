@@ -21,7 +21,7 @@ usage() {
 同名文件以传输来源为准，被覆盖或删除的旧文件另存到目标端的备份目录。
 同步 codes、objects、simulation、slides、robots_config、whole_task 和根目录的非隐藏文件、.gitignore。
 这些目录内的模型、数据和算法输出也参与同步；其他顶层目录不参与同步。
-下载时额外跳过 slides/Co-optimize/data/（也匹配小写 co-optimize），本机已有内容保留。
+下载时额外同步 whole_task_2/，跳过 slides/Co-optimize/data/（也匹配小写 co-optimize），本机已有内容保留。
 不传输 Git 元数据、虚拟环境、node_modules、工具缓存和传输临时目录。
 下载时保留本机 cadgrasp-sync.sh；排除项和同步范围外的文件不受删除影响。
 正式传输前自动预览文件数、待传输和待删除数量；预览与传输复用 SSH 连接。
@@ -137,7 +137,6 @@ rsync_args=(
     --include=/slides/
     --include=/robots_config/
     --include=/whole_task/
-    '--exclude=/*/'
     -e "ssh -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ControlMaster=auto -o ControlPersist=60 -o ControlPath=$control_socket"
 )
 
@@ -152,15 +151,19 @@ else
     # 传输完成后清理接收端多余文件；排除项保持受保护，删除文件也会备份。
     rsync_args+=(
         --delete-delay
+        --include=/whole_task_2/
         --exclude=/cadgrasp-sync.sh
         '--exclude=/slides/[Cc]o-optimize/data/'
     )
 fi
+# 顶层目录兜底排除规则必须放在各模式的目录白名单之后。
+rsync_args+=('--exclude=/*/')
 
 printf '来源：%s\n目标：%s\n旧文件备份（在接收端）：%s\n' \
     "$source_path" "$destination_path" "$backup_dir"
 printf '范围：codes/、objects/、simulation/、slides/、robots_config/、whole_task/、根目录项目文件；跳过依赖和缓存。\n'
 if [[ $mode == 'pull' ]]; then
+    printf '下载额外包含：whole_task_2/。\n'
     printf '下载排除：slides/Co-optimize/data/（含小写 co-optimize）；保留本机已有内容。\n'
 fi
 

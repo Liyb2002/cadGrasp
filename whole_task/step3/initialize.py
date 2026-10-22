@@ -1,13 +1,12 @@
 """Co-optimize Step3 registration, fitted wrap and complete demand diagnostics."""
-import json
 from pathlib import Path
 import numpy as np
 import trimesh
 
-from whole_task.step1.common import ROOT, load_shape, write_json
-from whole_task.step2.loads_adapter import load_task
-from whole_task.step2.transforms import inverse, points
-from whole_task.step2.wrenches import endpoint_demands
+from whole_task.step1.common import write_json
+from whole_task.common.transforms import points
+from whole_task.common.wrenches import endpoint_demands
+from whole_task.common.force_cone import certificate_description
 from .legacy import kernel as K, unpack_solid
 from .work_access import RegisteredWorkVolumes, MODEL, ENDPOINT_SOURCE
 
@@ -30,33 +29,9 @@ def validate_policy(policy):
 
 
 def register(output_root, object_name, pose_ids=None):
-    folder = Path(output_root)/object_name/"step2/step2.2"
-    source = json.loads((folder/"loads.json").read_text())
-    available = [row["id"] for row in source["poses"]]
-    pose_ids = available if pose_ids is None else list(pose_ids)
-    if not pose_ids or len(set(pose_ids)) != len(pose_ids) or not set(pose_ids) <= set(available):
-        raise ValueError("Expected unique current Step2 pose IDs")
-    mesh = load_shape(ROOT/"objects"/object_name/"mesh.stl")
-    states, rows = {}, []
-    reference_world = None
-    for pose in pose_ids:
-        task = load_task(pose, output_root, object_name)
-        transform = np.asarray(task.domain.data["frame"]["T_world_mesh"])
-        np.testing.assert_array_equal(mesh.faces, task.domain.mesh.faces)
-        np.testing.assert_allclose(points(transform, mesh.vertices), task.domain.mesh.vertices, atol=1e-12, rtol=0)
-        reference_world = transform.copy() if reference_world is None else reference_world
-        alignment = reference_world @ inverse(transform)
-        aligned = points(alignment, task.domain.mesh.vertices)
-        target = points(reference_world, mesh.vertices)
-        np.testing.assert_allclose(aligned, target, atol=1e-12, rtol=0)
-        states[pose] = (task, transform, mesh)
-        rows.append(dict(pose=pose, T_fixture_to_world=transform.tolist(),
-            T_world_to_fixture=inverse(transform).tolist(), object_to_fixture=np.eye(4).tolist(),
-            T_native_world_to_reference_world=alignment.tolist(),
-            alignment_max_error_m=float(np.max(np.abs(aligned-target))),
-            working_face_ids=task.domain.work_ids.tolist(), requires_geometry_review=task.requires_geometry_review))
-    return mesh, states, dict(reference_pose=pose_ids[0], states=rows,
-                             T_fixture_to_reference_world=reference_world.tolist()), source
+    """The former frozen-pose input reader was removed with its stage."""
+    from .input_state import require_joint_initialization
+    require_joint_initialization()
 
 
 def build_seed(mesh, states, policy, source_cone):
@@ -137,7 +112,8 @@ def force_diagnostics(states, triangles, sources, policy, out):
         error = None
         try:
             mask, info = K.J.classify(full, targets)
-            status = "pass" if mask.all() else "fail"
+            status = ("pass" if mask.all() else "fail" if not mask[:len(task.targets)].all()
+                      else "unresolved_outer_cover")
         except (RuntimeError, np.linalg.LinAlgError, AssertionError) as exception:
             # No numerical failure is labelled as physical infeasibility.
             mask = np.zeros(len(targets), dtype=bool)
@@ -150,6 +126,8 @@ def force_diagnostics(states, triangles, sources, policy, out):
         row = dict(pose=pose, status=status, original_sample_count=count, covered_samples=int(mask[:count].sum()),
             endpoint_count=len(endpoints), covered_endpoints=int(mask[count:].sum()),
             continuous_contact_equilibrium_passed=bool(mask[count:].all()) if error is None else None,
+            continuous_cover=certificate_description(task.domain),
+            true_cone_sample_failure=bool(not mask[:count].all()) if error is None else None,
             source_geometry_review_sample_count=int((~task.geometry_screened).sum()),
             reaction_generator_count=len(full), floor=floor, classifier=info, error=error,
             full_fixture_accepted=False, diagnostic_is_initialization_gate=False,
@@ -157,5 +135,5 @@ def force_diagnostics(states, triangles, sources, policy, out):
         write_json(folder/"force.json", row)
         rows.append(row)
         print(f"Step3.1 {pose}: {status}; samples {row['covered_samples']}/{count}, "
-              f"continuous endpoints {row['covered_endpoints']}/{len(endpoints)}", flush=True)
+              f"continuous outer-cover targets {row['covered_endpoints']}/{len(endpoints)}", flush=True)
     return rows

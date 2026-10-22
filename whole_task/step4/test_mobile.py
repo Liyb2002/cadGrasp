@@ -52,6 +52,34 @@ class MobileTests(unittest.TestCase):
             np.testing.assert_allclose(targets,task.targets_7d,atol=1e-13,rtol=0)
             np.testing.assert_allclose(task.domain.axis,[0,-2**-.5,-2**-.5],atol=1e-15)
 
+    def test_common_installation_preserves_task_and_exit_world_directions(self):
+        from .station_seed import common_installation
+        m=self.model;q=common_installation(m,self.layout)
+        centers=[]
+        self.assertEqual(len(set(q.hosts[list(q.active)])),1)
+        for k in q.active:
+            m.validate_placement(q,k)
+            T=installed_state(m.native,q,int(q.hosts[k]));U=T@q.placements[k]
+            np.testing.assert_allclose(U[:3,:3],m.native[k,:3,:3],atol=1e-12)
+            np.testing.assert_allclose(T[:3,:3]@q.directions[k],
+                m.native[k,:3,:3]@self.layout.directions[k],atol=1e-12)
+            self.assertAlmostEqual(m.workpiece_height(q,k),0.,places=12)
+            centers.append((U[:3,:3]@m.mesh.center_mass+U[:3,3])[:2])
+        np.testing.assert_allclose(centers,np.tile(centers[0],(len(centers),1)),atol=1e-12)
+
+    def test_planar_seat_offset_keeps_centered_execution_and_ground_support(self):
+        from .station_seed import common_installation,planar_offset
+        m=self.model;q=common_installation(m,self.layout)
+        owner=q.active[-1];delta=np.array([.03,-.02]);trial=planar_offset(m,q,owner,delta)
+        T=installed_state(m.native,q,int(q.hosts[owner]))
+        before=T@q.placements[owner];after=T@trial.placements[owner]
+        np.testing.assert_allclose(after[:3,3]-before[:3,3],np.r_[delta,0.],atol=1e-12)
+        for k in q.active:
+            actual=m.execution(trial,k)
+            np.testing.assert_allclose(actual['object_COM_world_m'][:2],m.center_xy,atol=1e-12)
+            self.assertTrue(m.floor_signature(trial,k))
+            if k!=owner:np.testing.assert_array_equal(trial.placements[k],q.placements[k])
+
     def test_continuous_pressure_envelope_contains_all_samples_at_new_heights(self):
         from system_floor import system_floor_demands
         from base_oracle import cover
@@ -62,7 +90,7 @@ class MobileTests(unittest.TestCase):
                 com=row['U'][:3,:3]@m.mesh.center_mass+row['U'][:3,3]
                 points=system_floor_demands(m.tasks[k].targets/m.tasks[k].scale,com)['floor_demands_xy_m']
                 self.assertTrue(cover(points,row['hull'])[0])
-                self.assertLess(len(m.base_oracle.loads[k]),len(m.tasks[k].targets)/80)
+                self.assertGreater(np.min(m.base_oracle.loads[k][:,2]),0.)
 
     def test_original_pass_cannot_stop_search_after_new_physical_gate_fails(self):
         from types import SimpleNamespace

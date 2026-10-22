@@ -1,4 +1,4 @@
-"""Run the original complete population search with movable fixture seats."""
+"""Certify movable seats, with bounded proposals then original population search."""
 import argparse
 import json
 from pathlib import Path
@@ -9,16 +9,19 @@ from .mobile import MobileTaskModel
 from .search import context
 from .export_geometry import condition_core
 from .complete_gate import MobileEvaluator
+from .station_seed import precheck
 from whole_task.step1.common import DEFAULT_OUTPUT, write_json, sha256
 from whole_task.step3.legacy import kernel as K, loaded_sources
-from whole_task.step2.wrenches import endpoint_demands
+from whole_task.common.wrenches import endpoint_demands
+from whole_task.common.force_cone import certificate_description
 from population_soft import PopulationSoftSearch
 from material_force import certify_material_contacts
 from whole_search.common import result_mesh
 from search_runtime import SearchRuntime, execution_scope
 
 
-def run(output_root=DEFAULT_OUTPUT, name='B', tag='movable_station', rounds=12, population=32, seed=42):
+def run(output_root=DEFAULT_OUTPUT, name='B', tag='movable_station', rounds=12, population=32, seed=42,
+        station_precheck=True):
     began = time.monotonic()
     out = Path(output_root).resolve()/name/'step4'/tag
     if (out/'report.json').exists():
@@ -30,8 +33,10 @@ def run(output_root=DEFAULT_OUTPUT, name='B', tag='movable_station', rounds=12, 
     loading_seconds = time.monotonic()-began
     q, metadata = model.initial()
     options = dict(rounds=rounds, population=population, seed=seed, tag=tag,
+        station_precheck=station_precheck, station_precheck_maximum_trials=25,
         execution='fixed_work_direction_mobile_window_COM_xy_recenter',
-        floor_pressure_envelope='exact_continuous_endpoint_hull',
+        floor_pressure_envelope='conservative_local_force_cone_outer_hull',
+        continuous_load_cover=certificate_description(model.tasks[0].domain),
         floor_projection_input_count=sum(len(x) for x in model.base_oracle.loads),
         full_original_force_sample_count=sum(len(t.targets) for t in model.tasks),
         object_floor_model=K.FLOOR.description())
@@ -50,8 +55,16 @@ def run(output_root=DEFAULT_OUTPUT, name='B', tag='movable_station', rounds=12, 
         construction='original PopulationSoftSearch connected nominal core',
         extra_one_percent_padded_initialization_used=False))
     print('Initial counts', initial['counts'], flush=True)
-    search.solve(initial)
-    selected = s.material_selected
+    selected, precheck_rows = precheck(search, initial) if station_precheck else (None, [])
+    if selected is None:
+        search.solve(initial)
+        selected = s.material_selected
+    else:
+        s.material_selected = selected
+        s.frontier_statistics = dict(policy='bounded_shared_installation_precheck',
+            precheck_trials=len(precheck_rows), original_population_search_run=False,
+            configured_rounds=rounds, configured_population=population,
+            stopped_on_first_complete_solid=True, statistics=dict(search.evaluator.stats))
     search_seconds=time.monotonic()-began-loading_seconds
     print('Search finished; complete=', selected.completed, 'counts=', selected.result['counts'], flush=True)
     np.savez_compressed(second/'layout.npz', **selected.layout.arrays(model.native))
@@ -108,6 +121,9 @@ def run(output_root=DEFAULT_OUTPUT, name='B', tag='movable_station', rounds=12, 
     report = dict(schema='whole_task_mobile_station_step4_v1', status='pass' if completed else 'search_budget_exhausted',
         full_fixture_accepted=completed, poses=model.poses, object=name, output_root=str(Path(output_root).resolve()),
         policy=options, original_search='PopulationSoftSearch with all current reference proposal families',
+        original_population_search_run=not bool(precheck_rows and precheck_rows[-1]['completed']),
+        selection_stage='station_precheck' if precheck_rows and precheck_rows[-1]['completed'] else 'population_search',
+        precheck_trials=len(precheck_rows),
         checks=checks, construction=selected.construction, export_conditioning=conditioning, evaluation=selected.evaluation,
         seconds=time.monotonic()-began, loading_seconds=loading_seconds, search_seconds=search_seconds,
         extra_one_percent_padded_initialization_used=False,
@@ -130,9 +146,11 @@ def main():
     p.add_argument('--object', default='B'); p.add_argument('--tag', default='movable_station')
     p.add_argument('--rounds', type=int, default=12); p.add_argument('--population', type=int, default=32)
     p.add_argument('--seed', type=int, default=42)
+    p.add_argument('--no-station-precheck', action='store_true',
+                   help='Run the original cold population directly, without bounded seat proposals')
     a=p.parse_args()
     try:
-        run(a.output_root, a.object, a.tag, a.rounds, a.population, a.seed)
+        run(a.output_root, a.object, a.tag, a.rounds, a.population, a.seed, not a.no_station_precheck)
     except Exception as error:
         folder=a.output_root/a.object/'step4'/a.tag
         if folder.exists() and not (folder/'report.json').exists():

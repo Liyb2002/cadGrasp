@@ -49,8 +49,9 @@ def fill_surrounded_surface(mesh, selected_ids, outward_axis_object, eligible,
                             threshold_deg=270.):
     """One pass against the original region; keep only surface-connected fills.
 
-    `eligible` enforces spatial and flange-position bounds, not incidence or
-    visibility. Those checks are recorded separately for every added face.
+    `eligible` enforces the caller's hard bounds. The first-layer workflow
+    includes whole-face visibility, spatial and flange-position bounds here;
+    enclosed but occluded faces can never be admitted by the angular rule.
     Centroid angular coverage is a region-initialization heuristic.
     """
     selected_ids = np.asarray(selected_ids, dtype=int)

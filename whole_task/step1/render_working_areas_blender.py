@@ -61,9 +61,9 @@ def dashed_sphere(center, radius):
 
 
 def fixed_work_cone(workspace):
-    """The actual fixed position constraint, extended through the work ball.
+    """Finite work cone ending at the first solid ring.
 
-    Solid reference cone to the work-center plane, dashed forward extensions.
+    Dashed forward extensions are context only and cannot supply work faces.
     This is a station work volume, not a spray fan or a moving flange diagram.
     """
     cone = workspace["spatial_cone"]
@@ -221,9 +221,11 @@ def main():
                                    spatial_cone_half_angle_deg=configured_half_angle,
                                    spatial_cone_usable_half_angle_deg=workspace["spatial_cone"]["usable_half_angle_deg"],
                                    spatial_cone_reference_distance_m=workspace["spatial_cone"]["reference_axial_distance_m"],
+                                   spatial_cone_maximum_work_depth_m=workspace["spatial_cone"]["maximum_axial_distance_m"],
+                                   dashed_extension_selectable=False,
                                    spatial_cone_fixed_across_all_candidates=True,
                                    displayed_tool_deviation_deg=math.degrees(axis.angle(Vector(configured_axis))),
-                                   direction_cone_semantics="fixed_station_spatial_constraint_with_forward_extensions",
+                                   direction_cone_semantics="first_solid_ring_finite_work_cone_dashed_extension_not_selectable",
                                    view_scope="fixed_cone_and_tool_end_without_ball",
                                    camera_orthographic_width_m=cam.data.ortho_scale,
                                    tabletop_dimensions_m=list(tabletop_dimensions),

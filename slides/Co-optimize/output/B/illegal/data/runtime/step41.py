@@ -1,1 +1,0 @@
-/home/yli581/Desktop/cadGrasp/slides/Co-optimize/step41.py

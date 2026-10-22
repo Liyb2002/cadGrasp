@@ -1,169 +1,205 @@
-"""Run computed-task Step4.1 and station-constrained Co-optimize Step4.2."""
+"""Optimize the accepted Step3.2; publish exactly one flat overview PNG."""
 import argparse
-import json
 from pathlib import Path
+import json
+import shutil
 import time
-import subprocess
-import sys
 import numpy as np
+import trimesh
 
-from whole_task.step1.common import DEFAULT_OUTPUT, write_json, sha256
-from whole_task.step3.legacy import kernel as K, loaded_sources
-from .adapter import TaskModel
-from .search import StationSearch, context
-from .export_geometry import condition_core
-from .render import render_support
-from whole_search.model import Model
-from whole_search.exact_worker import read_result
-from whole_search.common import result_mesh, transform_mesh
-from whole_pipeline import initialization_trials
-from whole_step4_render import render_initialization, sheet, raster_tile, layers_for_pose
-from material_force import certify_material_contacts
-from whole_task.step2.wrenches import endpoint_demands
+from whole_task.step1.common import ROOT,DEFAULT_OUTPUT,sha256,write_json
+from whole_task.step3 import independent_geometry as G
+from whole_task.operations.construction import CompactConstructionModel, overlaps
+from .optimize import Optimizer
+from .validate_optimized import validate
+from whole_task.operations.installations import floor_angles,standing_pairs
+
+POLICY = json.loads(Path(__file__).with_name('policy.json').read_text())
 
 
-POLICY=Path(__file__).with_name('policy.json')
-
-
-def save_geometry(model,result,folder):
-    folder.mkdir(parents=True,exist_ok=True)
-    support=result_mesh(result)
-    K.D.export_exact_obj(support,folder/'support.obj')
-    np.savez_compressed(folder/'layout.npz',**result['layout'].arrays(model.native))
-    for k in result['layout'].active:
-        np.savez_compressed(folder/f'{model.poses[k]}_force.npz',mask=result['masks'][k],supply_7d=result['supplies'][k])
-    return support
-
-
-def run(output_root=DEFAULT_OUTPUT,object_name='B',rounds=None,population=None,nominal_diagnostic=False):
-    began=time.monotonic();policy=json.loads(POLICY.read_text())
-    if rounds is not None:policy['maximum_rounds']=rounds
-    if population is not None:policy['population_size']=population
-    policy['nominal_diagnostic_trial']=bool(nominal_diagnostic)
-    if policy['maximum_rounds']<0 or policy['population_size']<3:raise ValueError('Invalid search budget')
-    out=Path(output_root).resolve()/object_name/'step4'
-    out.mkdir(parents=True,exist_ok=True)
-    write_json(out/'run_status.json',dict(status='running',policy=policy))
-    print('Step4: loading computed poses, loads and current Step3.1',flush=True)
-    model=TaskModel(name=object_name,output_root=output_root)
-    q,metadata=model.initial();failures=[]
-    first=out/'step4.1';first.mkdir(exist_ok=True);(first/'data').mkdir(exist_ok=True)
-    print('Step4.1: constructing complete insertion/withdrawal paths',flush=True)
-    trials=[] if nominal_diagnostic else initialization_trials(model,q)
-    trial=-1
-    for trial,layout in enumerate(trials):
-        try:
-            worker_layout=first/'data'/f'trial_{trial}_layout.npz'
-            np.savez_compressed(worker_layout,**layout.arrays(model.native))
-            prefix=first/'data'/f'trial_{trial}_result'
-            with (first/'data'/f'trial_{trial}.log').open('w')as log:
+def material_reuse(candidate,model):
+    support=G.solid(candidate['support'])
+    tasks=candidate['tasks']
+    rows=[]
+    bounds=[G.mesh(t['stock']).bounds for t in tasks]
+    for i in range(len(tasks)):
+        for j in range(i):
+            if overlaps(bounds[i],bounds[j]):
+                # Shared casting backing must be above BOTH installed feet;
+                # there is no universal material-z plate after a side turn.
+                lo,hi=candidate['support'].bounds
+                above=G.box(lo-.001,hi+.001)
                 try:
-                    process=subprocess.run([sys.executable,'-B','-m','whole_task.step4.exact_worker',
-                        '--output-root',str(Path(output_root).resolve()),'--object',object_name,
-                        '--layout',str(worker_layout),'--out',str(prefix)],stdout=log,stderr=subprocess.STDOUT,timeout=180)
-                except subprocess.TimeoutExpired as error:
-                    raise RuntimeError('Exact geometry candidate exceeded the reference 180-second limit')from error
-            if process.returncode:
-                raise RuntimeError(f'Exact worker failed; see {first / "data" / f"trial_{trial}.log"}')
-            actual=read_result(prefix,trial+1);q=layout;break
-        except (RuntimeError,ValueError,AssertionError) as error:
-            failures.append(dict(trial=trial,error=str(error)))
-            print('Step4.1 numerical recovery',trial,str(error),flush=True)
-    else:
-        if not nominal_diagnostic:raise RuntimeError('Step4.1 construction unresolved: '+str(failures))
-        from whole_step4_render import NominalBuilder
-        from whole_search.common import unpack_solid, transform_solid
-        solid=NominalBuilder(model).solid(q);mesh=unpack_solid(solid)
-        proof=certify_material_contacts(model,q,mesh)
-        overlaps=[]
-        for k in q.active:
-            d=q.placements[k,:3,:3].T@q.directions[k]
-            overlaps.append(K.material_volume(solid ^ transform_solid(model.clearance.sweep(model.length*d,padded=False),q.placements[k])))
-        if max(overlaps)>1e-10:raise RuntimeError('Nominal diagnostic has an exit collision')
-        actual=dict(proof,layout=q,remaining_mesh=mesh,remaining=solid,
-                    volume_cm3=K.material_volume(solid)*1e6,
-                    diagnostics=dict(nominal_sweep_overlap_m3=max(overlaps),additional_clearance_certified=False))
-    save_geometry(model,actual,first)
-    render_initialization(model,actual,first)
-    if nominal_diagnostic:
-        path=first/'data/render.json';visual=json.loads(path.read_text())
-        visual['final_support_policy']='nominal complete-path geometry; additional 1% clearance unresolved'
-        write_json(path,visual)
-    write_json(first/'report.json',dict(status='nominal_diagnostic' if nominal_diagnostic else 'initialized',initialization=metadata,
-        additional_clearance_certified=not nominal_diagnostic,
-        numerical_recovery_trial=trial,construction_failures=failures,counts=actual['counts'],
-        geometry=actual['diagnostics'],volume_cm3=actual['volume_cm3'],
-        directions_fixture=q.directions.tolist(),fixed_task_poses=True,full_fixture_accepted=False))
-    print('Step4.1 actual-contact counts',actual['counts'],flush=True)
-    second=out/'step4.2';second.mkdir(exist_ok=True)
-    search=StationSearch(context(model,second/'search',iterations=policy['maximum_rounds'],
-                                population=policy['population_size'],seed=policy['random_seed']))
-    print('Step4.2: evaluating connected contact core and searching coupled layouts',flush=True)
-    initial=model.evaluate(q)
-    selected=search.solve(initial)
-    core=save_geometry(model,selected.result,second)
-    core=K.trimesh.load(second/'support.obj',force='mesh',process=False)
-    core,conditioning=condition_core(model,selected.layout,core,second/'support.obj')
-    # Final records always reflect polygons of the actual saved core, even
-    # when the search ended without a complete solid.
-    proof=certify_material_contacts(model,selected.layout,core)
-    endpoint_counts={}
-    for k in selected.layout.active:
-        endpoints=endpoint_demands(model.tasks[k].domain)['endpoint_need_wrench']*model.tasks[k].scale
-        mask,_=K.J.classify(proof['supplies'][k],endpoints)
-        endpoint_counts[model.poses[k]]=dict(passed=int(mask.sum()),total=len(mask))
-        np.savez_compressed(second/f'{model.poses[k]}_force.npz',mask=proof['masks'][k],
-            supply_7d=proof['supplies'][k],endpoint_mask=mask)
-    render_support(model,selected.layout,core,second/'overview.png')
-    if selected.solid is not None:
-        K.D.export_exact_obj(selected.solid,second/'complete_support.obj')
-        if selected.completed:
-            np.savez_compressed(second/'complete_force_certificate.npz',
-                **{f'mask_{k}':v for k,v in selected.full_certificate['masks'].items()},
-                **{f'supply_{k}':v for k,v in selected.full_certificate['supplies'].items()})
-        sheet([raster_tile(layers_for_pose(model,selected.layout,selected.solid,k))
-               for k in selected.layout.active],second/'complete_overview.png')
-    if selected.witness is not None:K.D.export_exact_obj(selected.witness,second/'legal_component.obj')
-    write_json(second/'oracle.json',selected.oracle)
-    write_json(second/'construction.json',selected.construction or dict(passed=False,attempted=False))
-    source=model.upstream_report
-    inputs=dict(source['input_sha256']);inputs[str(model.initialization_report)]=sha256(model.initialization_report)
-    for name,digest in source['artifact_sha256'].items():inputs[str(model.initialization_report.parent/name)]=digest
-    for path in [POLICY,*loaded_sources(),*Path(__file__).parent.glob("*.py")]:inputs[str(path)]=sha256(path)
-    report=dict(schema='whole_task_fixed_station_step4_v1',object=object_name,output_root=str(Path(output_root).resolve()),
-        status=('nominal_candidate_only' if nominal_diagnostic else 'pass') if selected.completed else 'search_budget_exhausted',
-        full_fixture_accepted=bool(selected.completed and not nominal_diagnostic),
-        nominal_complete_solid_accepted=selected.completed,additional_initialization_clearance_certified=not nominal_diagnostic,
-        policy=policy,poses=model.poses,step41_counts=actual['counts'],
-        final_core_counts={model.poses[k]:int(v.sum())for k,v in proof['masks'].items()},
-        continuous_endpoint_counts=endpoint_counts,core_volume_cm3=abs(float(core.volume))*1e6,
-        core_connected=selected.result.get('connected_contact_core'),export_conditioning=conditioning,
-        base_oracle_status=selected.oracle['status'],construction=selected.construction,
-        evaluation=selected.evaluation,iterations=len(search.audit),
-        adaptations=['computed Step2 paired loads and poses','finite Step3 surface-to-head access',
-            'coupled seat/installation moves preserving every robot world task',
-            'bounded station-preserving local direction and translation proposals'],
-        global_infeasibility_claimed=False,source_geometry_review_required=source['source_geometry_review_required'],
-        seconds=time.monotonic()-began,input_sha256=inputs,
-        artifact_sha256={str(p.relative_to(out)):sha256(p)for p in out.rglob('*')
-                         if p.is_file()and p not in (out/'report.json',out/'run_status.json',out/'validation.json')})
-    write_json(out/'report.json',report)
-    write_json(out/'run_status.json',dict(status=report['status'],seconds=report['seconds']))
-    print('Step4 result',report['status'],report['final_core_counts'],flush=True)
+                    for k in (i,j):
+                        M=tasks[k]['material'];n=M[:3,2]
+                        above=above.trim_by_plane(n,float(n@M[:3,3]+model.policy['plate_thickness_m']+1e-8)/G.SCALE)
+                    shared=support^tasks[i]['stock']^tasks[j]['stock']^above
+                    volume=G.volume(shared)*1e6
+                except RuntimeError:
+                    # This optional measurement is not a legality criterion.
+                    # Preserve an unresolved result rather than inventing a
+                    # shared-volume number or aborting a certified export.
+                    rows.append(dict(tasks=[model.ids[j],model.ids[i]],shared_above_plate_cm3=None,
+                        numerical_status='unresolved optional intersection; not used for acceptance'))
+                    continue
+                if volume>1.:
+                    rows.append(dict(tasks=[model.ids[j],model.ids[i]],shared_above_plate_cm3=float(volume)))
+    return rows
+
+
+def run_legacy(output_root=DEFAULT_OUTPUT,object_name='B',workdir=None,resume=False,
+        phases=('sharing',),merge_trials=24,publish=True, *, rounds=32, samples=32,
+        repair_rounds=1, seed=42, workers=4):
+    began=time.monotonic()
+    output_root=Path(output_root).resolve()
+    data_root=ROOT/'whole_task/data'/object_name
+    active=data_root/'step4_active.json'
+    if workdir is None and resume and active.exists() and 'sharing' not in phases:
+        workdir=json.loads(active.read_text())['workdir']
+    workdir=Path(workdir or data_root/'step4_group_merges').resolve()
+    workdir.mkdir(parents=True,exist_ok=True)
+    model=CompactConstructionModel(output_root,object_name)
+    # Publication without new proposals needs the fresh final disk replay
+    # below; avoid running that same expensive source-prism proof twice.
+    # Persistent populations already have certified parent checkpoints and
+    # advisory contact signatures. New commits and the final replay still
+    # undergo independent complete audits.
+    audit_resume=bool(phases) and not ('sharing' in phases and
+        (workdir/'population_seed_contacts.npz').exists())
+    optimizer=Optimizer(model,workdir,resume,audit_resume=audit_resume)
+    optimizer.solve(phases,merge_trials,rounds=rounds,samples=samples,
+                    repair_rounds=repair_rounds,seed=seed,workers=workers)
+    sharing_used='sharing' in phases or (workdir/'sharing_search.json').exists()
+    sides=standing_pairs(optimizer.layout)
+    if not sharing_used and phases and not sides:
+        raise ValueError('Final design has no actual 90 degree whole-fixture installation')
+    replay_model,candidate,validation=validate(workdir,output_root,object_name)
+    support=candidate['support']
+    mesh_path=workdir/'support.obj'
+    mesh_path.write_text(trimesh.exchange.obj.export_obj(support,digits=17,include_normals=False))
+    reloaded=trimesh.load(mesh_path,force='mesh',process=False)
+    np.testing.assert_array_equal(reloaded.faces,support.faces)
+    np.testing.assert_allclose(reloaded.vertices,support.vertices,atol=1e-15,rtol=0)
+    execution=[]
+    angles=floor_angles(optimizer.layout)
+    seats=optimizer.layout.material@optimizer.layout.poses
+    shared_seats=[dict(tasks=[model.ids[j],model.ids[i]],relative_floor_angle_deg=float(angles[i,j]))
+                  for i in range(len(model.ids))for j in range(i)
+                  if angles[i,j]>1e-5 and np.allclose(seats[i],seats[j],atol=1e-8,rtol=0)]
+    for i,name in enumerate(model.ids):
+        execution.append(dict(task=name,world_from_support=np.linalg.inv(optimizer.layout.material[i]).tolist(),
+            fixture_from_object=(optimizer.layout.material[i]@optimizer.layout.poses[i]).tolist(),
+            world_from_object=optimizer.layout.poses[i].tolist(),head_world_m=model.head.tolist(),
+            original_working_face_ids=model.records[i]['working_face_ids'],
+            exit_direction_world=optimizer.layout.exits[i].tolist(),exit_length_m=candidate['tasks'][i]['length']))
+    source_paths=[*replay_model.inputs,Path(__file__).with_name('policy.json'),*Path(__file__).parent.glob('*.py'),
+                  *(ROOT/'whole_task/operations').glob('*.py')]
+    report=dict(status='passed',method=('random_family_union_from_step3' if sharing_used
+                                       else 'fully_certified_monotone_volume_operations'),
+        initial_volume_cm3=optimizer.initial_volume,final_volume_cm3=optimizer.volume,
+        volume_reduction_fraction=1-optimizer.volume/optimizer.initial_volume,
+        accepted_operations=optimizer.accepted,task_count=len(model.ids),execution=execution,
+        selected_surface_union_fraction=model.report['selected_surface_union_fraction'],
+        actual_material_reuse=material_reuse(candidate,replay_model),
+        unchanged_original_task_regions=True,head_position_and_nominal_world_direction_fixed=True,
+        forces_recomputed_in_current_world_pose=True,world_gravity_fixed=[0.,0.,-9.81],
+        actual_contact_force_and_moment_pairs=True,continuous_whole_object_exits=True,
+        max_relative_installation_floor_angle_deg=float(angles.max()),
+        final_uses_nonparallel_installation_floors=bool(angles.max()>1e-5),
+        final_uses_90_degree_side_installation=bool(sides),
+        same_complete_fixture_for_all_tasks=True,shared_object_seat_task_pairs=shared_seats,
+        side_installation_task_pairs=[[model.ids[i],model.ids[j]]for i,j in sides],
+        design_requirements=optimizer.requirements,
+        all_accepted_states_fully_certified=True,global_minimum_claimed=False,
+        native_robot_motion_certified=False,fixture_stress_or_strength_certified=False,
+        installation_search='SO(3) whole-fixture installations, including side faces, interleaved with task-level juxtaposition',
+        base_design='8mm pressure patches, narrow side posts and base strips, clipped by every installed floor',
+        final_construction=json.loads((workdir/f'state_{optimizer.accepted:03}.json').read_text()).get('construction',{}),
+        baseline_reconstruction_in_first_translation=not sharing_used,
+        geometry_tolerance_m3=model.tolerance,force_tolerance=2e-9,
+        source_sha256={str(p):sha256(p)for p in source_paths},
+        checkpoint_manifest_sha256=sha256(workdir/'current.json'),validation_sha256=sha256(workdir/'validation.json'),
+        support_obj_sha256=sha256(mesh_path),seconds=time.monotonic()-began,
+        timing_scope='this invocation, including resume replay; earlier invocations retained in the checkpoint trace')
+    if (workdir/'requirements.json').exists():
+        report['design_requirements_sha256']=sha256(workdir/'requirements.json')
+    if (workdir/'sharing_search.json').exists():
+        report['sharing_search']=json.loads((workdir/'sharing_search.json').read_text())
+    if (workdir/'selection.json').exists():
+        report['selection']=json.loads((workdir/'selection.json').read_text())
+        report['selection_sha256']=sha256(workdir/'selection.json')
+    if (workdir/'warm_start.json').exists():
+        report['warm_start']=json.loads((workdir/'warm_start.json').read_text())
+        report['reduction_from_warm_start_fraction']=1-optimizer.volume/report['warm_start']['volume_cm3']
+    previous=data_root/'step4_spatial_best/report.json'
+    if previous.exists() and previous.parent!=workdir:
+        volume=json.loads(previous.read_text())['final_volume_cm3']
+        report['previous_flat_result_volume_cm3']=volume
+        report['reduction_from_previous_flat_result_fraction']=1-optimizer.volume/volume
+    # Preserve a smaller published result while a cold-start experiment runs.
+    if publish and active.exists():
+        incumbent=json.loads(active.read_text())
+        if incumbent['volume_cm3'] <= optimizer.volume+1e-5 and Path(incumbent['workdir']) != workdir:
+            report['publication']=dict(status='retained_existing_smaller_design',
+                published_volume_cm3=incumbent['volume_cm3'],workdir=incumbent['workdir'])
+            publish=False
+    report['published']=bool(publish)
+    write_json(workdir/'report.json',report)
+    if publish:
+        from .overview import render
+        image=render(replay_model,candidate,validation,workdir/'overview.png')
+        out=output_root/object_name/'step4'
+        if out.exists() and any(p.name!='overview.png'for p in out.iterdir()):
+            archive=workdir/'legacy_output'
+            if archive.exists():
+                archive=workdir/f'previous_output_{time.time_ns()}'
+            shutil.move(str(out),str(archive))
+        out.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(image,out/'overview.png')
+        assert sorted(p.name for p in out.iterdir())==['overview.png']
+        report['overview_sha256']=sha256(out/'overview.png')
+        report['overview']=str(out/'overview.png')
+        write_json(workdir/'report.json',report)
+        write_json(active,dict(workdir=str(workdir),state=optimizer.accepted,
+            volume_cm3=optimizer.volume,report_sha256=sha256(workdir/'report.json'),
+            overview_sha256=report['overview_sha256']))
+    print('STEP4 PASS',json.dumps({k:report[k]for k in ('initial_volume_cm3','final_volume_cm3','volume_reduction_fraction','accepted_operations')},ensure_ascii=False),flush=True)
     return report
+
+
+def run(output_root=DEFAULT_OUTPUT,object_name='B',workdir=None,resume=False,
+        *,rounds=32,samples=32,repair_rounds=1,seed=42,workers=4,publish=True,target_max_groups=1):
+    """Default Step4: 25% saving per merge and certified subgroup recombination."""
+    from .membrane_search import run as run_membranes
+    return run_membranes(output_root,object_name,workdir,rounds=rounds,samples=samples,
+        workers=workers,repair_rounds=repair_rounds,seed=seed,resume=resume,publish=publish,target_max_groups=target_max_groups)
 
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--output-root',type=Path,default=DEFAULT_OUTPUT);p.add_argument('--object',default='B')
-    p.add_argument('--rounds',type=int);p.add_argument('--population',type=int)
-    p.add_argument('--nominal-diagnostic',action='store_true',help='Explicit experiment without certified extra 1% clearance; cannot produce full PASS')
+    p.add_argument('--output-root',type=Path,default=DEFAULT_OUTPUT)
+    p.add_argument('--object',default='B')
+    p.add_argument('--workdir',type=Path)
+    p.add_argument('--resume',action='store_true')
+    p.add_argument('--phases',nargs='+',choices=['sharing','poses','standing','task_turns','quarters','turns','merges','exits','translations'],default=['sharing'])
+    p.add_argument('--merge-trials',type=int,default=24)
+    p.add_argument('--rounds',type=int,default=POLICY['rounds'])
+    p.add_argument('--samples',type=int,default=POLICY['samples_per_operation'])
+    p.add_argument('--repair-rounds',type=int,default=POLICY['repair_rounds'])
+    p.add_argument('--seed',type=int,default=POLICY['random_seed'])
+    p.add_argument('--workers',type=int,default=POLICY.get('workers',4))
+    p.add_argument('--no-publish',action='store_true')
+    p.add_argument('--legacy-connected',action='store_true',help='Replay the historical common-floor model')
+    p.add_argument('--target-groups',type=int,choices=[1,2],default=1)
     a=p.parse_args()
-    try:run(a.output_root,a.object,a.rounds,a.population,a.nominal_diagnostic)
-    except Exception as error:
-        folder=a.output_root/a.object/'step4';folder.mkdir(parents=True,exist_ok=True)
-        write_json(folder/'run_status.json',dict(status='unresolved',error=f'{type(error).__name__}: {error}'))
-        raise
+    if not a.legacy_connected:
+        from .membrane_search import run as run_membranes
+        return run_membranes(a.output_root,a.object,a.workdir,rounds=a.rounds,samples=a.samples,
+            workers=a.workers,repair_rounds=a.repair_rounds,seed=a.seed,resume=a.resume,publish=not a.no_publish,
+            target_max_groups=a.target_groups)
+    run_legacy(a.output_root,a.object,a.workdir,a.resume,a.phases,a.merge_trials,not a.no_publish,
+        rounds=a.rounds,samples=a.samples,repair_rounds=a.repair_rounds,seed=a.seed,workers=a.workers)
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    main()

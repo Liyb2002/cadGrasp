@@ -70,6 +70,8 @@ def compose_working_areas(config, report, output):
                                    context_view="fixed_cone_tool_end_and_enlarged_tabletop",
                                    gold_cone_is_fixed_spatial_selection_constraint=True,
                                    gold_cone_matches_selection_nominal_boundary=True,
+                                   first_solid_ring_is_work_depth_limit=True,
+                                   dashed_extension_selectable=False,
                                    gold_cone_is_spray_fan=False,
                                    schematic_robot_posture_not_ik_solved=True,
                                    removed_previous_figures=removed)

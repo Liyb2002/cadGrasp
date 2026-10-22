@@ -1,9 +1,0 @@
-{
-  "population_size": 32,
-  "common_exit_directions": true,
-  "identical_registered_initial_directions": true,
-  "source": "saved original registered Step4.1",
-  "warm_start": false,
-  "predefined_juxtaposed_pose_ids": [],
-  "numerical_inputs_changed": false
-}

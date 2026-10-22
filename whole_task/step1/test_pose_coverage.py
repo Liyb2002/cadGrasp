@@ -10,7 +10,7 @@ from .common import ROOT, load_shape
 from .pose_coverage import (build_candidates, evaluate_alignment, evaluate_alignments,
                             evaluate_target_alignment,
                             representative_indices, sphere_workspace, spatial_workspace_mask,
-                            face_components, expand_same_alignment)
+                            face_components, expand_same_alignment, coverage_angular_budget)
 from .step1_3 import _adjacency
 
 
@@ -18,6 +18,21 @@ class PoseCoverageTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.config = load_config(ROOT/"robots_config/04_kuka_lbr_med14_r820.json")
+
+    def test_config_angle_controls_space_without_cropping_surface_normals(self):
+        config = copy.deepcopy(self.config)
+        for angle in (25., 35.):
+            config['task_constraint']['cone_half_angle_deg'] = angle
+            budget = coverage_angular_budget(config)
+            self.assertIsNone(budget['full_normal_cap_half_angle_deg'])
+            self.assertFalse(budget['normal_hard_limit_applied'])
+            self.assertAlmostEqual(sphere_workspace(config)['spatial_cone']['usable_half_angle_deg'], .95*angle)
+        mesh = trimesh.Trimesh(vertices=[[-.002,-.002,0],[.002,-.002,0],[0,.002,0]], faces=[[0,1,2]], process=False)
+        mesh.apply_transform(trimesh.transformations.rotation_matrix(np.radians(30), [1,0,0]))
+        config['task_constraint']['cone_half_angle_deg'] = 25.
+        self.assertIsNotNone(evaluate_alignment(mesh, config, [0,0,1]))
+        config['task_constraint']['cone_half_angle_deg'] = 35.
+        self.assertIsNotNone(evaluate_alignment(mesh, config, [0,0,1]))
 
     def test_disconnected_pieces_are_separate_candidates_without_losing_faces(self):
         mesh = trimesh.Trimesh(
@@ -49,7 +64,7 @@ class PoseCoverageTests(unittest.TestCase):
         config["feasibility"]["tcp_transform"]["translation_flange_m"][2] = .02
         self.assertIsNotNone(evaluate_alignment(mesh, config, [0, 0, 1]))
 
-    def test_aiming_point_centers_cone_and_keeps_its_component(self):
+    def test_aiming_point_lands_on_axis_inside_first_ring_and_keeps_its_component(self):
         mesh = trimesh.Trimesh(
             vertices=[[-.02, -.002, 0], [-.016, -.002, 0], [-.02, .002, 0],
                       [0, -.005, 0], [.01, -.005, 0], [0, .005, 0]],
@@ -63,7 +78,12 @@ class PoseCoverageTests(unittest.TestCase):
         np.testing.assert_array_equal(chosen["face_ids"], [0])
         point_world = (chosen["rotation_world_object"] @ mesh.triangles_center[0]
                        + chosen["translation_world_object_m"])
-        np.testing.assert_allclose(point_world, sphere_workspace(self.config)["center_world_m"], atol=1e-12)
+        workspace=sphere_workspace(self.config);cone=workspace['spatial_cone']
+        delta=point_world-np.asarray(cone['apex_world_m']);axis=np.asarray(cone['axis_world'])
+        depth=float(delta@axis)
+        np.testing.assert_allclose(delta,depth*axis,atol=1e-12)
+        self.assertGreater(depth,0.)
+        self.assertLess(depth,cone['maximum_axial_distance_m'])
         self.assertEqual(chosen["display_target"]["source_face_id"], 0)
 
     def test_configured_local_ball_actually_limits_the_selected_surface(self):
@@ -72,12 +92,13 @@ class PoseCoverageTests(unittest.TestCase):
         self.assertEqual(workspace["center_world_m"], [0, -.5, .3])
         self.assertAlmostEqual(workspace["usable_radius_m"], .095)
         self.assertAlmostEqual(workspace["base_reach_estimate"]["usable_radius_m"], .779)
-        triangle = np.array([[[.040, -.001, 0], [.042, -.001, 0], [.040, .001, 0]]])+workspace["center_world_m"]
+        triangle = (np.array([[[.040, -.001, 0], [.042, -.001, 0], [.040, .001, 0]]])
+                    +workspace['center_world_m']-.02*np.asarray(workspace['spatial_cone']['axis_world']))
         self.assertTrue(spatial_workspace_mask(triangle, workspace)[0])
         config["task_constraint"]["world_position_constraint"]["radius_m"] = .04
         self.assertFalse(spatial_workspace_mask(triangle, sphere_workspace(config))[0])
 
-    def test_fixed_cone_rejects_in_ball_points_and_accepts_its_forward_extension(self):
+    def test_first_solid_ring_rejects_forward_extension_even_inside_cone_and_ball(self):
         config = copy.deepcopy(self.config)
         config["task_constraint"]["working_direction_world"] = [0, 0, -1]
         config["task_constraint"]["world_position_constraint"]["center_world_m"] = [0, 0, .1]
@@ -85,9 +106,19 @@ class PoseCoverageTests(unittest.TestCase):
         vertices = np.array([[.064, -.001, .1], [.066, -.001, .1], [.065, .001, .1]])
         self.assertLess(np.linalg.norm(vertices-[0, 0, .1], axis=1).max(), .095)
         self.assertFalse(spatial_workspace_mask(vertices[None], workspace)[0])
-        vertices[:, 2] -= .04
+        vertices[:] = [[.01,-.001,.11],[.012,-.001,.11],[.01,.001,.11]]
         self.assertTrue(spatial_workspace_mask(vertices[None], workspace)[0])
-        # The cone is one-sided and the enclosing ball bounds its extension.
+        self.assertAlmostEqual(workspace['spatial_cone']['reference_axial_distance_m'],.12)
+        self.assertAlmostEqual(workspace['spatial_cone']['maximum_axial_distance_m'],.114)
+        # A face wholly inside the old cone/ball and before the dashed ring
+        # must still fail once it crosses the first solid ring's work limit.
+        vertices[:,2]=.06
+        self.assertLess(np.linalg.norm(vertices-[0,0,.1],axis=1).max(),.095)
+        self.assertFalse(spatial_workspace_mask(vertices[None],workspace)[0])
+        # All three vertices are tested, including one over the usable cap.
+        vertices[:,2]=.11;vertices[2,2]=.105
+        self.assertFalse(spatial_workspace_mask(vertices[None],workspace)[0])
+        # The cone remains one-sided and is also bounded by the local ball.
         vertices[:] = [[0, 0, .23], [.001, 0, .23], [0, .001, .23]]
         self.assertFalse(spatial_workspace_mask(vertices[None], workspace)[0])
         vertices[:, 2] = -.01
