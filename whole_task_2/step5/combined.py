@@ -1,7 +1,16 @@
-"""Step5: every distinct support of step4/combine.py with its feet, certified for every task, and its figure.
+"""Step5: every distinct support of step4/combine.py trimmed, with its feet, certified for every task, and its figure.
 
 The placing arm installs the support for each task so that the task faces the work arm at its certified
-pose, and the support rests on the table.  Feet wrap every task's pressure hull (as Co-optimize's Step5):
+pose, and the support rests on the table.
+
+First the outer material goes where that shrinks the support's bbx (Co-optimize's Step5.2): in the frame of
+the support's minimum-volume box, for each fraction in TRIM and each box face whose material reaches past
+the bunnies of every seat (widest gap first), a plane cut that fraction of the way from the support's extent
+to the bunnies'.  A cut stays only if the support is still one piece, its bbx smaller, every task passes
+the full Step4 audit on it (after Step4's exit recut), and the feet below can still enclose every task's
+pressure hull (as every deletion of Co-optimize keeps the stance).
+
+Then feet wrap every task's pressure hull (as Co-optimize's Step5):
 
   for every task, in its installation, a band FOOT['width'] wide and FOOT['height'] high on the table
   around its pressure hull, its outer edge FOOT['outward'][0] outside the hull's, kept only in the legal
@@ -13,11 +22,13 @@ pose, and the support rests on the table.  Feet wrap every task's pressure hull 
   floor), the band's legal part may not enclose the hull: the band then moves out, through the offsets
   FOOT['outward'], to the first whose legal part, joined, makes the ground faces enclose the hull.
 
-The whole membrane and every accepted piece stay; nothing is pruned.  Every task is then audited in full on
+The whole trimmed membrane and every accepted piece stay.  As before every Step4 audit, the
+original face cells at each task's final exit travel are recut (MembraneModel.refine_exits), removing the
+Boolean slivers (~1e-10 m^3) the joins can leave on an exit.  Every task is then audited in full on
 the support with its feet (32,768 paired samples and the continuous outer targets, the continuous exit of
 every source face, body and keep-out, the KUKA at every stored joint set), and in every installation the
 actual ground faces must enclose the task's pressure hull.  Validation rebuilds every support from Step4's
-membrane and audits it again.
+membrane (trim and feet) and audits it again.
 
 One figure per support, output/<object>/step5/<name>.png, no text: the top row, the support with the bunny
 in each seat (pink: the areas of the seat's tasks), then the support alone; the bottom row, every task at
@@ -45,6 +56,8 @@ from whole_task_2.step4.merge import move
 from whole_task_2.step4.combine import FOLDER as COMBINE, ExitModel, largest, plain, seats, solids, obb
 
 FOLDER = 'step5_combined'
+TRIM = (1., .5, .25, .125)                           # Co-optimize's Step5.2: a cut this fraction of the way
+                                                     # from a box face to the bunnies
 FOOT = dict(width=.008, height=.005,                 # Co-optimize's band: 8 mm wide, 5 mm high,
             outward=(.004, .008, .012, .016, .024, .032, .048, .064),   # its outer edge this far outside the hull
             link=.008,                               # round links, radius
@@ -124,25 +137,81 @@ def grow(stock, band, legal, tolerance, foot=FOOT):
     return stock, record
 
 
-def wrap(c, group, foot=FOOT):
-    """The support with its feet: (support, model, layout, record of every task's band)."""
-    membrane = read_mesh(ROOT/group['file']); model = ExitModel(c, group['slots']); q = model.layout(membrane)
+def audited(model, support):
+    """support after Step4's exit recut, if every task passes the full Step4 audit on it (else ValueError)."""
+    candidate = dict(layout=model.layout(support), support=support, tasks=None, construction={})
+    candidate['tasks'] = model.prepare(candidate['layout']); model.refine_exits(candidate)
+    support = candidate['support']; q = model.layout(support)
+    model.audit(dict(layout=q, support=support, tasks=model.prepare(q), construction={}))
+    return support
+
+
+def trim(c, model, group, support, fractions=TRIM):
+    """The outer material cut away where that shrinks the bbx and the feet still enclose every pressure hull:
+    (support, every cut tried)."""
+    T, _ = trimesh.bounds.oriented_bounds(support.vertices)
+    bunnies = trimesh.transform_points(np.vstack([trimesh.transform_points(model.source.vertices, X) for X in model.X]), T)
+    target = np.array([bunnies.min(0), bunnies.max(0)]); record = []
+
+    def bounds(m):
+        v = trimesh.transform_points(m.vertices, T); return np.array([v.min(0), v.max(0)])
+    for fraction in fractions:
+        b = bounds(support)
+        faces = sorted((((b[side, axis]-target[side, axis])*(1 if side else -1), axis, side) for axis in range(3) for side in range(2)), reverse=True)
+        for _, axis, side in faces:
+            edge = bounds(support)[side, axis]; gap = (edge-target[side, axis])*(1 if side else -1)
+            if gap <= 1e-8: continue
+            limit = edge+fraction*(target[side, axis]-edge)
+            normal, offset = (-T[axis, :3], T[axis, 3]-limit) if side else (T[axis, :3], limit-T[axis, 3])
+            row = dict(fraction=fraction, axis=axis, side=side, depth_m=float(gap*fraction), accepted=False)
+            try:
+                value = G.solid(support).trim_by_plane(tuple(normal), float(offset/G.SCALE))
+                if count(value) != 1: raise ValueError('the cut splits the support')
+                cut = G.mesh(value.simplify(0.))
+                if obb(cut.vertices) >= obb(support.vertices): raise ValueError('the bbx does not shrink')
+                kept = audited(model, cut)
+                if not feet(c, model, group, kept)[2]: raise ValueError('the feet no longer enclose every pressure hull')
+                row.update(accepted=True, removed_cm3=float(support.volume-kept.volume)*1e6, bbx_m3=obb(kept.vertices))
+                support = kept
+            except (ValueError, RuntimeError, AssertionError, np.linalg.LinAlgError) as ex: row['reason'] = str(ex)[:200]
+            record.append(row)
+    return support, record
+
+
+def feet(c, model, group, membrane, foot=FOOT):
+    """membrane with every task's band joined to it: (the solid, the record of every task's band, whether every
+    pressure hull is enclosed)."""
+    q = model.layout(membrane)
     rows = pressure_rows(model, q); pad = max(foot['outward'])+foot['padding']
     points = np.vstack([membrane.vertices, *[r['ground_material'] for r in rows]])
     legal = clip(G.box(points.min(0)-pad, points.max(0)+pad), planes(q.material))-solids(c.object_name, group)['F']
     stock, share = largest(G.solid(membrane))
     if share < 1-1e-9: raise ValueError('Step4 membrane is not one piece')
-    record = []
+    record = []; enclosed = True
     for r in rows:
         for d in foot['outward']:
             grown, pieces = grow(stock, rim(r, d, foot), legal, c.base.tolerance, foot)
             if d == foot['outward'][0]: first = grown, pieces
             if ground_enclosure(G.mesh(grown), [r])[0]['passed']: break
-        else: (grown, pieces), d = first, None          # no band encloses: the hull-edge band; certify reports it
+        else: (grown, pieces), d, enclosed = first, None, False      # no band encloses: the hull-edge band; certify reports it
         stock = grown; record.append(dict(task=r['id'], outward_m=d, pieces=pieces))
+    return stock, record, enclosed
+
+
+def wrap(c, group, foot=FOOT, fractions=TRIM):
+    """The support trimmed, with its feet: (support, model, layout, record of every task's band, record of
+    every cut tried)."""
+    model = ExitModel(c, group['slots']); membrane, cuts = trim(c, model, group, read_mesh(ROOT/group['file']), fractions)
+    stock, record, _ = feet(c, model, group, membrane, foot)
     support = G.mesh(stock.simplify(0.))
     if G.volume(G.solid(membrane)-G.solid(support)) > c.base.tolerance: raise ValueError('the feet lost membrane')
-    return support, model, model.layout(support), record
+    # Step4's own recut before an audit: every original face cell at the final exit travel.
+    candidate = dict(layout=model.layout(support), support=support, tasks=None, construction={})
+    candidate['tasks'] = model.prepare(candidate['layout']); model.refine_exits(candidate)
+    record.append(dict(exit_refinement_rounds=candidate['construction']['exit_refinement_rounds'],
+                       removed_cm3=float(support.volume-candidate['support'].volume)*1e6))
+    support = candidate['support']
+    return support, model, model.layout(support), record, cuts
 
 
 def certify(model, q, support):
@@ -173,24 +242,28 @@ def run(object_name='B', output_root=DEFAULT_OUTPUT):
                    joins=[dict(task=s['parents'][1], operation=s['operation'], seat=s['seat'], bbx_ratio=s['bbx_ratio'])
                           for s in group['chain']])
         try:
-            support, model, q, pieces = wrap(c, group); row['pieces'] = pieces; proof, ground = certify(model, q, support)
+            support, model, q, pieces, cuts = wrap(c, group); row.update(pieces=pieces, cuts=cuts)
+            trimmed = [r for r in cuts if r['accepted']]
+            row.update(trimmed_cm3=sum(r['removed_cm3'] for r in trimmed), trimmed_bbx_m3=trimmed[-1]['bbx_m3'] if trimmed else group['bbx_m3'])
+            proof, ground = certify(model, q, support)
         except (ValueError, RuntimeError, AssertionError, np.linalg.LinAlgError) as ex:
             rows.append(dict(row, status='failed', reason=str(ex)[:300], seconds=time.monotonic()-t0))
             print('STEP5', name, 'FAILED', str(ex)[:160], flush=True); continue
         np.savez_compressed(folder/f'{name}.npz', vertices=support.vertices, faces=support.faces)
         (folder/f'{name}.obj').write_text(trimesh.exchange.obj.export_obj(support, digits=17, include_normals=False))
         rows.append(dict(row, status='passed', volume_cm3=float(support.volume*1e6),
-                         feet_cm3=float(support.volume*1e6)-group['volume_cm3'], support_bbx_m3=obb(support.vertices),
+                         feet_cm3=float(support.volume*1e6)-group['volume_cm3']+row['trimmed_cm3'], support_bbx_m3=obb(support.vertices),
                          bounds_m=support.bounds.tolist(), support_sha256=sha256(folder/f'{name}.npz'),
                          tasks=[dict(id=t['id'], samples=t['force']['passed_original_sample_count'],
                                      outer=t['force']['passed_continuous_outer_target_count'], arm_faces_hit=len(t['arm']['faces_hit']),
                                      exit_length_m=t['exit_length_m']) for t in proof['tasks']],
                          ground=[dict(id=r['id'], passed=r['passed'], pressure_hull_gap_m=r['pressure_hull_gap_m']) for r in ground],
                          seconds=time.monotonic()-t0))
-        print('STEP5', name, 'PASS', round(support.volume*1e6, 1), 'cm3,', round(rows[-1]['feet_cm3'], 1), 'cm3 of feet,',
+        print('STEP5', name, 'PASS', round(support.volume*1e6, 1), 'cm3,', round(row['trimmed_cm3'], 1), 'cm3 trimmed (bbx',
+              round(group['bbx_m3']*1e6), '->', round(row['trimmed_bbx_m3']*1e6), 'cm3),', round(rows[-1]['feet_cm3'], 1), 'cm3 of feet,',
               round(time.monotonic()-t0), 's', flush=True)
         render(group, model, q, support, output_root/object_name/'step5'/f'{name}.png')
-    report = dict(object=object_name, foot=FOOT, results=rows, input_sha256=inputs(object_name), seconds=time.monotonic()-began)
+    report = dict(object=object_name, trim=TRIM, foot=FOOT, results=rows, input_sha256=inputs(object_name), seconds=time.monotonic()-began)
     write_json(folder/'report.json', plain(report))
     validate(object_name)
     return report
@@ -207,7 +280,7 @@ def validate(object_name='B'):
         if row['status'] != 'passed': continue
         path = folder/f"{row['name']}.npz"
         if sha256(path) != row['support_sha256']: raise ValueError(row['name']+': changed support file')
-        rebuilt, model, q, _ = wrap(c, groups[row['step4_file']]); support = read_mesh(path)
+        rebuilt, model, q, _, _ = wrap(c, groups[row['step4_file']]); support = read_mesh(path)
         d = G.volume(G.solid(support)-G.solid(rebuilt))+G.volume(G.solid(rebuilt)-G.solid(support))
         if d > c.base.tolerance: raise ValueError(f"{row['name']}: saved support differs from its rebuild: {d} m^3")
         proof, ground = certify(model, q, support)

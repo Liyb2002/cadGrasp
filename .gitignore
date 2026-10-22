@@ -62,6 +62,14 @@
 # Track ignore rules at every level; child rules must not allow data or outputs.
 !.gitignore
 
+# Never upload these formats, at any depth, including configuration and inputs.
+# Match mixed-case extensions too. Child .gitignore files must not re-include them.
+*.[nN][pP][zZ]
+*.[jJ][sS][oO][nN]
+*.[mM][pP]4
+*.[gG][iI][fF]
+*.[pP][nN][gG]
+
 # Dependencies, caches and local tooling are never project source.
 **/.git/
 **/.venv/

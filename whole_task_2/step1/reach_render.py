@@ -13,12 +13,12 @@ from PIL import Image
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
-from .common import ROOT, sha256, write_json
+from .common import ROOT, DEFAULT_OUTPUT, load_shape, object_of, sha256, write_json
 
 # One colour per working area, in order of size.
 PALETTE = np.array([[.93, .42, .62], [.25, .55, .85], [.40, .78, .85], [.38, .74, .48], [.62, .48, .82], [.95, .66, .22],
                     [.83, .42, .28], [.68, .68, .30], [.98, .86, .36], [.50, .50, .58], [.30, .35, .78], [.80, .60, .70]])
-WORKING_POSES_ZOOM = 1.5
+WORKING_POSES_MARGIN = 1.10
 
 
 def contact(mesh, faces, W):
@@ -44,9 +44,9 @@ def tiles(images, columns):
     return canvas
 
 
-def picture(scene, W, colors, tools, fit=True):
+def picture(scene, W, colors, tools, fit=True, shapes=()):
     if fit: scene.fit(scene.points(W, tools))
-    return Image.frombytes('RGB', scene.size, scene.draw(W, colors, tools)).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+    return Image.frombytes('RGB', scene.size, scene.draw(W, colors, tools,shapes=shapes)).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
 
 def station(area):
@@ -61,28 +61,34 @@ def tabletop(scene, setup):
     import trimesh
     mesh=trimesh.creation.box(bounds=np.asarray(setup['table_bounds_world_m']))
     shape=scene.r.Shape(scene.ctx,scene.shader,mesh.vertices,mesh.faces,(.91,.91,.91),roughness=.85)
-    return [(shape,np.eye(4))]
+    from .find_tasks_figure import workspace_box
+    box,_=workspace_box(scene,setup)
+    return [(shape,np.eye(4)),*box]
 
 
-def at_work(scene, arm, W, colors, tip, axis, ghosts=(), zoom=1., shapes=(), joints=None):
-    """KUKA holding the head on the object; zoomed views center the work and crop the arm."""
+def at_work(scene, arm, W, colors, tip, axis, ghosts=(), shapes=(), joints=None, close_up=False):
+    """The work arm holding the head; close-ups fit only the complete object and work box."""
     from .reach_video import arm_links
     if joints is None:links, _ = arm_links(arm, tip, axis)
     else:
         from whole_task_2.step5.video.prepare import matrices
         links=matrices(arm.forward(joints,geometry=True)[2])
     tools = [(tip, axis, False), *ghosts]
-    points = scene.points(W, tools)
-    focus = (points.min(axis=0)+points.max(axis=0))/2 if zoom != 1 else None
-    scene.fit(np.vstack([points, links[:, :3, 3]]), 1.06/zoom, target=focus)
+    from .workspace import box_edges
+    box=np.asarray(box_edges(scene.setup['surface_workspace']['bounds_world_m'])).reshape(-1,3)
+    if close_up:
+        points=np.vstack([scene.mesh.vertices@W[:3,:3].T+W[:3,3],box])
+        scene.fit(points,WORKING_POSES_MARGIN)
+    else:
+        scene.fit(np.vstack([scene.points(W,tools),box,links[:,:3,3]]),1.06)
     return Image.frombytes('RGB', scene.size, scene.draw(W, colors, tools, links,shapes=shapes)).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
 
 def working_poses(mesh, report, arrays, output):
-    """Render the exclusive task partition in pink at 150% scale."""
-    from .reach_video import Scene, kuka, STATION_VIEW
+    """Render the exclusive task partition in pink, together with the fixed XYZ box."""
+    from .reach_video import Scene, work_arm, STATION_VIEW
     from whole_task_2.step5.video import raster as r
-    tasks = report['tasks']; arm = kuka(report['setup']); images = []
+    tasks = report['tasks']; arm = work_arm(report['setup']); images = []
     scene = Scene(mesh, report['setup'], 640, 560, arm=True); scene.view = STATION_VIEW
     shapes=tabletop(scene,report['setup'])
     try:
@@ -93,11 +99,14 @@ def working_poses(mesh, report, arrays, output):
             faces = np.flatnonzero(arrays['reach'][:,j]&assigned)
             if not len(faces):
                 # Retain a redundant input pose without inventing a working contact.
-                images.append(picture(scene, W, colors, []))
+                from .workspace import box_edges
+                points=np.vstack([scene.points(W,[]),np.asarray(box_edges(report['setup']['surface_workspace']['bounds_world_m'])).reshape(-1,3)])
+                scene.fit(points,1.10)
+                images.append(picture(scene, W, colors, [],fit=False,shapes=shapes))
                 continue
             f = contact(mesh, faces, W)
             tip = mesh.triangles_center[f] @ W[:3, :3].T + W[:3, 3]; axis = W[:3, :3] @ arrays['reach_axis'][f,j]
-            images.append(at_work(scene, arm, W, colors, tip, axis, zoom=WORKING_POSES_ZOOM,shapes=shapes,joints=arrays['joints'][f,j,-1]))
+            images.append(at_work(scene, arm, W, colors, tip, axis,shapes=shapes,joints=arrays['joints'][f,j,-1],close_up=True))
     finally:
         scene.close()
     output = Path(output); output.parent.mkdir(parents=True, exist_ok=True)
@@ -179,12 +188,13 @@ def publish(mesh, report, root):
         work_window_center_m=s['work_window_center_m'], work_point_m=s['work_point_m'],
         work_point_forward_of_window_m=s['work_point_forward_of_window_m'], work_point_rule=s['work_point_rule'],
         table_height_m=s['table_height_m'],table_bounds_world_m=s['table_bounds_world_m'],pose_rule=s['pose_rule'],
+        surface_workspace=s['surface_workspace'],
         config_incidence_deg_not_applied=s['config_incidence_deg_not_applied'],
         tool=dict(source=s['tool_source'], needle_length_m=s['needle_length_m'], needle_radius_m=s['needle_radius_m'],
                   head_radius_m=s['head_radius_m']), max_tilt_deg=s['max_tilt_deg'],
         arm_motion=report['reach_definition']['arm_motion'], reach_definition=report['reach_definition']))
-    from .reach_video import kuka, STATION_VIEW
-    arm = kuka(s); view = STATION_VIEW
+    from .reach_video import work_arm, STATION_VIEW
+    arm = work_arm(s); view = STATION_VIEW
     scene = Scene(mesh, s, 1200, 1000, arm=True); scene.view = view
     shapes=tabletop(scene,s)
     try:
@@ -217,7 +227,42 @@ def publish(mesh, report, root):
     coverage=coverage_figures(mesh,report,arrays,folders[3])
     files = sorted(p for folder in folders.values() for p in folder.iterdir())
     return dict(files={str(p.relative_to(ROOT)): sha256(p) for p in files}, elapsed_s=time.perf_counter()-start,
-                working_poses_zoom=WORKING_POSES_ZOOM, working_poses_color='pink',
-                working_poses_region='exclusive face_task partition: every pink source face belongs to exactly one input pose; empty poses remain gray',
+                working_poses_camera='fit complete object and surface work box; crop tool and arm',
+                working_poses_margin=WORKING_POSES_MARGIN, working_poses_color='pink',
+                working_poses_region='fixed six-task preview: exclusive angle-reachable surface faces inside the inward box; no unsupported fill',
                 coverage_definition=coverage['definition'],covered_fraction=coverage['covered_fraction'],uncovered_fraction=coverage['uncovered_fraction'],
                 view='text-free images: one colour per direction task from six sides; overview and working poses per task')
+
+
+def refresh(object_name='B',output_root=DEFAULT_OUTPUT):
+    """Re-render an existing plan without changing its task masks or arm witnesses."""
+    import json
+    work=ROOT/'whole_task_2/data'/object_name/'step1_reach'
+    report=json.loads((work/'plan.json').read_text())
+    previous=json.loads((work/'validation.json').read_text())
+    if previous['status']!='passed' or previous['plan_sha256']!=sha256(work/'plan.json'):
+        raise ValueError('Only a validated Step1 plan can be re-rendered')
+    if report['arrays_sha256']!=sha256(work/'plan.npz'):
+        raise ValueError('Step1 task arrays changed')
+    render_source=str(Path(__file__).relative_to(ROOT))
+    for path,digest in report['input_sha256'].items():
+        if path!=render_source and sha256(ROOT/path)!=digest:
+            raise ValueError('Non-rendering input changed: '+path)
+    old_source=report['input_sha256'][render_source]
+    report['input_sha256'][render_source]=sha256(__file__)
+    mesh=load_shape(ROOT/'objects'/object_of(object_name)/'mesh.stl')
+    report['figures']=publish(mesh,report,Path(output_root)/object_name/'step1')
+    report['figure_refresh']=dict(previous_render_source_sha256=old_source,
+        render_source_sha256=sha256(__file__),unchanged_task_arrays_sha256=report['arrays_sha256'])
+    write_json(work/'plan.json',report)
+    from .plan_reach import validate
+    validate(object_name)
+    return report
+
+
+if __name__=='__main__':
+    import argparse
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--object',default='B')
+    parser.add_argument('--output-root',type=Path,default=DEFAULT_OUTPUT)
+    args=parser.parse_args();refresh(args.object,args.output_root)

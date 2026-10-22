@@ -26,7 +26,7 @@ import trimesh
 import manifold3d as md
 
 from robots_config.constraints import load_config
-from whole_task_2.step1.common import ROOT, DEFAULT_OUTPUT, load_shape, sha256, write_json
+from whole_task_2.step1.common import ROOT, DEFAULT_OUTPUT, load_shape, object_of, sha256, write_json
 from whole_task_2.step1.arm import Check
 from whole_task_2.common.poses import spin_pose
 from whole_task_2.common.wrenches import resolve_policy
@@ -189,7 +189,50 @@ def turned(record, source, setup, angle):
         code, Q = arm.pair(f, axis, P, previous)
         if code: return None
         joints.append(Q); previous = Q[-1]
-    return dict(record, pose=P, joints=np.asarray(joints).reshape(-1, 4, 7), angle_deg=angle)
+    return dict(record, pose=P, joints=np.asarray(joints).reshape(len(joints), 4, -1), angle_deg=angle)
+
+
+def row_axis(setup):
+    """The row's direction on the table: across the arm's reach (horizontal, perpendicular to base -> work
+    point), so the row of fixtures and its plate pass beside the work window, never into the base."""
+    u = np.subtract(setup['work_point_m'], setup.get('base_position_world_m', (0., 0., 0.)))[:2]
+    u = u/np.linalg.norm(u); return np.array([-u[1], u[0], 0.])
+
+
+def row(model, q, shells, gaps):
+    """Every fixture's place in the row: (placed membrane, its world -> plate translation, foot top, foot
+    footprint).  gaps[i]: room added between fixtures i and i+1 beyond row_gap_m."""
+    p = model.policy; h = p['plate_thickness_m']; t = p['mold_outward_displacement_m']
+    clear = 1.1*model.setup['needle_radius_m']; rows = []; left = 0.
+    e = row_axis(model.setup); across = np.array([-e[1], e[0], 0.])
+    for i, shell in enumerate(shells):
+        # The row keeps every object's whole exit (it rises from the object) clear of its neighbours:
+        # the range along the row of the membrane, the object and the object at the end of a full exit.
+        body = moved_mesh(model.source, q.poses[i]).vertices; reach = 4*float(np.linalg.norm(model.source.extents))
+        X = np.r_[shell.vertices@e, body@e, (body+reach*q.exits[i])@e]
+        shift = (left-X.min())*e+[0., 0., h-shell.bounds[0, 2]]
+        placed = shell.copy(); placed.apply_translation(shift); left = X.max()+shift@e+p['row_gap_m']+gaps[i]
+        top = min(h+t, body[:, 2].min()+shift[2]-clear)
+        V = placed.vertices[placed.vertices[:, 2] <= top]
+        if top <= h or len(V) < 3: raise ValueError(model.ids[i]+': no membrane below the object to stand on')
+        # The support slides freely on the table, so every foot is centred on one line along the row.
+        dy = -((V@across).min()+(V@across).max())/2; shift += dy*across; placed.apply_translation(dy*across); V = V+dy*across
+        rows.append((placed, shift, top, V))
+    return rows
+
+
+def arm_meets_neighbour(model, rows):
+    """The first (task, fixture) whose work arm, at any of the task's certified joints, meets that other
+    fixture's membrane in the row (None: every arm is clear of its neighbours)."""
+    check = None
+    for i, record in enumerate(model.records):
+        for j, (placed, _, _, _) in enumerate(rows):
+            if j == i: continue
+            world = placed.copy(); world.apply_translation(-rows[i][1])
+            if check is None: check = Check(world, model.setup)
+            check.mesh = world; check.placed = {}
+            if any(check.hits(Q, np.eye(4)) for Q in np.asarray(record['joints']).reshape(-1, check.arm.dof)): return i, j
+    return None
 
 
 def connected(model, q, shells):
@@ -197,40 +240,40 @@ def connected(model, q, shells):
 
     The work arm rises and falls, so a fixture simply drops until its membrane's lowest point
     rests on the plate; the whole support slides on the table to bring a seat to the station, so
-    the fixtures stand in a row along x, row_gap_m apart, their feet on one line.  Under each
-    membrane a foot -- an upright post over the footprint of the membrane's lowest part, from the
+    the fixtures stand in a row along row_axis (across the arm's reach), row_gap_m apart, their feet
+    on one line.  Where a task's work arm still meets a neighbouring membrane, the gap on that side
+    widens by row_gap_m until every arm is clear (arm_meets_neighbour).
+    Under each membrane a foot -- an upright post over the footprint of the membrane's lowest part, from the
     floor up into the membrane -- joins it to the plate.  The foot ends a needle radius below the object, and the
     tool keep-out and the exit both rise from the object, so it meets none of them.  The plate
     is the convex hull of the feet's footprints widened by plate_edge_margin_m, plate_thickness_m
     thick.  Returns the joined mesh and every installation's translation (its world -> plate frame).
     """
-    p = model.policy; h = p['plate_thickness_m']; t = p['mold_outward_displacement_m']
-    clear = 1.1*model.setup['needle_radius_m']
-    pieces = []; prints = []; shifts = []; tops = []; left = 0.
-    for i, shell in enumerate(shells):
-        # The row keeps every object's whole exit (it rises from the object) clear of its neighbours:
-        # the x range of the membrane, the object and the object at the end of a full exit.
-        body = moved_mesh(model.source, q.poses[i]).vertices; reach = 4*float(np.linalg.norm(model.source.extents))
-        X = np.r_[shell.vertices[:, 0], body[:, 0], body[:, 0]+reach*q.exits[i][0]]
-        shift = np.array([left-X.min(), 0., h-shell.bounds[0, 2]]); shifts.append(shift)
-        placed = shell.copy(); placed.apply_translation(shift); left = X.max()+shift[0]+p['row_gap_m']
-        top = min(h+t, body[:, 2].min()+shift[2]-clear)
-        V = placed.vertices[placed.vertices[:, 2] <= top]
-        if top <= h or len(V) < 3: raise ValueError(model.ids[i]+': no membrane below the object to stand on')
-        # The support slides freely on the table, so every foot is centred on one line, y = 0.
-        dy = -(V[:, 1].min()+V[:, 1].max())/2; shift[1] = dy; placed.apply_translation([0., dy, 0.]); V = V+[0., dy, 0.]
+    p = model.policy; h = p['plate_thickness_m']
+    gaps = np.zeros(len(shells))
+    for _ in range(64):
+        rows = row(model, q, shells, gaps); hit = arm_meets_neighbour(model, rows)
+        if hit is None: break
+        i, j = hit; gaps[i if j > i else i-1] += p['row_gap_m']
+    else: raise ValueError('The work arms still meet neighbouring fixtures in the row')
+    model.connected_gaps = gaps
+    pieces = []; prints = []; shifts = []; tops = []
+    for placed, shift, top, V in rows:
         # The foot: an upright post over the footprint of that part, from the floor to `top`.
         pieces += [G.solid(placed), md.Manifold.hull_points(np.vstack([np.c_[V[:, :2], np.zeros(len(V))], np.c_[V[:, :2], np.full(len(V), top)]])/G.SCALE)]
-        prints.append(V[:, :2]); tops.append(top)
+        prints.append(V[:, :2]); tops.append(top); shifts.append(shift)
     ring = disc(np.array([0., 0., 1.]), p['plate_edge_margin_m'], 16)[:, :2]
     F = (np.vstack(prints)[:, None]+ring[None]).reshape(-1, 2)
     pieces.append(md.Manifold.hull_points(np.vstack([np.c_[F, np.zeros(len(F))], np.c_[F, np.full(len(F), h)]])/G.SCALE))
     value = G.union(pieces); forbidden = []
     for i, shift in enumerate(shifts):
         M = np.eye(4); M[:3,3] = shift; P = M@q.poses[i]
-        forbidden.extend([G.solid(moved_mesh(model.source,P)), G.solid(moved_mesh(model.tool(i),P))])
+        body = moved_mesh(model.world_data(model.records[i], q.poses[i])['body_world'], M)
+        forbidden.extend([G.solid(body), G.solid(moved_mesh(model.tool(i),P))])
     # Joining and serializing can leave tiny tool intersections. Recut the same
     # exclusions, keeping a subset of the joined solid and the same tolerance.
+    # The body is placed exactly as prepare() places it for the audit: the membrane touches it, so a
+    # differently rounded copy leaves contact slivers above the tolerance.
     # The resulting whole base still undergoes all load, arm and exit audits.
     joined, conditioning = G.condition(value,forbidden,dict(p,maximum_conditioning_rounds=3),subset=value)
     model.connected_conditioning = conditioning
@@ -252,14 +295,14 @@ def joined_exits(model, q, shells, shifts, tops, separate, joined):
 
     The support is its own membrane, the other membranes, the feet and the plate.  Its own membrane
     is the one already certified on its own, moved rigidly; past that certificate's travel the object
-    is wholly above it.  Every other membrane, and its foot inside its footprint, lies outside the x
-    range the object sweeps.  The plate and its own foot end below the object, and the exit rises.
+    is wholly above it.  Every other membrane, and its foot inside its footprint, lies outside the range
+    along the row (row_axis) the object sweeps.  The plate and its own foot end below the object, and the exit rises.
     separate, joined: exit lengths of each task alone and in the joined support."""
-    rows = []; h = model.policy['plate_thickness_m']
+    rows = []; h = model.policy['plate_thickness_m']; e = row_axis(model.setup)
     for i, (shell, shift, d) in enumerate(zip(shells, shifts, q.exits)):
         body = moved_mesh(model.source, q.poses[i]).vertices+shift; low = body[:, 2].min()
-        x = np.r_[body[:, 0], body[:, 0]+joined[i]*d[0]]
-        gaps = [max(x.min()-(s.vertices[:, 0].max()+t[0]), (s.vertices[:, 0].min()+t[0])-x.max())
+        x = np.r_[body@e, (body+joined[i]*d)@e]
+        gaps = [max(x.min()-((s.vertices@e).max()+t@e), ((s.vertices@e).min()+t@e)-x.max())
                 for j, (s, t) in enumerate(zip(shells, shifts)) if j != i]
         own_top = shell.vertices[:, 2].max()+shift[2]
         row = dict(id=model.ids[i], exit_rises=bool(d[2] > 0), x_gap_to_other_membranes_m=float(min(gaps)),
@@ -315,8 +358,9 @@ def inputs_and_policy(object_name):
     policy = resolve_policy(policy, load_config(files[-1])); policy['task_count'] = len(records)
     if abs(policy['direction_half_angle_deg']-setup['max_tilt_deg']) > 1e-12:
         raise ValueError("The load cone must be Step1's tilt cone")
-    outer_path = ROOT/'whole_task_2/data'/object_name/'step3_mold_plate/fitted_outer.npz'
-    objects = [ROOT/'objects'/object_name/'mesh.stl', ROOT/'objects'/object_name/'meta.json']
+    # The fitted outer shell and the object belong to the object, whatever station a run (B+<config>) uses.
+    outer_path = ROOT/'whole_task_2/data'/object_of(object_name)/'step3_mold_plate/fitted_outer.npz'
+    objects = [ROOT/'objects'/object_of(object_name)/'mesh.stl', ROOT/'objects'/object_of(object_name)/'meta.json']
     inputs = {str(p): sha256(p) for p in [*files, *objects, *SOURCES, *(ROOT/p for p in PHYSICS_FILES)]}
     return plan, records, setup, policy, outer_path, inputs
 
@@ -325,7 +369,7 @@ def load_model(folder):
     """The model and layout from disk: tasks and tools rebuilt from Step1, poses and turned joints from Step3."""
     folder = Path(folder); report = json.loads((folder/'report.json').read_text())
     plan, records, setup, policy, outer_path, inputs = inputs_and_policy(report['object'])
-    source = load_shape(ROOT/'objects'/report['object']/'mesh.stl')
+    source = load_shape(ROOT/'objects'/object_of(report['object'])/'mesh.stl')
     if len(records) != len(report['tasks']):raise ValueError('Step3 task count differs from Step1')
     task_partition(report['tasks'], source)
     with np.load(folder/'initialization.npz') as z:
@@ -374,8 +418,8 @@ def run(output_root=DEFAULT_OUTPUT, object_name='B', workers=6):
     import multiprocessing
     began = time.monotonic(); output_root = Path(output_root).resolve()
     plan, records, setup, policy, outer_path, inputs = inputs_and_policy(object_name)
-    source = load_shape(ROOT/'objects'/object_name/'mesh.stl')
-    physical = json.loads((ROOT/'objects'/object_name/'meta.json').read_text())
+    source = load_shape(ROOT/'objects'/object_of(object_name)/'mesh.stl')
+    physical = json.loads((ROOT/'objects'/object_of(object_name)/'meta.json').read_text())
     if not outer_path.exists():
         outer = G.mesh(G.fitted_outer(source, policy['mold_outward_displacement_m']))
         outer_path.parent.mkdir(parents=True, exist_ok=True)
@@ -418,6 +462,7 @@ def run(output_root=DEFAULT_OUTPUT, object_name='B', workers=6):
             conditioning=model.connected_conditioning,
             plate_and_feet_cm3=float(joined.volume*1e6)-sum(r['volume_cm3'] for r in results),
             plate_thickness_m=policy['plate_thickness_m'], row_gap_m=policy['row_gap_m'], rule=policy['connected'],
+            row_axis=row_axis(setup).tolist(), gaps_widened_for_arms_m=model.connected_gaps.tolist(),
             arm_seconds=joint['arm_seconds']),
         seconds=time.monotonic()-began)
     write_json(folder/'report.json', report)

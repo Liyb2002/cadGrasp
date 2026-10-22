@@ -198,4 +198,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # Public execution uses the current bounded-translation model.
+    from .plan_reach import main as current_main
+    current_main()

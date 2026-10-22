@@ -6,6 +6,8 @@ from scipy.spatial.transform import Rotation
 from codes.simulation.kuka import description,ASSETS,visual_parts
 
 class Arm:
+    dof = 7
+
     def __init__(self,base,rotation,tool=.155):
         links, joints, limits = description()
         self.base = np.asarray(base).copy(); self.tool=tool
@@ -20,6 +22,18 @@ class Arm:
             mesh = trimesh.load(ASSETS / f'meshes/collision/link_{index}.stl', force='mesh')
             offset = np.fromstring(link.find('collision/origin').get('xyz'), sep=' ')
             self.collisions.append(mesh.vertices + offset)
+        self.seeds = [np.deg2rad([0, 55, 0, -95, 0, 90, 0]), np.deg2rad([0, 80, 90, 95, -90, 40, 0]),
+                      np.deg2rad([90, 70, 0, -95, 0, 90, 0])]
+        self.seeds += list(np.random.default_rng(17).uniform(self.lower*.7, self.upper*.7, (20, 7)))
+
+    def visuals(self):
+        """(transform index, vertices, faces, colour) of every visual mesh, in its link's frame."""
+        links, _, _ = description(); out = []
+        for i, link in enumerate(links):
+            offset = np.fromstring(link.find('visual/origin').get('xyz'), sep=' ')
+            for v, f, rgba in visual_parts(i):
+                out.append((i, v+offset, f, rgba[:3] if not (i in (2, 4) and np.allclose(rgba[:3], .2)) else np.full(3, .6)))
+        return out
 
     def forward(self, q, geometry=False):
         rotation, point = self.rotation.copy(), self.base.copy()
@@ -43,10 +57,7 @@ class Arm:
         target_axis = -np.asarray(outward)
         point = np.asarray(point)
         if previous is None:
-            seeds = [np.deg2rad([0, 55, 0, -95, 0, 90, 0]),
-                     np.deg2rad([0, 80, 90, 95, -90, 40, 0]),
-                     np.deg2rad([90, 70, 0, -95, 0, 90, 0])]
-            seeds += list(np.random.default_rng(17).uniform(self.lower*.7, self.upper*.7, (20,7)))
+            seeds = self.seeds
         else:
             seeds = [previous]
         best = None

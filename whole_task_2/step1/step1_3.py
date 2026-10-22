@@ -425,5 +425,7 @@ def main():
                           angular_budget=report["angular_budget"]), indent=2))
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    # Public execution uses the current bounded-translation model.
+    from .plan_reach import main as current_main
+    current_main()

@@ -1,25 +1,26 @@
-"""The arm behind the head: can the KUKA hold the needle on a face, without its body touching the object?
+"""The arm behind the head: can the work arm (KUKA or SO101) hold the needle on a face, without its body touching the object?
 
 reach.py certifies the needle and the head (everything within the head radius
 behind the needle).  Here the rest of the arm: for a (face, side) pair the
 object is placed as that side places it, and at each of the face's test points
-(three vertices and the centroid) the KUKA must
+(three vertices and the centroid) the work arm must
   - have an inverse-kinematics solution putting the tip there along the pair's
     certified needle axis, inside joint limits and above the floor (Arm.solve);
   - keep every link clear of the object: the convex hull of each link's collision
     mesh (a superset of the link) meets no object triangle.
 The triangle-hull test is exact: a vertex inside the hull is a hit, three vertices
 beyond one hull plane are clear, anything else is clipped against every plane.
-The arm is redundant, so a solution that touches the object is retried from the
-other seeds before the pair is refused.  Joint angles are kept so that validation
+A solution that touches the object is retried from the arm's other seeds before
+the pair is refused.  Joint angles are kept so that validation
 replays them with forward kinematics alone.
 """
 import numpy as np
 from scipy.spatial import ConvexHull, cKDTree
 
 from .reach import test_points, tip_contact
+from .workspace import points_inside_box
 
-OK, NO_IK, ARM_HITS, TABLE_HITS = 0, 1, 2, 3
+OK, NO_IK, ARM_HITS, TABLE_HITS, POINT_OUTSIDE_BOX = 0, 1, 2, 3, 4
 POSITION_TOL, AXIS_TOL = 1e-4, 1e-3          # Arm.solve's acceptance
 
 
@@ -40,10 +41,12 @@ def clipped(polygon, normals, offsets):
 
 class Check:
     def __init__(self, mesh, setup):
-        from .reach_video import kuka
-        self.mesh = mesh; self.arm = arm = kuka(setup); self.floor = float(setup['base_position_world_m'][2])-.001
+        from .reach_video import work_arm
+        self.mesh = mesh; self.arm = arm = work_arm(setup); self.floor = float(setup['base_position_world_m'][2])-.001
         self.table_bounds = np.asarray(setup['table_bounds_world_m']) if 'table_bounds_world_m' in setup else None
         self.table = None
+        bounds = setup['surface_workspace']['bounds_world_m'] if 'surface_workspace' in setup else None
+        self.work_bounds = np.asarray(bounds) if bounds is not None else None
         self.length=setup['needle_length_m'];self.needle_radius=setup['needle_radius_m'];self.head_radius=setup['head_radius_m']
         if self.table_bounds is not None:
             import trimesh
@@ -52,9 +55,7 @@ class Check:
         for v in arm.collisions:
             h = ConvexHull(v); c = v.mean(0)
             self.hulls.append((h.equations[:, :3], h.equations[:, 3], c, float(np.linalg.norm(v-c, axis=1).max())))
-        self.seeds = [np.deg2rad([0, 55, 0, -95, 0, 90, 0]), np.deg2rad([0, 80, 90, 95, -90, 40, 0]),
-                      np.deg2rad([90, 70, 0, -95, 0, 90, 0])]
-        self.seeds += list(np.random.default_rng(17).uniform(arm.lower*.7, arm.upper*.7, (20, 7)))
+        self.seeds = arm.seeds
         self.placed = {}
 
     def scene(self, W):
@@ -91,17 +92,23 @@ class Check:
 
     def solve(self, point, axis, W, previous):
         """Joints with the tip on point along axis and the body clear of the object (None: no IK, False: always hits)."""
+        bounds=getattr(self,'work_bounds',None)
+        if bounds is not None and not points_inside_box(point,bounds):return None
         found = False
         for seed in ([previous] if previous is not None else [])+self.seeds:
             try: q = self.arm.solve(point, -axis, seed)
             except ValueError: continue
             found = True
+            if bounds is not None:
+                tcp,_,_,_=self.arm.forward(q)
+                if not points_inside_box(tcp,bounds):continue
             if not self.hits(q, W): return q
         return False if found else None
 
     def pair(self, face, axis, W, previous=None):
-        """(code, joints (4, 7)) for one (face, side) pair; axis in object coordinates."""
-        P = test_points(self.mesh)[face]@W[:3, :3].T+W[:3, 3]; d = W[:3, :3]@axis; Q = np.zeros((4, 7))
+        """(code, joints (4, dof)) for one (face, side) pair; axis in object coordinates."""
+        P = test_points(self.mesh)[face]@W[:3, :3].T+W[:3, 3]; d = W[:3, :3]@axis; Q = np.zeros((4, self.arm.dof))
+        if self.work_bounds is not None and not points_inside_box(P,self.work_bounds).all():return POINT_OUTSIDE_BOX,Q
         if not self.tool_above_table(face,axis,W):return TABLE_HITS,Q
         for i, p in enumerate(P):
             q = self.solve(p, d, W, previous)
@@ -113,9 +120,11 @@ class Check:
     def replay(self, face, axis, W, Q):
         """Forward kinematics alone: every test point held along axis, within limits, above the floor, body clear."""
         P = test_points(self.mesh)[face]@W[:3, :3].T+W[:3, 3]; d = W[:3, :3]@axis
+        if self.work_bounds is not None and not points_inside_box(P,self.work_bounds).all():return False
         if not self.tool_above_table(face,axis,W):return False
         for p, q in zip(P, Q):
             tcp, z, _, _ = self.arm.forward(q)
+            if self.work_bounds is not None and not points_inside_box(tcp,self.work_bounds):return False
             if np.linalg.norm(tcp-p) > POSITION_TOL or np.linalg.norm(z-d) > AXIS_TOL: return False
             if np.any(q < self.arm.lower-1e-9) or np.any(q > self.arm.upper+1e-9): return False
             links = self.arm.forward(q, geometry=True)[2]

@@ -105,9 +105,7 @@ def validate(output_root=DEFAULT_OUTPUT, object_name='B'):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--object', default='B')
-    parser.add_argument('--output-root', type=Path, default=DEFAULT_OUTPUT)
-    args = parser.parse_args()
-    result = validate(args.output_root, args.object)
-    print(json.dumps({k: v for k, v in result.items() if k != 'working_areas'}, indent=2))
+    import sys
+    from .plan_reach import main as current_main
+    sys.argv.insert(1, '--validate-only')
+    current_main()

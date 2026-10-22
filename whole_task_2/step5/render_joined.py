@@ -14,7 +14,7 @@ from PIL import Image
 
 from whole_task_2.step1.common import ROOT, DEFAULT_OUTPUT
 from whole_task_2.step1.reach_render import contact
-from whole_task_2.step1.reach_video import STATION_VIEW, Scene, kuka
+from whole_task_2.step1.reach_video import STATION_VIEW, Scene, work_arm
 from whole_task_2.operations.geometry import moved_mesh
 from whole_task_2.step3.render_tool_membranes import camera, image
 from whole_task_2.step3.render_independent import BLUE
@@ -46,7 +46,7 @@ def use(model, q, support, k, size=620):
     world = moved_mesh(support, T@np.linalg.inv(q.material[k])); pose = T@P
     faces = np.asarray(r['certified_face_ids']); f = contact(model.source, faces, pose); j = int(np.flatnonzero(faces == f)[0])
     tip = model.source.triangles_center[f]@pose[:3, :3].T+pose[:3, 3]; axis = pose[:3, :3]@r['axes'][j]
-    links = matrices(kuka(model.setup).forward(r['joints'][j][3], geometry=True)[2])
+    links = matrices(work_arm(model.setup).forward(r['joints'][j][3], geometry=True)[2])
     scene = Scene(world, model.setup, size, size, arm=True)
     try:
         g = scene.r

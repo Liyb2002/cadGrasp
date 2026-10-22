@@ -169,7 +169,7 @@ def run(output_root=DEFAULT_OUTPUT,object_name='B',config_path=None,inset=.05):
     return plan
 
 
-if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--object',default='B');p.add_argument('--output-root',type=Path,default=DEFAULT_OUTPUT)
-    p.add_argument('--config',type=Path);p.add_argument('--inset',type=float,default=.05);a=p.parse_args()
-    run(a.output_root,a.object,a.config,a.inset)
+if __name__ == '__main__':
+    # Public execution uses the current bounded-translation model.
+    from .plan_reach import main as current_main
+    current_main()

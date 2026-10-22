@@ -1,2 +1,3 @@
 # Follow the repository-root source/Markdown allowlist.
 # Configuration, data and generated results stay local; do not re-include them here.
+# No exceptions for NPZ, JSON, MP4, GIF or PNG, including maintained inputs.

@@ -1,7 +1,7 @@
-"""One black head on the cropped arm; one 30%-opacity head at the bunny's rump.
+"""Two needle contacts on the processable region's 3D boundary.
 
 The whole head and needle move together. The gold cone shows the permitted
-orientation about the nominal axis; pink is the task. The camera frames the
+orientation about the nominal axis; pink is the angle/3D-box intersection. The camera frames the
 object and tool poses, leaving most of the real arm outside the image.
 """
 import json
@@ -13,7 +13,9 @@ from PIL import Image
 from .common import ROOT, load_shape, sha256, write_json
 from .reach import frame
 from .arm import Check
-from .reach_video import Scene, tool_frame, GOLD, kuka
+from .reach_video import Scene, tool_frame, GOLD, work_arm
+from .workspace import box_edges
+from .task_boundary import boundary_loops,candidate_region
 
 VIEW = np.array([1., .65, .55]); VIEW /= np.linalg.norm(VIEW)
 CONE_OPACITY = .50
@@ -21,6 +23,7 @@ POSE_INDEX = 0
 OUTLINE_COLOR = (.28, .07, .17)
 OUTLINE_WIDTH_PX = 2.
 OUTLINE_OFFSET_M = .00005
+WORKSPACE_COLOR = (.08, .48, .62)
 
 
 def task_outline(mesh, mask, W):
@@ -75,6 +78,14 @@ def tube(start, end, radius, end_radius=None):
 
 def tubes(segments, radius):
     return combine([tube(a, b, radius) for a, b in segments if np.linalg.norm(np.asarray(b)-a) > 1e-9])
+
+
+def workspace_box(scene, setup, shift=(0.,0.,0.)):
+    """Draw twelve true 3D edges, with the object occluding the rear edges."""
+    edges=box_edges(setup['surface_workspace']['bounds_world_m'],shift)
+    points=np.asarray(edges).reshape(-1,3)
+    scene.workspace_wireframe=(points,WORKSPACE_COLOR) if len(points) else None      # none: an unbounded work arm
+    return [],points
 
 
 def cone(root, axis, length, angle, ribs=8):
@@ -147,11 +158,12 @@ def picture(scene, W, colors, shapes, points, links, ghost, opacity,cones=None,s
 
 
 def select_contacts(mesh, arrays, j, W, length=.1):
-    """The black head high on the bunny; one certified tilted contact on the rump."""
-    can = arrays['reach'][:, j]&arrays['task_reach'][:, j]; d = arrays['area_axes'][j]
+    """Two certified contacts on the actual 3D task boundary, high and low."""
+    can = candidate_region(arrays,j); d = arrays['area_axes'][j]
     tilt = np.degrees(np.arccos(np.clip(arrays['reach_axis'][:, j]@d, -1, 1)))
-    ids = np.flatnonzero(can)
-    C = mesh.triangles_center[ids]@W[:3, :3].T+W[:3, 3]
+    loop=boundary_loops(mesh,can)[0];ids=loop['face_ids']
+    boundary_points=mesh.vertices[loop['vertex_ids'][:-1]]
+    C = boundary_points@W[:3, :3].T+W[:3, 3]
     axes = arrays['reach_axis'][ids, j]@W[:3, :3].T
     right = np.cross([0,0,1],VIEW); right /= np.linalg.norm(right); up = np.cross(VIEW,right)
     head_centers = C-(.5*.07+length)*axes
@@ -164,7 +176,7 @@ def select_contacts(mesh, arrays, j, W, length=.1):
     chosen = [int(np.argmin(cost))]
     # Display landmark only: the bunny is Y-up, its hindquarters towards +X.
     aim=mesh.bounds[0]+mesh.extents*np.array([.88,.34,.48])
-    score=np.linalg.norm(mesh.triangles_center[ids]-aim,axis=1)
+    score=np.linalg.norm(boundary_points-aim,axis=1)
     valid=(tilt[ids]>=9.)&(tilt[ids]<=20.);valid[chosen[0]]=False
     if not valid.any():valid=np.arange(len(ids))!=chosen[0]
     score[~valid]=np.inf;chosen.append(int(np.argmin(score)))
@@ -186,19 +198,23 @@ def render(object_name='B', output=ROOT/'whole_task_2/idea/find_tasks.png', heig
     for f, _, _ in contacts:
         if not checker.replay(f, arrays['reach_axis'][f,j], actual, arrays['joints'][f,j]):
             raise ValueError(f'Pose1 contact {f} no longer matches its certified witness')
-    arm = kuka(s); black_face = contacts[0][0]; q = arrays['joints'][black_face,j,3]
+    arm = work_arm(s); black_face,black_tip,black_axis = contacts[0]
+    q=checker.solve(black_tip+world_center,black_axis,actual,arrays['joints'][black_face,j,3])
+    if q is None or q is False:raise ValueError('Arm cannot hold the boundary contact')
     tcp, _, transforms = arm.forward(q,geometry=True)
     links = np.repeat(np.eye(4)[None],len(transforms),axis=0)
     for M,(rotation,point) in zip(links,transforms):M[:3,:3]=rotation;M[:3,3]=point-world_center
     assert np.linalg.norm(tcp-world_center-contacts[0][1]) < 1e-4
     scene = Scene(mesh, s, int(height*1.1), height, arm=True); r = scene.r
     scene.view = VIEW.copy()
-    colors = np.tile(r.GRAY, (len(mesh.faces), 1)); colors[arrays['task_reach'][:, j]] = r.PINK
-    outline = task_outline(mesh, arrays['task_reach'][:, j], W)
+    region=candidate_region(arrays,j)
+    colors = np.tile(r.GRAY, (len(mesh.faces), 1)); colors[region] = r.PINK
+    outline = task_outline(mesh, region, W)
     def shape(geometry, color, metal=.1):
         return r.Shape(scene.ctx, scene.shader, *geometry, color, metallic=metal, roughness=.5)
     try:
-        shapes = tabletop(scene, s, world_center); ghost = []; cones = []; fit = list(T)
+        box,box_points=workspace_box(scene,s,world_center)
+        shapes = tabletop(scene, s, world_center)+box; ghost = []; cones = []; fit = list(T)+list(box_points)
         for k, (f, tip, d) in enumerate(contacts):
             parts = [(part,tool_frame(tip,d)) for part in scene.tools[False]]
             if k==0:shapes+=parts
@@ -221,20 +237,26 @@ def render(object_name='B', output=ROOT/'whole_task_2/idea/find_tasks.png', heig
                   task=report['areas'][j]['id'],pose_number=1,pose_index=j,
                   placement=report['areas'][j]['placement'],table_height_m=s['table_height_m'],
                   width=result.width,height=result.height,needle_length_m=L, max_tilt_deg=beta,
-                  layout='one black head and one transparent head on the rump',
-                  head_opacities=[1.,.30],ghost_location='rump',cone_styles=['dashed','dashed'],cone_opacities=[CONE_OPACITY,CONE_OPACITY],
+                  layout='black head and transparent head at two actual 3D task-boundary contacts',
+                  head_opacities=[1.,.30],ghost_location='task boundary',cone_styles=['dashed','dashed'],cone_opacities=[CONE_OPACITY,CONE_OPACITY],
                   cone='one direction cone at each moving head root, opening along the nominal needle axis',
                   motion='entire heads and needles translate and rotate together within max_tilt_deg',
                   arm='only the black head uses the real arm; arm excluded from camera fitting',
                   arm_cropped_vertex_fraction=arm_cropped_fraction,
                   black_head_joints=q.tolist(),
-                  surface='pose1 cleaned task_reach: small detached islands removed and enclosed pockets assigned',
+                  surface='pose1 candidate region: angle reachable surface intersect 3D work box',
+                  candidate_face_count=int(region.sum()),
+                  candidate_area_fraction_of_target=float(mesh.area_faces[region].sum()/mesh.area_faces[arrays['target']].sum()),
+                  downstream_tasks='exclusive face_task partition unchanged',
+                  surface_workspace=s['surface_workspace'],workspace_box_color=list(WORKSPACE_COLOR),
+                  workspace_box_edges=12,surface_contact_points_inside_box=True,
+                  workspace_rendering='3D inward surface workspace; depth-tested edges, rear edges occluded by the object; reference object AABB hidden',
                   task_outline=dict(color_rgb=OUTLINE_COLOR,width_px=OUTLINE_WIDTH_PX,
                                     boundary_edges=sum(len(points)//2 for points,_ in outline),
                                     vertex_normal_offset_m=OUTLINE_OFFSET_M,visible_surfaces_only=True),
-                  task_area_fraction_of_target=report['areas'][j]['task_area_fraction_of_target'],
+                  task_area_fraction_of_target=report['areas'][j]['area_fraction_of_target'],
                   contact_face_ids=[f for f, _, _ in contacts],
-                  contacts_in_cleaned_task_and_certified_reach=True,
+                  contacts_in_displayed_certified_candidate_region=True,
                   contact_axes_world=[d.tolist() for _, _, d in contacts],
                   axis_provenance=['stored pose1 Step1 arm witness']*len(contacts),
                   tilts_deg=np.degrees(np.arccos(np.clip(np.asarray([d for _,_,d in contacts])@a,-1,1))).tolist())

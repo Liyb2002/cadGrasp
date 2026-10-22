@@ -32,7 +32,7 @@ from scipy.spatial.transform import Rotation, Slerp
 from whole_task_2.step1.common import ROOT, DEFAULT_OUTPUT, sha256, write_json
 from whole_task_2.step1.arm import clipped
 from whole_task_2.step1.reach import tip_contact
-from whole_task_2.step1.reach_video import STATION_VIEW, LIGHT, Scene, kuka, tool_frame, slerp, ease
+from whole_task_2.step1.reach_video import STATION_VIEW, LIGHT, Scene, work_arm, tool_frame, slerp, ease
 from whole_task_2.operations.geometry import moved_mesh
 from whole_task_2.step3 import independent_geometry as G
 from whole_task_2.step3.render_independent import BLUE
@@ -137,7 +137,7 @@ class Plan:
     def __init__(self, model, q, support, report, policy):
         self.model, self.layout, self.support, self.policy = model, q, support, policy
         self.source = model.source; self.D = float(np.linalg.norm(self.source.extents)); self.fps = policy['fps']
-        self.arm = kuka(model.setup); self.L = model.setup['needle_length_m']; H = self.L+.07
+        self.arm = work_arm(model.setup); self.L = model.setup['needle_length_m']; H = self.L+.07
         self.speed = policy['speed_fraction']*self.arm.velocity/self.fps        # per joint, per frame
         self.links = pieces(self.arm.collisions)
         s = policy['prism_sides']; self.r = model.setup['needle_radius_m']; self.needles = {}

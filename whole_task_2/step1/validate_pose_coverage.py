@@ -297,5 +297,8 @@ def main():
                           maxima=result["maxima"], examples=result["examples"]), indent=2))
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    import sys
+    from .plan_reach import main as current_main
+    sys.argv.insert(1, '--validate-only')
+    current_main()

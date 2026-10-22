@@ -20,6 +20,10 @@ The keep-out covers the arm where Step1 certified it, painting each face; moves 
 painting points are not certified there and not covered here.  Final acceptance keeps the
 exact test of step1.arm at the stored joints; the keep-out lets construction, the ground
 oracle and feet avoid the arm without it.
+
+A later step reads the saved keep-outs (load) if the saved files of the earlier steps they were built
+from are unchanged: each step reruns from the files of the one before it, whatever code built them.  The
+keep-out's own cache and its disk replay (validate) also bind its code.
 """
 import argparse
 import hashlib
@@ -32,7 +36,7 @@ import manifold3d as md
 from scipy.spatial import ConvexHull
 
 from whole_task_2.step1.common import ROOT, sha256, write_json
-from whole_task_2.step1.reach_video import kuka
+from whole_task_2.step1.reach_video import work_arm
 from whole_task_2.step3 import independent_geometry as G
 from whole_task_2.step3.tool_membranes import load_model, stem, task_partition
 
@@ -40,7 +44,8 @@ HERE = Path(__file__).parent
 POLICY = dict(cell_fraction=.12, containment_tolerance_m=2e-6)
 TOLERANCE = 1e-10                 # m^3, the Boolean volume tolerance of Step3
 SOURCES = [Path(__file__), ROOT/'whole_task_2/step3/tool_keepout.py', ROOT/'whole_task_2/step3/tool_membranes.py',
-           ROOT/'whole_task_2/step1/arm.py', ROOT/'whole_task_2/step5/video/kuka.py']
+           ROOT/'whole_task_2/step1/arm.py', ROOT/'whole_task_2/step5/video/kuka.py',
+           ROOT/'whole_task_2/step5/video/so101.py', ROOT/'whole_task_2/step1/reach_video.py']
 
 
 def folders(object_name):
@@ -48,18 +53,23 @@ def folders(object_name):
     return data/'step3_tool_membranes', data/'step4_keepout'
 
 
-def signature(object_name):
-    """Every input the keep-out depends on: Step3's tasks, poses and joints, Step1's plan, the code, the policy."""
+def data_inputs(object_name):
+    """The saved files of earlier steps the keep-out is built from: Step3's tasks, poses and joints, Step1's plan."""
     source, _ = folders(object_name)
-    files = [source/'report.json', source/'initialization.npz', ROOT/'whole_task_2/data'/object_name/'step1_reach/plan.npz', *SOURCES]
-    inputs = {str(p.relative_to(ROOT)): sha256(p) for p in files}
+    files = [source/'report.json', source/'initialization.npz', ROOT/'whole_task_2/data'/object_name/'step1_reach/plan.npz']
+    return {str(p.relative_to(ROOT)): sha256(p) for p in files}
+
+
+def signature(object_name):
+    """Every input the keep-out depends on: the data inputs, the code, the policy."""
+    inputs = dict(data_inputs(object_name), **{str(p.relative_to(ROOT)): sha256(p) for p in SOURCES})
     key = hashlib.sha256(json.dumps(dict(inputs=inputs, policy=POLICY), sort_keys=True).encode()).hexdigest()
     return inputs, key
 
 
 def link_points(model, r):
     """Per link, its collision hull's vertices at every stored configuration of record r: (faces, 4, n, 3), object frame."""
-    arm = kuka(model.setup); inverse = np.linalg.inv(r['pose'])
+    arm = work_arm(model.setup); inverse = np.linalg.inv(r['pose'])
     hulls = [v[ConvexHull(v).vertices] for v in arm.collisions]
     out = [np.empty((len(r['joints']), 4, len(h), 3)) for h in hulls]
     for f, Q in enumerate(r['joints']):
@@ -170,9 +180,10 @@ def run(object_name='B', workers=6):
 
 
 def load(object_name='B'):
-    """{task id: (tool, arm, keepout) trimeshes, object frame}, refusing a keep-out built from other inputs."""
+    """{task id: (tool, arm, keepout) trimeshes, object frame}, refusing a keep-out built from other data."""
     _, folder = folders(object_name); report = json.loads((folder/'report.json').read_text())
-    if report['signature'] != signature(object_name)[1]: raise ValueError('Keep-out inputs changed; rerun whole_task_2.step4.keepout')
+    if any(report['input_sha256'].get(p) != d for p, d in data_inputs(object_name).items()):
+        raise ValueError('Keep-out data inputs changed; rerun whole_task_2.step4.keepout')
     out = {}
     for t in report['tasks']:
         path = folder/t['file']

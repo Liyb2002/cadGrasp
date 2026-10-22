@@ -1,6 +1,71 @@
 """Station geometry: six axis-aligned object placements on one horizontal tabletop."""
 import numpy as np
+from itertools import product
 from scipy.spatial.transform import Rotation
+
+
+UNSET=object()
+
+
+def surface_workspace(mesh, reference_pose, size_fraction=.5, base_position_world=(0.,0.,0.), edge=UNSET):
+    """A surface work cube extending inward from the robot-facing object AABB face.
+
+    Every side is `edge` (the work arm's bbx, from robots_config; None: unbounded, bounds None), or else
+    size_fraction of the longest reference object AABB side.  The two adjoining faces share their centre.
+    Only the work box is rendered; both its size and placement stay fixed when later object poses change.
+    """
+    rotation=np.asarray(reference_pose['rotation_world_object'],float)
+    shift=np.asarray(reference_pose['translation_world_m'],float)
+    vertices=mesh.vertices@rotation.T+shift
+    reference=np.array([vertices.min(axis=0),vertices.max(axis=0)])
+    size=reference[1]-reference[0]
+    if edge is UNSET:
+        if not np.isfinite(size_fraction) or size_fraction <= 0:
+            raise ValueError('Workspace size fraction must be finite and positive')
+        edge=float(size_fraction*size.max());rule='cube edge is size_fraction times the longest reference object AABB edge'
+    elif edge is None:rule='unbounded: the robots_config work arm has no bbx'
+    else:
+        if not np.isfinite(edge) or edge <= 0:raise ValueError('Workspace edge must be finite and positive')
+        edge=float(edge);size_fraction=None;rule='cube edge from robots_config (the work arm bbx)'
+    if edge is None:size_fraction=None
+    work_size=np.full(3,edge if edge is not None else np.nan);center=reference.mean(axis=0)
+    face_centers=np.repeat(center[None],6,axis=0)
+    for axis in range(3):
+        face_centers[2*axis,axis]=reference[0,axis]
+        face_centers[2*axis+1,axis]=reference[1,axis]
+    nearest=int(np.linalg.norm(face_centers-np.asarray(base_position_world,float),axis=1).argmin())
+    axis=nearest//2;sign=1 if nearest%2 else -1;shared=face_centers[nearest]
+    work_center=shared.copy();work_center[axis]-=sign*work_size[axis]/2
+    bounds=np.array([work_center-work_size/2,work_center+work_size/2]) if edge is not None else None
+    return dict(frame='world',shape='cube' if edge is not None else 'unbounded',applies_to='surface_process_point',reference_pose='+X',
+                rule=rule+'; the robot-facing faces share their centre; extend toward the object interior and remain fixed for every task; do not clip cube dimensions to the object AABB',
+                object_extents_m=mesh.extents.tolist(),object_aabb_size_world_m=size.tolist(),
+                size_fraction=None if size_fraction is None else float(size_fraction),cube_edge_m=edge,
+                workspace_size_world_m=work_size.tolist() if edge is not None else None,
+                robot_base_position_world_m=np.asarray(base_position_world,float).tolist(),
+                adjoining_axis='xyz'[axis],adjoining_sign=sign,
+                shared_face_center_world_m=shared.tolist(),workspace_center_world_m=work_center.tolist() if edge is not None else None,
+                reference_object_bounds_world_m=reference.tolist(),bounds_world_m=bounds.tolist() if edge is not None else None,
+                xyz_ranges_world_m={axis:bounds[:,i].tolist() for i,axis in enumerate('xyz')} if edge is not None else None)
+
+
+def points_inside_box(points, bounds, tolerance=1e-9):
+    """Test surface/process points directly; tool length and head position do not enter.  bounds None: an
+    unbounded work arm, every finite point is inside."""
+    points=np.asarray(points,float)
+    if bounds is None or np.asarray(bounds,dtype=object).ndim==0:return np.isfinite(points).all(axis=-1)
+    bounds=np.asarray(bounds,float)
+    return np.isfinite(points).all(axis=-1)&((points>=bounds[0]-tolerance)&(points<=bounds[1]+tolerance)).all(axis=-1)
+
+
+def box_edges(bounds, shift=(0.,0.,0.)):
+    """Twelve box edges in world coordinates, or translated render coordinates (none: unbounded)."""
+    if bounds is None:return []
+    bounds=np.asarray(bounds,float)-np.asarray(shift,float)
+    keys=list(product((0,1),repeat=3))
+    points={key:np.array([bounds[key[i],i] for i in range(3)]) for key in keys}
+    return [(points[a],points[b]) for i,a in enumerate(keys) for b in keys[i+1:]
+            if sum(x!=y for x,y in zip(a,b))==1]
 
 
 def tabletop_placements(mesh, views, setup):

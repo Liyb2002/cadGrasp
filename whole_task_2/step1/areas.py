@@ -164,7 +164,7 @@ def corridor(surface,label,reach,k,piece,target,area):
     return False
 
 
-def areas(mesh,ids,tilt,axes,beta,kappa,small_piece=.01):
+def areas(mesh,ids,tilt,axes,beta,kappa,small_piece=.01,strict_reach=False):
     """A non-overlapping split of the target faces ids among the given directions.
 
     tilt: (faces, directions) certified needle tilt in radians (inf: that direction cannot paint the face).
@@ -177,6 +177,11 @@ def areas(mesh,ids,tilt,axes,beta,kappa,small_piece=.01):
     cut,_=model.solve(D,D.argmin(1));label=np.full(F,-1);label[covered]=cut
     perimeter=np.zeros(F);perimeter[covered]=model.perimeter
     label=smooth(surface,covered,label,reach,cost,kappa*perimeter)
+    if strict_reach:
+        if not np.all(reach[covered,label[covered]]):raise ValueError('Task assignment left certified reach')
+        return label,dict(pieces_absorbed=0,pieces_joined_by_corridor=0,small_pieces_dropped=0,
+                          enclosed_face_ids=[],small_piece_fraction=small_piece,strict_reach=True,
+                          pieces=[len(surface.pieces(label==k)) for k in range(len(axes))])
     small=small_piece*area[ids].sum()
     filled=fill_enclosed(surface,ids,label,area,small)
     dropped=drop_small(surface,ids,label,area,small)

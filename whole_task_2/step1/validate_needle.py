@@ -103,6 +103,8 @@ def validate(output_root=DEFAULT_OUTPUT,object_name='B'):
     return dict(common,working_area_count=len(summaries),candidate_count=three['candidate_count'])
 
 
-if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--object',default='B');p.add_argument('--output-root',type=Path,default=DEFAULT_OUTPUT)
-    a=p.parse_args();validate(a.output_root,a.object)
+if __name__ == '__main__':
+    import sys
+    from .plan_reach import main as current_main
+    sys.argv.insert(1, '--validate-only')
+    current_main()

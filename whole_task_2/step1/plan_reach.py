@@ -1,5 +1,12 @@
 """Coverage of six axis-aligned tabletop object poses at a fixed robot station.
 
+Everything about the station comes from its robots_config file: the robot model (KUKA LBR Med 14 or
+SO101), the nominal needle direction and its tilt cone, the work-arm bbx (the surface work cube's edge;
+null: unbounded), the base pose, the table and how far the work point may be searched.  A run named
+<object>+<config> (e.g. B+01_kuka) reads robots_config/random/<config>.json and keeps its data and
+figures under that name; the plain object name keeps the original KUKA station (04_kuka_lbr_med14_r820),
+whose cube edge is still half the longest object edge.
+
 Each named object side faces the robot horizontally; the object rests on one
 table instead of tilting to match the slanted needle. Needle axes are searched
 within the fixed world cone, with exact tool, object, table and arm checks.
@@ -13,11 +20,11 @@ from pathlib import Path
 
 import numpy as np
 from robots_config.constraints import load_config
-from .common import ROOT,DEFAULT_OUTPUT,load_shape,sha256,write_json
+from .common import ROOT,DEFAULT_OUTPUT,load_shape,object_of,sha256,write_json
 from . import reach as R
 from . import arm as A
-from .areas import SIDES,VIEWS,areas,task_regions,Surface,fill_enclosed,drop_small
-from .workspace import tabletop_placements
+from .areas import SIDES,VIEWS,areas,Surface
+from .workspace import tabletop_placements,surface_workspace,points_inside_box
 
 HERE=Path(__file__).parent
 POLICY=HERE/'reach_policy.json'
@@ -61,10 +68,25 @@ def _certify(job):
     return face,None,None,None,None,failed
 
 
+def config_file(object_name,config_path=None):
+    """The station's robots_config file: given, or named by the run (<object>+<config>), or the original KUKA."""
+    if config_path:return Path(config_path).resolve()
+    if '+' in object_name:return ROOT/'robots_config/random'/(object_name.split('+',1)[1]+'.json')
+    return ROOT/'robots_config/04_kuka_lbr_med14_r820.json'
+
+
+def workspace_box(mesh,reference,s,policy):
+    """The surface work cube: its edge from the config (None: unbounded), else half the longest object edge."""
+    if 'workspace_edge_m' in s:
+        box=surface_workspace(mesh,reference,s.get('base_position_world_m',[0.,0.,0.]),edge=s['workspace_edge_m'])
+    else:box=surface_workspace(mesh,reference,s.get('base_position_world_m',[0.,0.,0.]),size_fraction=policy['surface_workspace_size_fraction'])
+    return dict(box,robot=s.get('robot','unspecified'))
+
+
 def setup(object_name='B',config_path=None,target_path=None):
     tool=json.loads((HERE/'needle_workspace.json').read_text())
-    config=load_config(config_path or ROOT/'robots_config/04_kuka_lbr_med14_r820.json')
-    shape=ROOT/'objects'/object_name/'mesh.stl';mesh=load_shape(shape)
+    path=config_file(object_name,config_path);config=load_config(path)
+    shape=ROOT/'objects'/object_of(object_name)/'mesh.stl';mesh=load_shape(shape)
     target=np.ones(len(mesh.faces),bool)
     if target_path:
         target[:]=False;target[json.loads(Path(target_path).read_text())['face_ids']]=True
@@ -77,8 +99,11 @@ def setup(object_name='B',config_path=None,target_path=None):
         work_window_center_m=cube['center_m'],
         base_position_world_m=list(map(float,base['position_m'])),base_rotation_world=base['rotation_matrix'],
         working_direction_world=(w/np.linalg.norm(w)).tolist(),robot=config['id'],robot_name=config['name'],
+        robot_model=config.get('robot_model','kuka_lbr_med14_r820'),config_file=str(path.relative_to(ROOT)),
         target='user_faces:'+str(target_path) if target_path else 'whole_surface',
-        tool_source=tool['length_source']['title'])
+        tool_source=tool['length_source']['title'],
+        **({'workspace_edge_m':task['surface_workspace']['edge_m']} if 'surface_workspace' in task else {}),
+        **{k:config['feasibility'][k] for k in ('table_half_size_m','work_point_search') if k in config['feasibility']})
 
 
 def screen(mesh,shape,s,policy,work):
@@ -89,9 +114,13 @@ def screen(mesh,shape,s,policy,work):
         radius=s['head_radius_m'],needle_radius=s['needle_radius_m'],incidence=s['max_incidence_deg'],axes=len(axes),
         pixel=pixel,samples=samples),sort_keys=True)
     cache=work/'screen.npz'
-    if cache.exists():
-        with np.load(cache) as z:
-            if str(z['key'])==key:return axes,z['reach'].copy(),pixel
+    # The screen depends on the object and the tool alone: a run of another station may share it.
+    for path in (cache,ROOT/'whole_task_2/data'/work.parent.name.split('+')[0]/'step1_reach/screen.npz'):
+        if path.exists():
+            with np.load(path) as z:
+                if str(z['key'])==key:
+                    if path!=cache:np.savez_compressed(cache,key=key,reach=z['reach'],axes=z['axes'])
+                    return axes,z['reach'].copy(),pixel
     with ProcessPoolExecutor(policy['workers'],initializer=_init_screen,
             initargs=(str(shape),s['needle_length_m'],s['head_radius_m'],s['needle_radius_m'],pixel,samples,
                       s['max_incidence_deg'])) as pool:
@@ -117,9 +146,16 @@ def placed(mesh,directions,s):
 def certify_directions(pool,mesh,ids,axes,reach,directions,beta,s,eps,placements):
     """Certified tilt (faces, directions) in radians (inf: no axis within beta passes) and the axis used."""
     cosb=np.cos(np.radians(beta));C=axes@np.asarray(directions).T;jobs=[]
+    bounds=np.asarray(s['surface_workspace']['bounds_world_m']);inside_by_pose=[]
+    for placement in placements:
+        rot=np.asarray(placement['rotation_world_object']);shift=np.asarray(placement['translation_world_m'])
+        inside_by_pose.append(points_inside_box(R.test_points(mesh)@rot.T+shift,bounds).all(axis=1))
+    possible=np.zeros(len(mesh.faces),bool)
     for f in ids:
         for j in range(len(directions)):
+            if not inside_by_pose[j][f]:continue
             k=np.flatnonzero((C[:,j]>=cosb-1e-12)&reach[:,f])
+            if len(k):possible[f]=True
             if len(k):k=k[np.argsort(-C[k,j])];jobs.append((int(f),[(j,int(i),axes[i]) for i in k],
                 s['needle_length_m'],s['head_radius_m'],s['needle_radius_m'],eps,s['max_incidence_deg']))
     tilt=np.full((len(mesh.faces),len(directions)),np.inf);witness=np.zeros((len(mesh.faces),len(directions),3))
@@ -128,7 +164,8 @@ def certify_directions(pool,mesh,ids,axes,reach,directions,beta,s,eps,placements
         rejected+=len(failed)
         if j is not None:tilt[face,j]=np.arccos(min(C[k,j],1.));witness[face,j]=axes[k];gaps[face,j]=(needle,head)
     # The arm behind the head, for every pair the needle and head pass.
-    joints=np.zeros((len(mesh.faces),len(directions),4,7));code=np.zeros((len(mesh.faces),len(directions)),np.int8)
+    from .reach_video import arm_dof
+    joints=np.zeros((len(mesh.faces),len(directions),4,arm_dof(s)));code=np.zeros((len(mesh.faces),len(directions)),np.int8)
     chunks=[]
     for j,pl in enumerate(placements):
         W=np.eye(4);W[:3,:3]=pl['rotation_world_object'];W[:3,3]=pl['translation_world_m']
@@ -138,8 +175,15 @@ def certify_directions(pool,mesh,ids,axes,reach,directions,beta,s,eps,placements
         for face,j,c,Q in rows:code[face,j]=c;joints[face,j]=Q
     tilt[code!=A.OK]=np.inf
     return tilt,witness,gaps,joints,code,dict(pairs_tried=len(jobs),rejected_screened_axes=rejected,
+        surface_faces_inside_box_by_pose=[int(inside[ids].sum()) for inside in inside_by_pose],
+        possible_coverage_screened=float(mesh.area_faces[ids][possible[ids]].sum()/mesh.area_faces[ids].sum()),
         arm_pairs=int(sum(len(c[2]) for c in chunks)),arm_no_ik=int((code==A.NO_IK).sum()),
-        arm_hits_object=int((code==A.ARM_HITS).sum()),tool_hits_table=int((code==A.TABLE_HITS).sum()))
+        arm_hits_object=int((code==A.ARM_HITS).sum()),tool_hits_table=int((code==A.TABLE_HITS).sum()),
+        surface_point_outside_box=int((code==A.POINT_OUTSIDE_BOX).sum()))
+
+
+def finite(x):
+    return float(x) if np.isfinite(x) else None
 
 
 def plan(object_name='B',config_path=None,target_path=None,output_root=DEFAULT_OUTPUT,render=True,allow_partial=True):
@@ -147,13 +191,15 @@ def plan(object_name='B',config_path=None,target_path=None,output_root=DEFAULT_O
     mesh,shape,target,s=setup(object_name,config_path,target_path)
     from .reach_video import work_point
     # The configured window is an unverified estimate; the object sits where the arm reaches all of it.
-    point,forward=work_point(s,.5*float(mesh.extents.max()))
-    s.update(work_point_m=point.tolist(),work_point_forward_of_window_m=forward,
-             work_point_rule='first point forward of the window centre, along base->window, where the KUKA reaches every tip within half the object size at any tilt in the cone')
-    table_z=float(point[2]-.5*mesh.extents.max())
+    point,forward,share=work_point(s,.5*float(mesh.extents.max()))
+    s.update(work_point_m=point.tolist(),work_point_forward_of_window_m=forward,work_point_reached_share=share,
+             work_point_rule='first point forward of the window centre, along base->window, where the work arm reaches every tip within half the object size at any tilt in the cone; if none, the point reaching the most')
+    table_z=float(point[2]-.5*mesh.extents.max());half=s.get('table_half_size_m',.25)
     s.update(table_height_m=table_z,table_bounds_world_m=[
-        [point[0]-.25,point[1]-.25,table_z-.02],[point[0]+.25,point[1]+.25,table_z]],
+        [point[0]-half,point[1]-half,table_z-.02],[point[0]+half,point[1]+half,table_z]],
         pose_rule='six object-coordinate sides toward the robot horizontally; original +Y up for side views, -Z/+Z up for top/bottom; lowest vertex on the common table')
+    reference=placed(mesh,VIEWS,s)[0]
+    s['surface_workspace']=workspace_box(mesh,reference,s,policy)
     work=ROOT/'whole_task_2/data'/object_name/'step1_reach';work.mkdir(parents=True,exist_ok=True)
     axes,reach,pixel=screen(mesh,shape,s,policy,work);screened=time.monotonic()-start
     tilt_limit=s['max_tilt_deg'];eps=policy['needle_start_fraction_of_length']*s['needle_length_m'];required=policy['required_coverage']
@@ -165,17 +211,16 @@ def plan(object_name='B',config_path=None,target_path=None,output_root=DEFAULT_O
         print('STEP1 ARM',cert['arm_pairs'],'pairs, no IK',cert['arm_no_ik'],'arm hits object',cert['arm_hits_object'],flush=True)
         covered=np.isfinite(tilt).any(1)
         screened_reach=np.isfinite(pose_tilts(axes,reach,directions,tilt_limit))
-        possible=float(area[ids][screened_reach.any(1)[ids]].sum()/total)
+        possible=cert.get('possible_coverage_screened',float(area[ids][screened_reach.any(1)[ids]].sum()/total))
         goal=required
         print('STEP1 SIDES COVER',round(float(area[ids][covered[ids]].sum()/total),4),'possible',round(possible,4),'goal',round(goal,4),flush=True)
     directions=np.asarray(directions);covered_fraction=float(area[ids][covered[ids]].sum()/total)
     if covered_fraction<required and not allow_partial:
         raise ValueError(f'Certified coverage {covered_fraction:.4%} is below the required {required:.4%}; '
                          'remaining faces cannot be assigned as a completed plan')
-    regions,enclosed=task_regions(mesh,ids,np.isfinite(tilt),policy['small_piece_fraction'])
-    removed=np.isfinite(tilt)&~regions
+    regions=np.isfinite(tilt);enclosed=np.zeros_like(regions);removed=np.zeros_like(regions)
     partition_tilt=np.where(regions,tilt,np.inf)
-    label,split=areas(mesh,ids,partition_tilt,directions,tilt_limit,policy['assignment_tilt_weight'],policy['small_piece_fraction'])
+    label,split=areas(mesh,ids,partition_tilt,directions,tilt_limit,policy['assignment_tilt_weight'],policy['small_piece_fraction'],strict_reach=True)
     final_coverage=float(area[ids][(label>=0)[ids]].sum()/total)
     # Certified: the face's own side paints it.  The rest (no side paints it, or a small piece given
     # to a neighbour) has a task but no certified needle axis.
@@ -200,10 +245,11 @@ def plan(object_name='B',config_path=None,target_path=None,output_root=DEFAULT_O
     face_task=label.copy()
     tasks=[dict(row,direction_index=j,direction_id=row['id']) for j,row in enumerate(rows)]
     report=dict(status='analyzed' if allow_partial else 'passed',
-        model='fixed_robot_six_axis_aligned_tabletop_poses',object=object_name,setup=s,allow_partial_analysis=allow_partial,
+        model='angle_reach_intersect_surface_box_fixed_six_task_preview',object=object_name,setup=s,allow_partial_analysis=allow_partial,
+        task_count_mode=policy['task_count_mode'],task_count_optimized=False,strict_surface_intersection=True,
         required_coverage=required,possible_coverage_screened=possible,coverage_goal=goal,
         requirement_met=bool(covered_fraction>=required),covered_fraction_of_target=final_coverage,
-        coverage_definition='task assignment after removing small detached components and filling enclosed pockets; other faces stay unassigned',
+        coverage_definition='non-overlapping assignment of angle-reachable faces whose surface test points lie inside the inward work box; no hole filling or island deletion',
         certified_fraction_before_completion=covered_fraction,
         task_regions_union_fraction=float(area[regions.any(1)&target].sum()/total),
         retained_certified_union_fraction=float(area[(regions&np.isfinite(tilt)).any(1)&target].sum()/total),
@@ -213,32 +259,35 @@ def plan(object_name='B',config_path=None,target_path=None,output_root=DEFAULT_O
         task_count=len(tasks),tasks=tasks,
         active_task_count=sum(bool(task['face_count']) for task in tasks),
         empty_task_ids=[task['id'] for task in tasks if not task['face_count']],
-        task_definition='exclusive surface partition shared by Step1.2, Step1.3 and downstream tasks; empty input poses remain recorded',
-        task_surface_rule='face_task == direction_index; cleaned task_reach contains overlapping candidate reach regions only',
+        task_definition='fixed six-pose preview; task count is supplied for this version, not optimized',
+        task_surface_rule='face_task == direction_index; task_reach == certified angle reach intersect surface_inside_box',
         target_face_count=int(target.sum()),target_area_m2=total,
         unreachable_face_ids=uncovered.tolist(),unreachable_area_fraction_of_target=float(area[uncovered].sum()/total),
         unassigned_face_ids=np.flatnonzero(target&(label<0)).tolist(),unassigned_area_fraction_of_target=1-final_coverage,
         split_fraction_of_target=final_coverage,
         split_certified_fraction_of_target=float(area[hit].sum()/total),uncertified_face_ids=np.flatnonzero(nearest).tolist(),
-        uncertified='small enclosed pockets belong to the surrounding task even if unpaintable; detached small islands are discarded, other gaps remain unassigned',
+        uncertified='none: actual task faces must satisfy angle reach and the surface-position box',
         reach_definition=dict(needle='line from the tip back to infinity misses the object beyond needle_start_m',
             needle_body='needle radius clears the object beyond the tip contact r(1+tan(incidence)), incidence capped at 80 deg',
             head='no object point within head_radius_m of the needle line at needle_length_m and beyond',
             facing='face normal faces the tool',face_test_points='three vertices and the centroid',
             arm_motion='fixed base (robots_config); needle within max_tilt_deg of the slanted nominal direction',
-            arm='KUKA inverse kinematics at every test point along the certified axis (joint limits, above the floor), '
+            arm='work-arm inverse kinematics at every test point along the certified axis (joint limits, above the floor), '
                 'convex hulls of all link collision meshes clear of the object and tabletop; joints kept for replay',
+            surface_position='surface process point (needle tip) is inside the fixed inward XYZ work box; head and needle root are not constrained by this box',
             placement=s['pose_rule'],table='needle body and head above the table; arm collision hulls clear of the finite tabletop',
             needle_start_m=eps),
         grids=dict(tool_axes=len(axes),tool_axis_spacing_deg=policy['tool_axis_spacing_deg'],screen_pixel_m=pixel),
         certification=dict(exact=True,method='clipped-triangle distance to the needle line (reach.clearance)',
             faces_assigned=int(hit.sum()),**cert,
-            min_needle_body_gap_minus_radius_m=float(face_gaps[hit,0].min()-s['needle_radius_m']),
-            min_head_gap_minus_radius_m=float(face_gaps[hit,1].min()-s['head_radius_m'])),
+            # None: no object point ever comes near that part of the tool (an infinite gap).
+            min_needle_body_gap_minus_radius_m=finite(face_gaps[hit,0].min()-s['needle_radius_m']),
+            min_head_gap_minus_radius_m=finite(face_gaps[hit,1].min()-s['head_radius_m'])),
         seconds=dict(screen=screened,total=time.monotonic()-start),
         input_sha256={str(p.relative_to(ROOT)):sha256(p) for p in [shape,*[HERE/n for n in SOURCES],
-            Path(config_path or ROOT/'robots_config/04_kuka_lbr_med14_r820.json')]})
-    np.savez_compressed(work/'plan.npz',face_area=label,face_task=face_task,face_certified=hit,face_axis=face_axis,face_tilt_deg=face_tilt,gaps=face_gaps,
+            config_file(object_name,config_path)]})
+    surface_in_box=np.column_stack([points_inside_box(R.test_points(mesh)@np.asarray(p['rotation_world_object']).T+p['translation_world_m'],s['surface_workspace']['bounds_world_m']).all(axis=1) for p in placements])
+    np.savez_compressed(work/'plan.npz',face_area=label,face_task=face_task,face_certified=hit,face_axis=face_axis,face_tilt_deg=face_tilt,gaps=face_gaps,surface_inside_box=surface_in_box,
         area_axes=directions,reach=np.isfinite(tilt),task_reach=regions,task_enclosed=enclosed,task_removed=removed,
         reach_axis=witness,target=target,arm_code=code,joints=joints)
     report['arrays_sha256']=sha256(work/'plan.npz');write_json(work/'plan.json',report)
@@ -253,7 +302,7 @@ def validate(object_name='B'):
     """Replay from disk: every split face and every overlapping (face, side) pair passes the exact test."""
     work=ROOT/'whole_task_2/data'/object_name/'step1_reach';report=json.loads((work/'plan.json').read_text())
     if sha256(work/'plan.npz')!=report['arrays_sha256']:raise ValueError('plan.npz changed')
-    s=report['setup'];shape=ROOT/'objects'/object_name/'mesh.stl'
+    s=report['setup'];shape=ROOT/'objects'/object_of(object_name)/'mesh.stl'
     with np.load(work/'plan.npz') as z:a={k:z[k] for k in z.files}
     eps=report['reach_definition']['needle_start_m'];L,H,N=s['needle_length_m'],s['head_radius_m'],s['needle_radius_m']
     pairs=np.argwhere(a['reach']);hit=a['face_area']>=0
@@ -272,17 +321,31 @@ def validate(object_name='B'):
     mesh=load_shape(shape);area=mesh.area_faces
     certified_covered=float(area[a['reach'].any(1)&a['target']].sum()/area[a['target']].sum())
     covered=float(area[hit&a['target']].sum()/area[a['target']].sum())
-    regions,enclosed=task_regions(mesh,np.flatnonzero(a['target']),a['reach'],report['split']['small_piece_fraction'])
+    regions=a['reach'].copy();enclosed=np.zeros_like(regions)
     complete=certified_covered>=report['required_coverage']
-    split_target=a['target']
-    closed_labels=a['face_area'].copy()
-    fill_enclosed(Surface(mesh),np.flatnonzero(split_target),closed_labels,area,
-                  report['split']['small_piece_fraction']*area[split_target].sum())
-    pruned_labels=closed_labels.copy()
-    drop_small(Surface(mesh),np.flatnonzero(split_target),pruned_labels,area,
-               report['split']['small_piece_fraction']*area[split_target].sum())
     surface=Surface(mesh);task_labels=np.full(len(mesh.faces),-1);disjoint=True;inherited=True;metadata=True
-    expected=placed(mesh,VIEWS,s);poses_match=True;axes_match=True;on_table=True
+    expected=placed(mesh,VIEWS,s);poses_match=True;axes_match=True;on_table=True;points_inside=True;box_margin=np.inf
+    bounded=s['surface_workspace']['bounds_world_m'] is not None
+    bounds=np.asarray(s['surface_workspace']['bounds_world_m'] if bounded else [[-np.inf]*3,[np.inf]*3]);replayed_surface_masks=[]
+    for j,row in enumerate(report['areas']):
+        f=np.flatnonzero(a['reach'][:,j]);rot=np.asarray(row['placement']['rotation_world_object']);shift=np.asarray(row['placement']['translation_world_m'])
+        points=R.test_points(mesh)[f]@rot.T+shift;axis=a['reach_axis'][f,j]@rot.T
+        points_inside &= bool(points_inside_box(points,bounds).all())
+        if len(points) and bounded:box_margin=min(box_margin,float(np.minimum(points-bounds[0],bounds[1]-points).min()))
+        replayed_surface_masks.append(points_inside_box(R.test_points(mesh)@rot.T+shift,bounds).all(axis=1))
+    policy=json.loads(POLICY.read_text())
+    expected_box=workspace_box(mesh,expected[0],s,policy)
+    reference_bounds=np.asarray(s['surface_workspace']['reference_object_bounds_world_m'])
+    shared=np.asarray(s['surface_workspace']['shared_face_center_world_m'])
+    normal='xyz'.index(s['surface_workspace']['adjoining_axis']);sign=s['surface_workspace']['adjoining_sign']
+    if bounded:
+        work_size=bounds[1]-bounds[0]
+        work_face=bounds.mean(axis=0);work_face[normal]=bounds[1 if sign>0 else 0,normal]
+        object_face=reference_bounds.mean(axis=0);object_face[normal]=reference_bounds[1 if sign>0 else 0,normal]
+    config_edge=json.loads((ROOT/s['config_file']).read_text())['task_constraint'].get('surface_workspace',{}) if 'config_file' in s else {}
+    if 'edge_m' in config_edge:   # the config's edge, or no bound
+        edge_ok=config_edge['edge_m'] is None if not bounded else config_edge['edge_m'] is not None and np.allclose(work_size,config_edge['edge_m'],atol=1e-12,rtol=0)
+    else:edge_ok=bounded and np.allclose(work_size,.5*np.max(reference_bounds[1]-reference_bounds[0]),atol=1e-12,rtol=0)
     for k,task in enumerate(report['tasks']):
         f=np.asarray(task['face_ids'],int);j=task['direction_index'];parent=report['areas'][j]
         disjoint&=bool(np.all(task_labels[f]<0) and len(np.unique(f))==len(f));task_labels[f]=k
@@ -301,6 +364,17 @@ def validate(object_name='B'):
         assigned_faces_inside_cleaned_task_regions=bool(np.all(regions[np.flatnonzero(hit),a['face_area'][hit]])),
         six_tabletop_poses_match=bool(poses_match and report['task_count']==6 and [t['id'] for t in report['tasks']]==list(SIDES)),
         fixed_world_needle_direction=bool(axes_match),objects_rest_on_common_table=bool(on_table),
+        surface_workspace_matches_reference_size_and_placement=s['surface_workspace']==expected_box,
+        workspace_is_cube=bool(not bounded or (s['surface_workspace']['shape']=='cube' and np.allclose(work_size,work_size[0],atol=1e-12,rtol=0))),
+        workspace_cube_edge_from_config=bool(edge_ok),
+        workspace_shares_robot_facing_face_center=bool(not bounded or (np.allclose(work_face,shared,atol=1e-12,rtol=0) and np.allclose(object_face,shared,atol=1e-12,rtol=0))),
+        workspace_extends_inward_from_shared_face=bool(not bounded or (np.isclose(bounds[0 if sign>0 else 1,normal],shared[normal]-sign*work_size[normal],atol=1e-12,rtol=0)
+            and sign*(bounds.mean(axis=0)[normal]-shared[normal])<0)),
+        every_certified_surface_point_inside_fixed_xyz_box=bool(points_inside),
+        saved_surface_mask_matches=bool(np.array_equal(a['surface_inside_box'],np.column_stack(replayed_surface_masks))),
+        strict_intersection_without_uncertified_fill=bool(report['strict_surface_intersection'] and certified[hit].all() and not a['task_enclosed'].any() and not a['task_removed'].any()),
+        all_reachable_surface_faces_assigned=bool(np.array_equal(hit,a['reach'].any(axis=1)&a['target'])),
+        fixed_six_preview_is_not_an_optimized_task_count=bool(report['task_count_mode']=='fixed_six_pose_preview_not_optimized' and not report['task_count_optimized']),
         tasks_are_disjoint=bool(disjoint),
         task_labels_match_report=bool(np.array_equal(task_labels,a['face_task'])),
         tasks_cover_exactly_the_direction_partition=bool(np.array_equal(a['face_task'],a['face_area'])),
@@ -315,8 +389,7 @@ def validate(object_name='B'):
         goal_is_required=bool(report['coverage_goal']==report['required_coverage']),
         enclosed_task_regions_match=bool(np.array_equal(regions,a['task_reach']) and np.array_equal(enclosed,a['task_enclosed'])),
         removed_task_regions_match=bool(np.array_equal(a['reach']&~regions,a['task_removed'])),
-        no_small_enclosed_split_holes=bool(np.array_equal(closed_labels,a['face_area'])),
-        no_small_detached_split_islands=bool(np.array_equal(pruned_labels,a['face_area'])),
+        task_regions_are_exact_certified_intersection=bool(np.array_equal(a['task_reach'],a['reach'])),
         coverage_matches_report=bool(abs(covered-report['covered_fraction_of_target'])<1e-12),
         certified_coverage_matches_report=bool(abs(certified_covered-report['certified_fraction_before_completion'])<1e-12),
         uncertified_listed=np.flatnonzero(hit&~certified).tolist()==report['uncertified_face_ids'],
@@ -325,15 +398,18 @@ def validate(object_name='B'):
     result=dict(status='passed' if all(checks.values()) else 'failed',checks=checks,pairs=len(jobs),
         pairs_passed=passed,arm_pairs_replayed=held,max_tilt_deg=float(tilt.max()),
         task_count=report['task_count'],direction_count=report['direction_count'],
+        active_task_count=report['active_task_count'],surface_workspace=s['surface_workspace'],
+        minimum_surface_point_box_margin_m=float(box_margin) if np.isfinite(box_margin) else None,
         covered_fraction_of_target=covered,requirement_met=bool(complete),plan_sha256=sha256(work/'plan.json'))
     write_json(work/'validation.json',result)
     if result['status']!='passed':raise ValueError('Step1 reach validation failed: '+json.dumps(checks))
     print('STEP1 VALIDATION PASSED',passed,'pairs',flush=True);return result
 
 
-if __name__=='__main__':
+def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--object',default='B');p.add_argument('--config',type=Path)
+    p.add_argument('--output-root',type=Path,default=DEFAULT_OUTPUT)
     p.add_argument('--target',type=Path,help='JSON with the user-drawn face_ids; default the whole surface')
     p.add_argument('--no-render',action='store_true');p.add_argument('--validate-only',action='store_true')
     coverage=p.add_mutually_exclusive_group()
@@ -341,5 +417,8 @@ if __name__=='__main__':
     coverage.add_argument('--require-coverage',dest='allow_partial',action='store_false',help='Require certified coverage to meet the configured target')
     p.set_defaults(allow_partial=True)
     a=p.parse_args()
-    if not a.validate_only:plan(a.object,a.config,a.target,render=not a.no_render,allow_partial=a.allow_partial)
+    if not a.validate_only:plan(a.object,a.config,a.target,output_root=a.output_root,render=not a.no_render,allow_partial=a.allow_partial)
     validate(a.object)
+
+
+if __name__=='__main__':main()

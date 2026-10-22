@@ -22,6 +22,11 @@ def write_json(path, value):
                                allow_nan=False) + "\n", encoding="utf-8")
 
 
+def object_of(name):
+    """The object of a run: B+01_kuka -> B (its data and figures stay under the run's name)."""
+    return name.split("+", 1)[0]
+
+
 def stage_directory(output_root, object_name, stage):
     if Path(object_name).name != object_name or object_name in (".", "..", ""):
         raise ValueError("Expected a single object directory name")

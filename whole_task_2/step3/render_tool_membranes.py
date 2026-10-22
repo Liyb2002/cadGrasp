@@ -10,6 +10,7 @@ from whole_task_2.operations.geometry import moved_mesh
 from whole_task_2.step1.reach_render import contact
 from whole_task_2.step1.reach_video import GOLD, Scene, STATION_VIEW, tool_frame
 from .render_independent import BLUE
+from .tool_membranes import row_axis
 
 def camera(R, a):
     """The diagonal of the six sides (object rotation R) on the needle's side, nearest the station view."""
@@ -27,11 +28,11 @@ def cone(scene, tip):
     return np.vstack([rim, scene.sides])@T[:3, :3].T+T[:3, 3]
 
 
-def render_connected(model, q, joined, shifts, folder, width=4200, height=1050, view=(0., 1., .35)):
+def render_connected(model, q, joined, shifts, folder, width=4200, height=1050, view=None):
     """initialization.png, no text: all six membranes on one base plate, joined.
     Top: every bunny in its seat with the needle and head on its central certified face and Step1's gold
-    max-tilt cone at the tip; bottom: the support alone.  The camera looks level along the row from the
-    needle's side (+y), a little from above, so the plate lies flat across the picture.  Vertices are split at sharp edges for drawing only, so the plate shades flat."""
+    max-tilt cone at the tip; bottom: the support alone.  The camera looks level across the row from the
+    needle's side (towards the base), a little from above, so the plate lies flat across the picture.  Vertices are split at sharp edges for drawing only, so the plate shades flat."""
     shown = joined.smooth_shaded
     scene = Scene(shown, model.setup, width, height)                     # the joined support is the body
     scene.ctx.line_width = 3*height/560                                  # Step1's 3 px lines on its 560 px pictures
@@ -45,6 +46,7 @@ def render_connected(model, q, joined, shifts, folder, width=4200, height=1050, 
             tip = model.source.triangles_center[f]@P[:3, :3].T+P[:3, 3]+shift; axis = P[:3, :3]@r['axes'][k]
             seated.append((bunny, M@P)); tools += [(shape, tool_frame(tip, axis)) for shape in scene.tools[False]]
             cones.append(cone(scene, tip))
+        if view is None: e = row_axis(model.setup); view = (-e[1], e[0], .35)
         blue = np.tile(BLUE, (len(shown.faces), 1)); scene.view = np.asarray(view)/np.linalg.norm(view)
         L = model.setup['needle_length_m']
         tops = [world[:3, 3]+world[:3, 2]*(L+.07) for _, world in tools[::2]]
