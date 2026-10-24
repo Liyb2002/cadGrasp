@@ -14,7 +14,7 @@ from PIL import Image
 
 from whole_task_2.step1.common import ROOT, DEFAULT_OUTPUT
 from whole_task_2.step1.reach_render import contact
-from whole_task_2.step1.reach_video import STATION_VIEW, Scene, work_arm
+from whole_task_2.step1.reach_video import STATION_VIEW, Scene, kuka as work_arm
 from whole_task_2.operations.geometry import moved_mesh
 from whole_task_2.step3.render_tool_membranes import camera, image
 from whole_task_2.step3.render_independent import BLUE

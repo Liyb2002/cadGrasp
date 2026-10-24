@@ -1,87 +1,18 @@
-# Only source code, Markdown and Git ignore rules belong in this repository.
-# Data/configuration (including JSON/NPZ), images, videos, models and logs stay local.
-# Keep directories traversable so source files can be allowed at any depth.
+# Ignore everything by default. Only Python sources and Markdown docs are tracked.
 *
 !*/
-
-# Project documentation.
+!*.py
 !*.md
 
-# Source code and scripts.
-!*.py
-!*.pyi
-!*.sh
-!*.bash
-!*.zsh
-!*.c
-!*.h
-!*.cc
-!*.hh
-!*.cpp
-!*.hpp
-!*.cxx
-!*.hxx
-!*.cu
-!*.cuh
-!*.rs
-!*.go
-!*.java
-!*.kt
-!*.kts
-!*.cs
-!*.js
-!*.mjs
-!*.cjs
-!*.jsx
-!*.ts
-!*.tsx
-!*.html
-!*.htm
-!*.css
-!*.scss
-!*.sass
-!*.less
-!*.lua
-!*.rb
-!*.pl
-!*.r
-!*.R
-!*.jl
-!*.m
-!*.mm
-!*.swift
-!*.f
-!*.f90
-!*.f95
-!*.glsl
-!*.vert
-!*.frag
-!*.geom
-!*.comp
-
-# Track ignore rules at every level; child rules must not allow data or outputs.
-!.gitignore
-
-# Never upload these formats, at any depth, including configuration and inputs.
-# Match mixed-case extensions too. Child .gitignore files must not re-include them.
-*.[nN][pP][zZ]
-*.[jJ][sS][oO][nN]
-*.[mM][pP]4
-*.[gG][iI][fF]
-*.[pP][nN][gG]
+# Keep this policy itself under version control.
+!/.gitignore
 
 # Dependencies, caches and local tooling are never project source.
 **/.git/
 **/.venv/
-**/.venv*/
 **/venv/
-**/venv-*/
-**/venv_*/
 **/env/
 **/node_modules/
-**/.cache/
-**/.conda/
-**/.mamba/
 **/__pycache__/
 **/.pytest_cache/
 **/.mypy_cache/
@@ -89,26 +20,9 @@
 **/.tox/
 **/.nox/
 **/.ipynb_checkpoints/
-**/.rsync-partial/
-**/build/
-**/dist/
 /.agents/
 /.codex/
 /.aws/
 
-# Generated results and intermediate data, including any copied code/Markdown.
-**/output/
-**/outputs/
-**/legacy_output/
-**/results/
-**/data/
-**/steps_data/
-**/runs/
-**/cache/
-**/caches/
-**/snapshots/
-**/source_snapshots/
-**/*executed_sources*/
-**/historical_render_sources/
-**/final_audit_sources/
-/slides/Co-optimize/seperate_base_support_proof/recovery/
+# Local numerical runs and their execution snapshots.
+/slides/Co-optimize/baseline_no_pso/runs/

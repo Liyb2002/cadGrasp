@@ -13,7 +13,7 @@ from PIL import Image
 from .common import ROOT, load_shape, sha256, write_json
 from .reach import frame
 from .arm import Check
-from .reach_video import Scene, tool_frame, GOLD, work_arm
+from .reach_video import Scene, tool_frame, GOLD, kuka
 from .workspace import box_edges
 from .task_boundary import boundary_loops,candidate_region
 
@@ -84,7 +84,7 @@ def workspace_box(scene, setup, shift=(0.,0.,0.)):
     """Draw twelve true 3D edges, with the object occluding the rear edges."""
     edges=box_edges(setup['surface_workspace']['bounds_world_m'],shift)
     points=np.asarray(edges).reshape(-1,3)
-    scene.workspace_wireframe=(points,WORKSPACE_COLOR) if len(points) else None      # none: an unbounded work arm
+    scene.workspace_wireframe=(points,WORKSPACE_COLOR)
     return [],points
 
 
@@ -198,7 +198,7 @@ def render(object_name='B', output=ROOT/'whole_task_2/idea/find_tasks.png', heig
     for f, _, _ in contacts:
         if not checker.replay(f, arrays['reach_axis'][f,j], actual, arrays['joints'][f,j]):
             raise ValueError(f'Pose1 contact {f} no longer matches its certified witness')
-    arm = work_arm(s); black_face,black_tip,black_axis = contacts[0]
+    arm = kuka(s); black_face,black_tip,black_axis = contacts[0]
     q=checker.solve(black_tip+world_center,black_axis,actual,arrays['joints'][black_face,j,3])
     if q is None or q is False:raise ValueError('Arm cannot hold the boundary contact')
     tcp, _, transforms = arm.forward(q,geometry=True)

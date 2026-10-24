@@ -1,8 +1,8 @@
 """Delete local Boolean remnants; certify the unchanged original exit paths."""
 import numpy as np
 import manifold3d as md
-from whole_task_2.step3 import independent_geometry as G
-from whole_task_2.step3.exit_geometry import continuous_checks
+from whole_task.step3 import independent_geometry as G
+from whole_task.step3.exit_geometry import continuous_checks
 from .floors import connected_material, condition
 
 

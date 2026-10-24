@@ -16,17 +16,17 @@ import trimesh
 from PIL import Image
 from scipy.spatial.transform import Rotation, Slerp
 
-from whole_task_2.step1.common import ROOT, sha256, write_json
-from whole_task_2.step1.needle_render import sector_lines
-from whole_task_2.step3 import independent_geometry as G
-from whole_task_2.step3.render_independent import Renderer, BLUE, head_context
-from whole_task_2.step5.video import raster
+from whole_task.step1.common import ROOT, sha256, write_json
+from whole_task.step1.needle_render import sector_lines
+from whole_task.step3 import independent_geometry as G
+from whole_task.step3.render_independent import Renderer, BLUE, head_context
+from whole_task.step5.video import raster
 from .geometry import OperationModel, moved_mesh
 from .merge_pose import build_fixed_needle_merge
 from .state import Layout, transform
 
 
-DATA = ROOT / 'whole_task_2/data/B/operation_videos/merge'
+DATA = ROOT / 'whole_task/data/B/operation_videos/merge'
 TASKS = ['W06', 'W08']
 
 
@@ -197,7 +197,7 @@ def main():
         support_geometry_constant_entire_video=True, support_modified_during_video=False,
         fixture_mesh_sha256=fixture_digest,
         object_absent_during_entire_turn=True, object_reinserted_after_turn=True,
-        working_area_color='pink', validation='whole_task_2/data/B/operation_videos/merge/validation.json',
+        working_area_color='pink', validation='whole_task/data/B/operation_videos/merge/validation.json',
         continuous_robot_motion_claimed=False)
     write_json(DATA / 'video.json', metadata)
     index = DATA.parent / 'videos.json'

@@ -2,7 +2,7 @@
 import unittest
 import numpy as np
 import trimesh
-from whole_task_2.step1.needle_geometry import geometric_mask
+from whole_task.step1.needle_geometry import geometric_mask
 from .state import Layout, transform
 from .translation import translation
 from .support_merge import support_merge
@@ -74,7 +74,7 @@ class OperationTests(unittest.TestCase):
 
     def test_local_clearance_contains_the_original_forbidden_prism(self):
         from .clearance import expand_prism
-        from whole_task_2.step3 import independent_geometry as G
+        from whole_task.step3 import independent_geometry as G
         box=trimesh.creation.box(extents=[.02,.01,.03])
         original=G.solid(box)
         expanded=expand_prism(original,1e-6)

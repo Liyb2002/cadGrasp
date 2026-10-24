@@ -5,20 +5,20 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-from whole_task_2.step1.common import ROOT, sha256, write_json
-from whole_task_2.step1.find_tasks_figure import cone
-from whole_task_2.step1.reach_video import tool_frame, HEAD, STEEL
-from whole_task_2.step3 import independent_geometry as G
-from whole_task_2.step3.render_independent import Renderer, BLUE
-from whole_task_2.step5.video import raster
+from whole_task.step1.common import ROOT, sha256, write_json
+from whole_task.step1.find_tasks_figure import cone
+from whole_task.step1.reach_video import tool_frame, HEAD, STEEL
+from whole_task.step3 import independent_geometry as G
+from whole_task.step3.render_independent import Renderer, BLUE
+from whole_task.step5.video import raster
 from .geometry import moved_mesh
 from .render_merge import mesh_digest, ease
 from .render_pose_rotation import first_hit, VIEW
 from .render_refinements import encode, TOLERANCE
 
 
-DATA = ROOT / 'whole_task_2/data/B/operation_videos/merge'
-ARCHIVE = ROOT / 'whole_task_2/data/B/step3_connected_output_legacy/step3.2'
+DATA = ROOT / 'whole_task/data/B/operation_videos/merge'
+ARCHIVE = ROOT / 'whole_task/data/B/step3_connected_output_legacy/step3.2'
 REFERENCE = DATA.parent / 'pose_rotation_render.json'
 
 

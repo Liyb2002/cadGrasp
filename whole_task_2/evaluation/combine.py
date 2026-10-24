@@ -1,7 +1,7 @@
 """Evaluation of step4/combine.py and step5/combined.py, by bounding boxes (minimum-volume oriented boxes).
 
 The object's own bbx is the reference.  For every distinct support: the bbx of Step4's membrane, of it after
-Step5's trim, and of Step5's support with its feet, their material, the seats and how many joins were Juxtaposition and how many Rotational
+Step5's trim (its peel), and of Step5's support with its feet, their material, the seats and how many joins were Juxtaposition and how many Rotational
 reuse.  Sorted by Step5's bbx (a support Step5 could not stand comes last, by Step4's bbx).
 """
 import argparse
@@ -26,7 +26,7 @@ def run(object_name='B', top=10):
                          seats=[len(ks) for _, ks in seats(g)],
                          chain=' -> '.join([g['chain'][0]['parents'][0]]+[f"{s['parents'][1]}({s['operation'][0].upper()})" for s in g['chain']]),
                          step4_bbx_cm3=g['bbx_m3']*1e6, step4_volume_cm3=g['volume_cm3'],
-                         trimmed_bbx_cm3=r5['trimmed_bbx_m3']*1e6 if stood else None,
+                         trimmed_bbx_cm3=r5.get('peeled_bbx_m3', r5.get('trimmed_bbx_m3'))*1e6 if stood else None,
                          step5_bbx_cm3=r5['support_bbx_m3']*1e6 if stood else None, step5_volume_cm3=r5.get('volume_cm3') if stood else None,
                          step5_status=r5.get('status', 'not run'), step5_reason=r5.get('reason')))
     rows.sort(key=lambda r: (r['step5_bbx_cm3'] is None, r['step5_bbx_cm3'] if r['step5_bbx_cm3'] is not None else r['step4_bbx_cm3']))

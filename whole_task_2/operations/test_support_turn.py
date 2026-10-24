@@ -2,7 +2,7 @@
 import unittest
 import numpy as np
 import trimesh
-from whole_task_2.step3 import independent_geometry as G
+from whole_task.step3 import independent_geometry as G
 from .state import Layout,transform
 from .support_turn import support_turn
 from .floors import planes,clip,connected_material
@@ -64,7 +64,7 @@ class SideTurnTests(unittest.TestCase):
     def test_needle_spin_matches_the_entire_seat_and_an_exact_side_installation(self):
         from types import SimpleNamespace
         from scipy.spatial.transform import Rotation
-        from whole_task_2.step4.aligned_side import needle_angles,propose
+        from whole_task.step4.aligned_side import needle_angles,propose
         model=SimpleNamespace(source=SimpleNamespace(center_mass=np.array([.02,.03,.01])),
                               axis=np.array([0.,-1.,-1.])/np.sqrt(2),head=np.array([0.,0.,.22]))
         rng=np.random.default_rng(42)
@@ -137,7 +137,7 @@ class SideTurnTests(unittest.TestCase):
         self.assertFalse(rows[0]['passed'])
 
     def test_one_task_can_leave_a_previous_cohort_without_losing_other_tasks(self):
-        from whole_task_2.step4.quarter_turns import reassigned_groups
+        from whole_task.step4.quarter_turns import reassigned_groups
         groups=[[0,1,2],[3,4],[5,6]]
         actual=reassigned_groups(groups,[1],4)
         self.assertEqual(actual,[[0,2],[5,6],[1,3,4]])
@@ -147,7 +147,7 @@ class SideTurnTests(unittest.TestCase):
     def test_side_alignment_optimizes_bearing_without_changing_world_pose(self):
         from types import SimpleNamespace
         from scipy.spatial.transform import Rotation
-        from whole_task_2.step4.quarter_turns import propose
+        from whole_task.step4.quarter_turns import propose
         model=SimpleNamespace(source=SimpleNamespace(center_mass=np.zeros(3)))
         rng=np.random.default_rng(29)
         for _ in range(6):

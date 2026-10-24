@@ -1,9 +1,9 @@
 import unittest
 from unittest.mock import Mock
 import numpy as np
-from whole_task_2.step3 import independent_geometry as G
-from whole_task_2.step3 import independent_physics as P
-from whole_task_2.step3.legacy import kernel as K
+from whole_task.step3 import independent_geometry as G
+from whole_task.step3 import independent_physics as P
+from whole_task.step3.legacy import kernel as K
 from .contact_cache import query_contacts,cached_certificate_contacts
 import trimesh
 

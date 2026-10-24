@@ -1,17 +1,17 @@
-"""The arm behind the head: can the work arm (KUKA or SO101) hold the needle on a face, without its body touching the object?
+"""The arm behind the head: can the KUKA hold the needle on a face, without its body touching the object?
 
 reach.py certifies the needle and the head (everything within the head radius
 behind the needle).  Here the rest of the arm: for a (face, side) pair the
 object is placed as that side places it, and at each of the face's test points
-(three vertices and the centroid) the work arm must
+(three vertices and the centroid) the KUKA must
   - have an inverse-kinematics solution putting the tip there along the pair's
     certified needle axis, inside joint limits and above the floor (Arm.solve);
   - keep every link clear of the object: the convex hull of each link's collision
     mesh (a superset of the link) meets no object triangle.
 The triangle-hull test is exact: a vertex inside the hull is a hit, three vertices
 beyond one hull plane are clear, anything else is clipped against every plane.
-A solution that touches the object is retried from the arm's other seeds before
-the pair is refused.  Joint angles are kept so that validation
+The arm is redundant, so a solution that touches the object is retried from the
+other seeds before the pair is refused.  Joint angles are kept so that validation
 replays them with forward kinematics alone.
 """
 import numpy as np
@@ -41,12 +41,11 @@ def clipped(polygon, normals, offsets):
 
 class Check:
     def __init__(self, mesh, setup):
-        from .reach_video import work_arm
-        self.mesh = mesh; self.arm = arm = work_arm(setup); self.floor = float(setup['base_position_world_m'][2])-.001
+        from .reach_video import kuka
+        self.mesh = mesh; self.arm = arm = kuka(setup); self.floor = float(setup['base_position_world_m'][2])-.001
         self.table_bounds = np.asarray(setup['table_bounds_world_m']) if 'table_bounds_world_m' in setup else None
         self.table = None
-        bounds = setup['surface_workspace']['bounds_world_m'] if 'surface_workspace' in setup else None
-        self.work_bounds = np.asarray(bounds) if bounds is not None else None
+        self.work_bounds = np.asarray(setup['surface_workspace']['bounds_world_m']) if 'surface_workspace' in setup else None
         self.length=setup['needle_length_m'];self.needle_radius=setup['needle_radius_m'];self.head_radius=setup['head_radius_m']
         if self.table_bounds is not None:
             import trimesh
@@ -55,7 +54,9 @@ class Check:
         for v in arm.collisions:
             h = ConvexHull(v); c = v.mean(0)
             self.hulls.append((h.equations[:, :3], h.equations[:, 3], c, float(np.linalg.norm(v-c, axis=1).max())))
-        self.seeds = arm.seeds
+        self.seeds = [np.deg2rad([0, 55, 0, -95, 0, 90, 0]), np.deg2rad([0, 80, 90, 95, -90, 40, 0]),
+                      np.deg2rad([90, 70, 0, -95, 0, 90, 0])]
+        self.seeds += list(np.random.default_rng(17).uniform(arm.lower*.7, arm.upper*.7, (20, 7)))
         self.placed = {}
 
     def scene(self, W):
@@ -106,8 +107,8 @@ class Check:
         return False if found else None
 
     def pair(self, face, axis, W, previous=None):
-        """(code, joints (4, dof)) for one (face, side) pair; axis in object coordinates."""
-        P = test_points(self.mesh)[face]@W[:3, :3].T+W[:3, 3]; d = W[:3, :3]@axis; Q = np.zeros((4, self.arm.dof))
+        """(code, joints (4, 7)) for one (face, side) pair; axis in object coordinates."""
+        P = test_points(self.mesh)[face]@W[:3, :3].T+W[:3, 3]; d = W[:3, :3]@axis; Q = np.zeros((4, 7))
         if self.work_bounds is not None and not points_inside_box(P,self.work_bounds).all():return POINT_OUTSIDE_BOX,Q
         if not self.tool_above_table(face,axis,W):return TABLE_HITS,Q
         for i, p in enumerate(P):

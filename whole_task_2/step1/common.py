@@ -11,6 +11,11 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ROOT / "whole_task_2/output"
 
 
+def object_of(run_name):
+    """Resolve the object shared by a plain run or an object+station run."""
+    return str(run_name).split('+', 1)[0]
+
+
 def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -20,11 +25,6 @@ def write_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2,
                                allow_nan=False) + "\n", encoding="utf-8")
-
-
-def object_of(name):
-    """The object of a run: B+01_kuka -> B (its data and figures stay under the run's name)."""
-    return name.split("+", 1)[0]
 
 
 def stage_directory(output_root, object_name, stage):

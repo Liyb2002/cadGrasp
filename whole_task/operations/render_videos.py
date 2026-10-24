@@ -174,9 +174,12 @@ def retire_old_videos():
 def main(only=None):
     only = {'pose_rotation': 'pose', 'juxtaposition': 'juxtapose',
             'rotational_reuse': 'merge', 'exit_direction': 'exit_redirection'}.get(only, only)
-    if only in (None, 'exit_redirection', 'translation'):
+    if only in (None, 'exit_redirection'):
+        from .render_horizontal_exit import main as render_horizontal_exit
+        render_horizontal_exit()
+    if only in (None, 'translation'):
         from .render_refinements import main as render_refinements
-        render_refinements(only)
+        render_refinements('translation')
     if only in (None, 'pose'):
         from .render_pose_rotation import main as render_pose_rotation
         render_pose_rotation()

@@ -2,12 +2,12 @@
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from whole_task_2.step1.needle_geometry import geometric_mask
-from whole_task_2.step3 import independent_geometry as G
-from whole_task_2.step3.exit_geometry import continuous_checks, whole_object_sweep
-from whole_task_2.step3.independent_physics import demands, certificate
-from whole_task_2.step3.render_independent import head_context
-from whole_task_2.step3.run_independent import make_domain
+from whole_task.step1.needle_geometry import geometric_mask
+from whole_task.step3 import independent_geometry as G
+from whole_task.step3.exit_geometry import continuous_checks, whole_object_sweep
+from whole_task.step3.independent_physics import demands, certificate
+from whole_task.step3.render_independent import head_context
+from whole_task.step3.run_independent import make_domain
 from .geometry import moved_mesh
 from .pose_change import pose_change
 from .state import transform

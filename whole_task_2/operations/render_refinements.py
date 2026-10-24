@@ -1,8 +1,9 @@
 """Replay exit and translation demonstrations with the pose-rotation object and studio.
 
-The original design timelines are retained. The 5,000-face object and its fitted
-outer layer replace the old 1,000-face approximation. These remain geometry
-demonstrations; no new force or robot-motion certificate is asserted.
+Translation retains its recorded timeline. Exit direction makes a 180-degree
+semicircle in the screen plane in five seconds. The 5,000-face object and its
+fitted outer layer replace the old 1,000-face approximation. These remain
+geometry demonstrations; no new force or robot-motion certificate is asserted.
 """
 import argparse
 import importlib.util
@@ -16,16 +17,16 @@ import numpy as np
 import trimesh
 from PIL import Image, ImageDraw
 
-from whole_task_2.step1.common import ROOT, sha256, write_json
-from whole_task_2.step3 import independent_geometry as G
-from whole_task_2.step3.exit_geometry import whole_object_sweep
-from whole_task_2.step3.render_independent import BLUE, Renderer
-from whole_task_2.step5.video import raster
+from whole_task.step1.common import ROOT, sha256, write_json
+from whole_task.step3 import independent_geometry as G
+from whole_task.step3.exit_geometry import whole_object_sweep
+from whole_task.step3.render_independent import BLUE, Renderer
+from whole_task.step5.video import raster
 from .geometry import moved_mesh
 
 
 HERE = Path(__file__).parent
-DATA = ROOT / 'whole_task_2/data/B/operation_videos'
+DATA = ROOT / 'whole_task/data/B/operation_videos'
 REFERENCE = ROOT / 'slides/Co-optimize/operation_demo'
 POSES = ['pose_1', 'pose_2', 'pose_4', 'pose_6']
 VIEW = np.array([1.1, 1.4, .95])
@@ -35,6 +36,8 @@ GREEN = (.13, .78, .46)
 RED = (.94, .29, .22)
 TOLERANCE = 1e-10
 SWEEP_REFERENCE = ROOT / 'slides/Co-optimize/vis_func/animate_exit_directions.py'
+EXIT_FPS = 24
+EXIT_FRAMES = 120
 
 
 def load_mesh(path, vertices='vertices', faces='faces'):
@@ -90,29 +93,25 @@ def condition_geometry(value, forbidden):
                 value = value - cut
 
 
-def single_exit_schedule(record):
-    """Replay the original first task's spherical arc across the single view.
+def single_exit_schedule(pose, view=VIEW):
+    """Left -> above -> right, rotating about the viewing axis by 180 degrees.
 
-    Preserve all source frame boundaries, pauses, and the 11-second duration;
-    the other three tasks no longer silently cut the displayed fixture.
+    Every world direction is in the camera's right/up plane, so the sweep
+    never turns toward the viewer. Convert to object coordinates only after
+    constructing that visible semicircle; the object and camera stay fixed.
     """
-    arc = [np.asarray(record['states'][0]['directions_fixture'][0])]
-    arc.extend(np.asarray(row['directions_fixture'][0]) for row in record['states']
-               if row['active_pose'] == POSES[0])
-    count = len(record['states'])
-    for index, row in enumerate(record['states']):
-        position = index * (len(arc) - 1) / (count - 1)
-        left = min(int(position), len(arc) - 2)
-        fraction = position - left
-        a, b = arc[left:left + 2]
-        angle = np.arccos(np.clip(a @ b, -1., 1.))
-        if angle < 1e-10:
-            direction = a.copy()
-        else:
-            direction = (np.sin((1 - fraction) * angle) * a + np.sin(fraction * angle) * b) / np.sin(angle)
-        yield dict(state=index, active_pose=POSES[0], progress=index / (count - 1),
-                   directions_fixture=[(direction / np.linalg.norm(direction)).tolist()],
-                   first_frame=row['first_frame'], repetitions=row['repetitions'])
+    view = np.asarray(view, float) / np.linalg.norm(view)
+    right = np.cross([0., 0., 1.], view)
+    right /= np.linalg.norm(right)
+    up = np.cross(view, right)
+    for index, angle in enumerate(np.linspace(0., np.pi, EXIT_FRAMES)):
+        world = -np.cos(angle) * right + np.sin(angle) * up
+        world /= np.linalg.norm(world)
+        direction = pose[:3, :3].T @ world
+        assert abs(world @ view) < 1e-12
+        yield dict(state=index, active_pose=POSES[0], progress=index / (EXIT_FRAMES - 1),
+                   angle_deg=float(np.degrees(angle)), directions_world=[world.tolist()],
+                   directions_fixture=[direction.tolist()], first_frame=index, repetitions=1)
 
 
 def projection(points, bounds, view):
@@ -220,10 +219,10 @@ class SweepOverlay:
 
 class Scene:
     def __init__(self):
-        archive = ROOT / 'whole_task_2/data/B/step3_connected_output_legacy/step3.2'
+        archive = ROOT / 'whole_task/data/B/step3_connected_output_legacy/step3.2'
         self.source_path = archive / 'initialization.npz'
         self.source = load_mesh(self.source_path, 'source_vertices_object', 'source_faces')
-        self.outer_path = ROOT / 'whole_task_2/data/B/step3_mold_plate/fitted_outer.npz'
+        self.outer_path = ROOT / 'whole_task/data/B/step3_mold_plate/fitted_outer.npz'
         self.outer = load_mesh(self.outer_path)
         self.record_path = REFERENCE / 'direction/vis/source_animation_record.json'
         self.record = json.loads(self.record_path.read_text())
@@ -308,7 +307,7 @@ def exit_redirection(scene, preview=False):
     folder.mkdir(parents=True, exist_ok=True)
     pose = scene.transforms[0]
     body = moved_mesh(scene.source, pose)
-    schedule = list(single_exit_schedule(scene.record))
+    schedule = list(single_exit_schedule(pose))
     # The original video frames the object closely and clips the distant sweep.
     outer_world = moved_mesh(scene.outer, pose)
     bounds = np.vstack([body.vertices, outer_world.vertices])
@@ -357,30 +356,38 @@ def exit_redirection(scene, preview=False):
             assert len(frames) == row['first_frame']
             frames.extend([image] * row['repetitions'])
             if index % 8 == 0:
-                print('EXIT STATE', index, '/', len(scene.record['states']) - 1, flush=True)
+                print('EXIT STATE', index, '/', len(schedule) - 1, 'angle', round(row['angle_deg'], 1), flush=True)
     finally:
         overlay.close()
         renderer.close()
-    assert len(frames) == scene.record['frame_count']
-    original_timeline = [{key: row[key] for key in ('state', 'first_frame', 'repetitions')}
-                         for row in scene.record['states']]
-    new_timeline = [{key: row[key] for key in original_timeline[0]} for row in states]
-    assert new_timeline == original_timeline
+    assert len(frames) == EXIT_FRAMES
+    world_directions = np.asarray([row['directions_world'][0] for row in states])
+    assert np.max(np.abs(world_directions @ VIEW)) < 1e-12
+    np.testing.assert_allclose(world_directions[0], -world_directions[-1], atol=1e-12, rtol=0)
     frames[0].save(folder / 'first.png')
     frames[-1].save(folder / 'last.png')
     if reused != len(states):
         write_json(record_path, dict(states=states, inputs_sha256=bindings,
-            working_face_mapping=scene.mask_mapping, original_frame_timing_preserved=True,
-            original_first_task_direction_arc_preserved=True,
+            working_face_mapping=scene.mask_mapping, original_frame_timing_preserved=False,
+            original_first_task_direction_arc_preserved=False,
+            fps=EXIT_FPS, frame_count=EXIT_FRAMES, duration_seconds=EXIT_FRAMES / EXIT_FPS,
+            direction_span_deg=180., rotation_axis_world=VIEW.tolist(),
+            directions_in_camera_plane=True, screen_arc='left -> above -> right',
             displayed_pose=POSES[0], single_task_fixture_rebuilt_from_current_sweep=True))
-    details = encode('exit_redirection.mp4', frames, scene.record['fps'], folder)
-    publish('exit_redirection.mp4', dict(**details, original_frame_timing_preserved=True,
-        original_first_task_direction_arc_preserved=True,
+    snapshot = folder / 'render_screen_plane_180_source.py'
+    snapshot.write_bytes(Path(__file__).read_bytes())
+    details = encode('exit_redirection.mp4', frames, EXIT_FPS, folder)
+    publish('exit_redirection.mp4', dict(**details, original_frame_timing_preserved=False,
+        original_first_task_direction_arc_preserved=False,
         source_video=str(REFERENCE / 'direction/vis/pose1+2+4+6_exit_direction_changes.mp4'),
         original_source_record_sha256=sha256(scene.record_path),
         original_object_replaced=True, object_face_count=len(scene.source.faces),
         displayed_pose=POSES[0], fixture_recomputed_for_each_direction=True,
-        original_direction_state_count=len(states), inputs_sha256=bindings,
+        original_direction_state_count=len(scene.record['states']), direction_state_count=len(states),
+        direction_span_deg=180., rotation_axis_world=VIEW.tolist(), directions_in_camera_plane=True,
+        maximum_view_depth_component=float(np.max(np.abs(world_directions @ VIEW))),
+        screen_arc='left -> above -> right', object_and_camera_fixed=True,
+        source_snapshot=str(snapshot.relative_to(ROOT)), inputs_sha256=bindings,
         geometry_states_reused=reused, swept_volume_visible=True, swept_volume_opacity=.084,
         sweep_full_length_m=scene.length, sweep_color='#6ebad8', sweep_edgecolors='none',
         discrete_object_ghosts=False, original_sweep_renderer_reused=True,

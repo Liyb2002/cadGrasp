@@ -11,7 +11,7 @@ from PIL import Image
 from .common import ROOT,load_shape,sha256,write_json
 from .arm import Check
 from .reach import clearance,tip_contact
-from .reach_video import Scene,tool_frame,work_arm,GOLD
+from .reach_video import Scene,tool_frame,kuka,GOLD
 from .find_tasks_figure import VIEW,cone,tubes,dashed,Opacity,CONE_OPACITY,POSE_INDEX,placement,tabletop,task_outline,OUTLINE_COLOR,OUTLINE_WIDTH_PX,OUTLINE_OFFSET_M,workspace_box,WORKSPACE_COLOR
 from .workspace import points_inside_box
 from .task_boundary import boundary_loops,sample_loop,candidate_region
@@ -81,7 +81,7 @@ def render(object_name='B',output=None,fps=24,width=1280,height=960):
     e=path['edge_indices'];u=path['edge_parameters'][:,None]
     trace=(1-u)*contour[e]+u*contour[e+1]
     tips=[];axes=[];roots=[];faces=[];first_hits=[];Qs=[];links=[];gaps=[]
-    arm=work_arm(s);checker=Check(mesh,s)
+    arm=kuka(s);checker=Check(mesh,s)
     vertex_slot=int(np.flatnonzero(mesh.faces[first]==loop['vertex_ids'][0])[0])
     q=arrays['joints'][first,j,vertex_slot].copy()
     for f in np.unique(anchor_faces):

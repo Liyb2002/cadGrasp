@@ -13,7 +13,7 @@ from PIL import Image
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
-from .common import ROOT, DEFAULT_OUTPUT, load_shape, object_of, sha256, write_json
+from .common import ROOT, DEFAULT_OUTPUT, load_shape, sha256, write_json
 
 # One colour per working area, in order of size.
 PALETTE = np.array([[.93, .42, .62], [.25, .55, .85], [.40, .78, .85], [.38, .74, .48], [.62, .48, .82], [.95, .66, .22],
@@ -67,7 +67,7 @@ def tabletop(scene, setup):
 
 
 def at_work(scene, arm, W, colors, tip, axis, ghosts=(), shapes=(), joints=None, close_up=False):
-    """The work arm holding the head; close-ups fit only the complete object and work box."""
+    """KUKA holding the head; close-ups fit only the complete object and work box."""
     from .reach_video import arm_links
     if joints is None:links, _ = arm_links(arm, tip, axis)
     else:
@@ -86,9 +86,9 @@ def at_work(scene, arm, W, colors, tip, axis, ghosts=(), shapes=(), joints=None,
 
 def working_poses(mesh, report, arrays, output):
     """Render the exclusive task partition in pink, together with the fixed XYZ box."""
-    from .reach_video import Scene, work_arm, STATION_VIEW
+    from .reach_video import Scene, kuka, STATION_VIEW
     from whole_task_2.step5.video import raster as r
-    tasks = report['tasks']; arm = work_arm(report['setup']); images = []
+    tasks = report['tasks']; arm = kuka(report['setup']); images = []
     scene = Scene(mesh, report['setup'], 640, 560, arm=True); scene.view = STATION_VIEW
     shapes=tabletop(scene,report['setup'])
     try:
@@ -193,8 +193,8 @@ def publish(mesh, report, root):
         tool=dict(source=s['tool_source'], needle_length_m=s['needle_length_m'], needle_radius_m=s['needle_radius_m'],
                   head_radius_m=s['head_radius_m']), max_tilt_deg=s['max_tilt_deg'],
         arm_motion=report['reach_definition']['arm_motion'], reach_definition=report['reach_definition']))
-    from .reach_video import work_arm, STATION_VIEW
-    arm = work_arm(s); view = STATION_VIEW
+    from .reach_video import kuka, STATION_VIEW
+    arm = kuka(s); view = STATION_VIEW
     scene = Scene(mesh, s, 1200, 1000, arm=True); scene.view = view
     shapes=tabletop(scene,s)
     try:
@@ -250,7 +250,7 @@ def refresh(object_name='B',output_root=DEFAULT_OUTPUT):
             raise ValueError('Non-rendering input changed: '+path)
     old_source=report['input_sha256'][render_source]
     report['input_sha256'][render_source]=sha256(__file__)
-    mesh=load_shape(ROOT/'objects'/object_of(object_name)/'mesh.stl')
+    mesh=load_shape(ROOT/'objects'/object_name/'mesh.stl')
     report['figures']=publish(mesh,report,Path(output_root)/object_name/'step1')
     report['figure_refresh']=dict(previous_render_source_sha256=old_source,
         render_source_sha256=sha256(__file__),unchanged_task_arrays_sha256=report['arrays_sha256'])

@@ -36,7 +36,7 @@ import manifold3d as md
 from scipy.spatial import ConvexHull
 
 from whole_task_2.step1.common import ROOT, sha256, write_json
-from whole_task_2.step1.reach_video import work_arm
+from whole_task_2.step1.reach_video import kuka as work_arm
 from whole_task_2.step3 import independent_geometry as G
 from whole_task_2.step3.tool_membranes import load_model, stem, task_partition
 

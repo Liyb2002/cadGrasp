@@ -32,7 +32,7 @@ from scipy.spatial.transform import Rotation, Slerp
 from whole_task_2.step1.common import ROOT, DEFAULT_OUTPUT, sha256, write_json
 from whole_task_2.step1.arm import clipped
 from whole_task_2.step1.reach import tip_contact
-from whole_task_2.step1.reach_video import STATION_VIEW, LIGHT, Scene, work_arm, tool_frame, slerp, ease
+from whole_task_2.step1.reach_video import STATION_VIEW, LIGHT, Scene, kuka as work_arm, tool_frame, slerp, ease
 from whole_task_2.operations.geometry import moved_mesh
 from whole_task_2.step3 import independent_geometry as G
 from whole_task_2.step3.render_independent import BLUE

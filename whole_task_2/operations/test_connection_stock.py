@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 import numpy as np
 import trimesh
-from whole_task_2.step3 import independent_geometry as G
+from whole_task.step3 import independent_geometry as G
 from .state import Layout
 from .connection_stock import connecting_stock,positive_parts
 

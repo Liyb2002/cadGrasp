@@ -7,16 +7,16 @@ import numpy as np
 import trimesh
 from PIL import Image,ImageDraw,ImageFont
 
-from whole_task_2.step1.common import ROOT,sha256,write_json
-from whole_task_2.step1.find_tasks_figure import cone
-from whole_task_2.step1.reach_video import tool_frame,HEAD,STEEL
-from whole_task_2.step3.render_independent import Renderer,BLUE
-from whole_task_2.step5.video import raster as r
-from whole_task_2.common.poses import spin_pose
+from whole_task.step1.common import ROOT,sha256,write_json
+from whole_task.step1.find_tasks_figure import cone
+from whole_task.step1.reach_video import tool_frame,HEAD,STEEL
+from whole_task.step3.render_independent import Renderer,BLUE
+from whole_task.step5.video import raster as r
+from whole_task.common.poses import spin_pose
 from .geometry import moved_mesh
 
 HERE=Path(__file__).parent
-DATA=ROOT/'whole_task_2/data/B/operation_videos'
+DATA=ROOT/'whole_task/data/B/operation_videos'
 VIEW=np.array([1.1,1.4,.95]);VIEW/=np.linalg.norm(VIEW)
 
 
@@ -54,7 +54,7 @@ def annotate(image,start,end):
 
 
 def main():
-    archive=ROOT/'whole_task_2/data/B/step3_connected_output_legacy/step3.2'
+    archive=ROOT/'whole_task/data/B/step3_connected_output_legacy/step3.2'
     report=json.loads((archive/'report.json').read_text());manifest=DATA/'videos.json'
     metadata=json.loads(manifest.read_text());base_path=DATA/'pose_shell/000.npz'
     base_meta=json.loads(base_path.with_suffix('.json').read_text())
@@ -72,7 +72,7 @@ def main():
             raise ValueError('Saved rotation state is not the original checked state')
         records.append((path,saved))
     task=next(t for t in report['tasks'] if t['id']=='W02');mask=np.zeros(len(source.faces),bool);mask[task['working_face_ids']]=True
-    setup_path=ROOT/'whole_task_2/data/B/step1_reach/plan.json';setup=json.loads(setup_path.read_text())['setup']
+    setup_path=ROOT/'whole_task/data/B/step1_reach/plan.json';setup=json.loads(setup_path.read_text())['setup']
     L,R,N=setup['needle_length_m'],setup['head_radius_m'],setup['needle_radius_m']
     axis=np.array(report['source_workspace']['nominal_axis_world']);origin=np.array(report['source_workspace']['reference_head_front_world_m'])
     origin[2]=report['common_tool_head_height_m'];tip=first_hit(moved_mesh(source,initial),origin,axis)

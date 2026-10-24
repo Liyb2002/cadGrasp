@@ -1,6 +1,6 @@
 """How a given head works: the Step1 directions painted in turn at the robot station (idea video).
 
-The work arm (robots_config: KUKA LBR Med 14 or SO101) stands at the station's fixed base and carries
+The KUKA LBR Med 14 stands at the station's fixed base (robots_config) and carries
 the head (needle and head cylinder at their real sizes, flange behind the head).
 For each direction the object sits at the work point with that side facing the
 slanted nominal needle direction; the arm moves the head over the side's faces
@@ -129,8 +129,13 @@ class Scene:
         self.nominal=np.asarray(setup.get('working_direction_world',[0.,0.,-1.]),float);self.nominal/=np.linalg.norm(self.nominal)
         self.arm=[]
         if arm:
-            for i,v,f,color in work_arm(setup).visuals():
-                self.arm.append((i,r.Shape(ctx,self.shader,v,f,tuple(color),metallic=.25,roughness=.4)))
+            from codes.simulation.kuka import description,visual_parts
+            links,_,_=description()
+            for i,link in enumerate(links):
+                offset=np.fromstring(link.find('visual/origin').get('xyz'),sep=' ')
+                for v,f,rgba in visual_parts(i):
+                    color=rgba[:3] if not (i in (2,4) and np.allclose(rgba[:3],.2)) else np.full(3,.6)
+                    self.arm.append((i,r.Shape(ctx,self.shader,v+offset,f,tuple(color),metallic=.25,roughness=.4)))
 
     def points(self,W,tools):
         """Everything a frame shows: the placed object, each tool to its head top, the cone."""
@@ -186,48 +191,30 @@ def pose_colors(mesh,face_area,pose,painted,gray,pink):
     return colors
 
 
-ARMS={'kuka_lbr_med14_r820':'whole_task_2.step5.video.kuka','so101':'whole_task_2.step5.video.so101'}
-
-
-def work_arm(setup):
-    """The station's work arm (setup['robot_model'], robots_config) at its base pose, carrying the head: the
-    needle root 70 mm from the flange (KUKA) or from the jaws (SO101)."""
-    from importlib import import_module
-    Arm=import_module(ARMS[setup.get('robot_model','kuka_lbr_med14_r820')]).Arm
+def kuka(setup):
+    """The work arm at the station's base pose, carrying the head: flange 70 mm behind the needle root."""
+    from whole_task_2.step5.video.kuka import Arm
     return Arm(np.asarray(setup['base_position_world_m'],float),np.asarray(setup['base_rotation_world'],float),
                tool=setup['needle_length_m']+.07)
 
 
-def arm_dof(setup):
-    from importlib import import_module
-    return import_module(ARMS[setup.get('robot_model','kuka_lbr_med14_r820')]).Arm.dof
-
-
-def work_point(setup,radius,samples=60,seed=3):
-    """Where the object sits: from the configured window centre forward, away from the base, in steps of
-    work_point_search step_m up to range_m, the first point where the arm reaches every tip within `radius`
-    with the needle anywhere in its cone; if no point reaches them all, the point reaching the most.
-    Returns (point, its distance forward of the centre, the share of tips it reaches)."""
-    arm=work_arm(setup);a=np.asarray(setup['working_direction_world']);c=np.asarray(setup['work_window_center_m'])
+def work_point(setup,radius,step=.01,samples=60,seed=3):
+    """Where the object sits: from the configured window centre forward, away from the base, the first
+    point where the arm reaches every tip within `radius` with the needle anywhere in its cone."""
+    arm=kuka(setup);a=np.asarray(setup['working_direction_world']);c=np.asarray(setup['work_window_center_m'])
     base=np.asarray(setup['base_position_world_m']);out=c-base;out[2]=0;out/=np.linalg.norm(out)
     rng=np.random.default_rng(seed);tilt=np.radians(setup['max_tilt_deg']);trials=[]
     for _ in range(samples):
         u=rng.normal(size=3);u-=u@a*a;u/=np.linalg.norm(u);t=tilt*np.sqrt(rng.random())
         trials.append((rng.uniform(-radius,radius,3),np.cos(t)*a+np.sin(t)*u))
-    search=setup.get('work_point_search',dict(step_m=.01,range_m=2.));step=search['step_m'];best=None
-    for k in range(int(round(search['range_m']/step))):
+    for k in range(200):
         point=c+k*step*out
-        try:q=arm.solve(point,-a)
-        except ValueError:q=None
-        reached=0
-        for n,(offset,d) in enumerate(trials):
-            try:arm_links(arm,point+offset,d,q);reached+=1
-            except ValueError:
-                if best is not None and reached+samples-n-1<=best[0]:break      # cannot beat the best point
-        if reached==samples:return point,k*step,1.
-        if best is None or reached>best[0]:best=(reached,point,k*step)
-    if best is None or best[0]==0:raise ValueError(f"No work point within {search['range_m']} m forward of the window reaches any tip")
-    return best[1],best[2],best[0]/samples
+        try:
+            q=arm.solve(point,-a)
+            for offset,d in trials:arm_links(arm,point+offset,d,q)
+            return point,k*step
+        except ValueError:continue
+    raise ValueError('No reachable work point within 2 m forward of the window')
 
 
 def arm_links(arm,tip,axis,previous=None):
@@ -244,7 +231,7 @@ def arm_motion(mesh,frames,setup):
     Returns per-frame link transforms and a sampled check of the arm body against the object."""
     from whole_task_2.step5.video.prepare import matrices
     from scipy.spatial import ConvexHull
-    arm=work_arm(setup);q=None;links=[];fallbacks=0
+    arm=kuka(setup);q=None;links=[];fallbacks=0
     for f in frames:
         try:q=arm.solve(f['tip'],-f['axis'],q)
         except ValueError:q=arm.solve(f['tip'],-f['axis']);fallbacks+=1
