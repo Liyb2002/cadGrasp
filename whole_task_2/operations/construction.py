@@ -7,7 +7,7 @@ import manifold3d as md
 from scipy.spatial import ConvexHull
 from scipy.sparse.csgraph import minimum_spanning_tree
 
-from whole_task.step3 import independent_geometry as G
+from whole_task_2.step3 import independent_geometry as G
 from .geometry import OperationModel
 from .state import Layout, transform
 from .floors import planes, clip, connected_material, condition

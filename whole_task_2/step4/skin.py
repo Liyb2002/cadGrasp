@@ -82,12 +82,14 @@ class Skin:
         """The cells of the seat X (support <- object) under material: a regular tetrahedron on alternate corners of
         a cube `probe` wide at each mid-layer point (inside the cell's cutting prism), intersected with the support
         (exact and repeatable, unlike a ray parity on these meshes; a third of a cube's triangles)."""
-        P = transform(self.mid, X); n = len(P); corners = TETRA*probe/2
-        V = (P[:, None]+corners[None]).reshape(-1, 3); F = (TETRA_FACES[None]+4*np.arange(n)[:, None, None]).reshape(-1, 3)
-        probes = md.Manifold(md.Mesh64(np.ascontiguousarray(V/G.SCALE), np.ascontiguousarray(F, dtype=np.uint64)))
         value = support if isinstance(support, md.Manifold) else G.solid(support)
+        P = transform(self.mid, X); n = len(P); corners = TETRA*probe/2; out = np.zeros(n, bool)
+        box = np.asarray(value.bounding_box(), float).reshape(2, 3)*G.SCALE                  # only probes there can meet it
+        P = P[((P >= box[0]-probe) & (P <= box[1]+probe)).all(1)]
+        if not len(P): return out
+        V = (P[:, None]+corners[None]).reshape(-1, 3); F = (TETRA_FACES[None]+4*np.arange(len(P))[:, None, None]).reshape(-1, 3)
+        probes = md.Manifold(md.Mesh64(np.ascontiguousarray(V/G.SCALE), np.ascontiguousarray(F, dtype=np.uint64)))
         hit = (value ^ probes).to_mesh64().vert_properties[:, :3]*G.SCALE
-        out = np.zeros(n, bool)
         if len(hit): out[np.unique(self.tree_mid.query(transform(hit, np.linalg.inv(X)))[1])] = True
         return out
 
@@ -185,7 +187,8 @@ def nearer(c, A, B):
     if key not in _nearer:
         if len(_nearer) > 512: _nearer.pop(next(iter(_nearer)))
         S, _ = skin(c); half = np.linalg.norm(S.mid-S.centers, axis=1)       # the mid-layer point's distance to its own surface
-        _nearer[key] = S.tree.query(transform(transform(S.mid, A), np.linalg.inv(B)))[0] >= half
+        # Only whether the nearest cell is within half matters: the search stops beyond the largest half (inf: none).
+        _nearer[key] = S.tree.query(transform(transform(S.mid, A), np.linalg.inv(B)), distance_upper_bound=half.max()*(1+1e-9))[0] >= half
     return _nearer[key]
 
 
@@ -202,7 +205,8 @@ def owners(c, slots):
 
 def regions(c, slots, support):
     """Every seat's skin: [(X, covered cells, its own cells)]."""
-    S, _ = skin(c); return [(X, S.covered(support, X), own) for (X, _), own in zip(seats_of(slots), owners(c, slots))]
+    S, _ = skin(c); value = support if isinstance(support, md.Manifold) else G.solid(support)
+    return [(X, S.covered(value, X), own) for (X, _), own in zip(seats_of(slots), owners(c, slots))]
 
 
 def thin_cells(c, slots, support):

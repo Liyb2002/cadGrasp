@@ -52,6 +52,6 @@ def sweep_mesh(folder,body,direction,length,build,implementation):
 
 
 def implementation_key():
-    from whole_task.step3 import exit_geometry,independent_geometry
+    from whole_task_2.step3 import exit_geometry,independent_geometry
     return ':'.join([digest(__file__),digest(exit_geometry.__file__),
         digest(independent_geometry.__file__),version('manifold3d'),str(independent_geometry.SCALE)])

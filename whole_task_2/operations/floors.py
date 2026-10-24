@@ -1,6 +1,6 @@
 """Actual installation floor halfspaces in the common material frame."""
 import numpy as np
-from whole_task.step3 import independent_geometry as G
+from whole_task_2.step3 import independent_geometry as G
 
 
 def planes(material):

@@ -3,9 +3,9 @@
 A station is a robot model (models/<model>.json: KUKA LBR Med 14 or SO101), a nominal needle direction
 drawn uniformly on the northern hemisphere (the tool comes from above: the surface-to-tool direction has
 z > 0), a tilt-cone half-angle from TILTS and the work arm's bbx (the edge of the surface work cube, from
-EDGES; null: unbounded).  The base stands at the origin with its +X toward the work window; the window
-centre is the model's wrist home plus the tool (needle and holder, TOOL) along the needle direction, so
-that the wrist stays where the arm is dexterous.  Every file is a full schema-1 config
+EDGES; null: unbounded).  The base stands at the origin facing the work window, whose centre is the
+comfortable work point of robots_config.place: the arm has the most room around the whole job there (first
+guess: the model's wrist home plus the tool, TOOL, along the needle).  Every file is a full schema-1 config
 (constraints.load_config); whole_task_2 Step1 reads it for the run <object>+<NN>_<model>.
 
 A draw of `count` stations holds both models and exactly one unbounded bbx.
@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 
 from robots_config.constraints import load_config
+from robots_config.place import placed
 
 HERE = Path(__file__).resolve().parent
 MODELS = ('kuka_lbr_med14_r820', 'so101')
@@ -68,7 +69,7 @@ def draw(count=5, seed=20261022, folder=HERE/'random'):
         z = rng.uniform(0, 1); phi = rng.uniform(0, 2*np.pi)    # uniform on the hemisphere
         up = np.array([np.sqrt(1-z*z)*np.cos(phi), np.sqrt(1-z*z)*np.sin(phi), z])
         edge = None if k == unbounded else float(EDGES[rng.integers(len(EDGES))])
-        config = station(k+1, MODELS[models[k]], up, int(TILTS[rng.integers(len(TILTS))]), edge, seed)
+        config = placed(station(k+1, MODELS[models[k]], up, int(TILTS[rng.integers(len(TILTS))]), edge, seed))
         path = folder/f"{config['id']}.json"; folder.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(config, indent=2)+'\n'); load_config(path); out.append(path)
         t = config['task_constraint']

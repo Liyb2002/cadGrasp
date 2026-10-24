@@ -19,7 +19,7 @@ to its group G with one of Step4's two operations:
 
 Each step a sample draws its operation: Rotational reuse with a share falling from 80% at the first step to
 50% at the last (it fails more often, so it is tried more), else Juxtaposition.  It tries only that operation,
-on the seats used by the fewest tasks first.  Every join passes the gate
+on at most policy['seats'] seats, those used by the fewest tasks first.  Every join passes the gate
 bbx(G+T) <= gate (bbx(G)+bbx(T)), bbx the minimum-volume oriented box, so that a join shares material
 instead of laying T beside G.
 
@@ -48,7 +48,8 @@ one fails the join tries its next start that holds (at most policy['audits'] aud
 
 The samples run on their own, none waiting for another: a sample whose task joins nowhere continues from a
 random state that has already succeeded at that step (else one at its own step) and draws again; it stops
-after policy['retries'] failures in a row while no state has reached the next step.  The best support: the fewest seats, then the
+after policy['retries'] failures in a row while no state has reached the next step.  The search stops at
+policy['enough'] distinct supports holding every task.  The best support: the fewest seats, then the
 smallest bbx, then the least material.
 """
 import argparse
@@ -98,7 +99,9 @@ POLICY = dict(samples=32, seed=11,
               exit_starts=((15., 30.), 8),                      # Rotational reuse starts from the best exit on these rings
               scales=3,                 # while a measured gradient is zero, the finite difference grows x4, this many times
               translation=(.004, .03),  # Translation, object diagonals: finite difference, first step
-              retries=6)                # a sample stops after this many failed joins in a row, none yet past them
+              retries=6,                # a sample stops after this many failed joins in a row, none yet past them
+              seats=3,                  # a join tries at most this many seats (those used by the fewest tasks first)
+              enough=3)                 # the search stops at this many distinct supports holding every task
 
 
 def unit(v):
@@ -221,24 +224,57 @@ def seats(group):
 
 
 _groups = {}
+PAD = .002                      # m: a cutter clipped to a box this much wider than a solid cuts it as the whole cutter does
 
 
-def forbidden(object_name, slots):
-    """The union of every slot's body, keep-out and exit sweep, support frame."""
+def bounds(value):
+    """A solid's bounding box (low, high), m."""
+    b = np.asarray(value.bounding_box(), float)*G.SCALE; return b[:3], b[3:]
+
+
+def clipped(value, box):
+    """value within box (low, high) widened by PAD."""
+    return value ^ G.box(np.asarray(box[0])-PAD, np.asarray(box[1])+PAD)
+
+
+def forbidden(object_name, slots, box=None):
+    """The union of every slot's body, keep-out and exit sweep, support frame.  Given box (low, high), each part
+    clipped to it first: a solid inside the box is cut by it exactly as by the whole, and the parts far from the
+    box -- the KUKA's links, an exit sweep's length: most of the triangles -- cost the Booleans nothing (at 8 poses
+    the union of one task's keep-out and exit sweep took 17 s, the whole region 107 s)."""
     F = []
     for s in slots:
         X = np.asarray(s['X'], float)
         F += [move(X, body_and_keepout(object_name, s['members'][0])), move(X, sweep(object_name, s['exit']))]
-    return G.union(F)
+    return G.union(F if box is None else [clipped(f, box) for f in F])
+
+
+def group_solids(object_name, group):
+    """The group's solids, its frame, kept for the latest few groups: its support 's', and what solids() and
+    nearby() add."""
+    key = group['file']
+    if key not in _groups:
+        if len(_groups) >= 4: _groups.pop(next(iter(_groups)))
+        _groups[key] = dict(s=G.solid(read_mesh(ROOT/group['file'])))
+    return _groups[key]
 
 
 def solids(object_name, group):
     """The group's support and the union of every slot's body, keep-out and exit sweep, its frame."""
-    key = group['file']
-    if key not in _groups:
-        if len(_groups) >= 4: _groups.pop(next(iter(_groups)))
-        _groups[key] = dict(s=G.solid(read_mesh(ROOT/group['file'])), F=forbidden(object_name, group['slots']))
-    return _groups[key]
+    g = group_solids(object_name, group)
+    if 'F' not in g: g['F'] = forbidden(object_name, group['slots'])
+    return g
+
+
+def nearby(object_name, group, value):
+    """The group's forbidden region for cutting value: clipped (once per group) to the box of its support widened by
+    the object's diagonal when value lies in that box, else to value's own box."""
+    g = group_solids(object_name, group); low, high = bounds(value)
+    if 'near' not in g:
+        D = float(np.linalg.norm(context(object_name).base.source.extents)); lo, hi = bounds(g['s'])
+        g['near'] = (lo-D, hi+D, forbidden(object_name, group['slots'], (lo-D, hi+D)))
+    lo, hi, F = g['near']
+    return F if (low >= lo).all() and (high <= hi).all() else forbidden(object_name, group['slots'], (low, high))
 
 
 def largest(value):
@@ -251,7 +287,7 @@ def largest(value):
 
 def reuse(object_name, group, i, X, e):
     """Rotational reuse: task i in the seat X, the group's support opened by its keep-out and exit sweep along e."""
-    return largest(solids(object_name, group)['s']-move(X, body_and_keepout(object_name, i))-move(X, sweep(object_name, e)))
+    s = group_solids(object_name, group)['s']; return largest(s-forbidden(object_name, [slot(i, X, e)], bounds(s)))
 
 
 def juxtaposed(object_name, group, k, i, angle, t):
@@ -267,8 +303,14 @@ def juxtaposed(object_name, group, k, i, angle, t):
 def juxtapose(object_name, group, i, X, e):
     """Juxtaposition: task i's Step3 membrane at X joined to the group's support, each cut by the other's
     forbidden region (each already excludes its own)."""
-    g = solids(object_name, group); F = body_and_keepout(object_name, i)+sweep(object_name, e)
-    return largest((g['s']-move(X, F))+(move(X, membrane(object_name, i)-F)-g['F']))
+    s = group_solids(object_name, group)['s']; placed = move(X, alone(object_name, i, direction_key(e)))
+    return largest((s-forbidden(object_name, [slot(i, X, e)], bounds(s)))+(placed-nearby(object_name, group, placed)))
+
+
+@lru_cache(maxsize=None)
+def alone(object_name, i, e):
+    """Task i's Step3 membrane less its own body, keep-out and exit sweep along e, object frame."""
+    m = membrane(object_name, i); return m-forbidden(object_name, [slot(i, np.eye(4), e)], bounds(m))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -388,7 +430,8 @@ def certify(c, slots, membrane):
     """One pose: the standing support (membrane, post, plate) built, every task audited in full on it, its
     ground faces enclosing every pressure hull -- the post and plate stay below the objects, so its contacts
     are the membrane's.  Several poses: no pressure hull below another resting plane (checked first, it is
-    cheap), every task audited in full on the membrane, and the foot-region oracle.  Returns facts."""
+    cheap), the foot-region oracle (then: it costs less than the audit and fails more often -- at 8 poses most
+    failed audits were this), every task audited in full on the membrane.  Returns facts."""
     from .ground_oracle import pressure_rows, pressure_floor_gap, ground_enclosure, foot_regions
     width = measure(c, slots, membrane)
     if width[1] > 0: raise ValueError(f'skin narrower than {WIDTH*1000:.0f} mm: {skin_facts(width)}')
@@ -406,9 +449,10 @@ def certify(c, slots, membrane):
         model = ExitModel(c, slots); candidate = dict(layout=model.layout(membrane), support=membrane, construction={})
         candidate['tasks'] = model.prepare(candidate['layout'])
         if pressure_floor_gap(model, candidate['layout']) < -1e-8: raise ValueError('Required pressure hull crosses another resting plane')
-        model.audit(candidate)
+        model.exit_paths(candidate)             # every task's exit travel on this support, as the audit sets it
         found = next(foot_regions(model, candidate), None)
         if found is None: raise ValueError('no foot region')
+        model.audit(candidate)
         out.update(foot_padding_m=found[0])
     return out
 
@@ -423,7 +467,7 @@ def accept(object_name, slots, keep, limit, file):
         model = ExitModel(c, slots)
         # What is not joined to the largest piece goes, and the skin narrower than WIDTH, again while that leaves
         # more; then the oracle judges what is left.
-        support, out['skin_pruning'] = pruned(c, slots, support, forbidden(object_name, slots))
+        support, out['skin_pruning'] = pruned(c, slots, support, forbidden(object_name, slots, support.bounds))
         candidate = dict(layout=model.layout(support), support=support, construction={})
         candidate['tasks'] = model.prepare(candidate['layout']); model.refine_exits(candidate)
         support = steady(candidate['support'])
@@ -554,7 +598,7 @@ def try_reuse(object_name, group, i, k, limit, file, policy):
     # holds nothing more, so if the group's support opened by the keep-out alone cannot hold every task's loads,
     # no exit direction will.  Only the loads bound it: the gate and the floors can still come right as the exit
     # removes more, so they are judged on each exit.
-    opened, _ = largest(solids(object_name, group)['s']-move(X, body_and_keepout(object_name, i)))
+    s = group_solids(object_name, group)['s']; opened, _ = largest(s-clipped(move(X, body_and_keepout(object_name, i)), bounds(s)))
     if opened is None: return dict(row, passed=False, reason='the keep-out removes the whole seat')
     try:
         mesh = G.mesh(opened); opened_slots = group['slots']+[slot(i, X, default_exit(object_name, i))]
@@ -655,11 +699,11 @@ def restore(object_name, build, starts, blocks, extra, limit, file, row, policy)
 
 
 def join(args):
-    """Task i joins the group by the drawn operation, on the seats used by the fewest tasks first.  The first
-    accepted is the join."""
+    """Task i joins the group by the drawn operation, on at most policy['seats'] seats, those used by the fewest
+    tasks first.  The first accepted is the join."""
     object_name, group, single, i, operation, file, seed, policy = args; began = time.monotonic(); rng = np.random.default_rng(seed)
     limit = policy['gate']*(group['bbx_m3']+single['bbx_m3']); order = seats(group)
-    ranked = sorted(range(len(order)), key=lambda k: (len(order[k][1]), rng.random()))
+    ranked = sorted(range(len(order)), key=lambda k: (len(order[k][1]), rng.random()))[:policy['seats']]
     attempts = []
     for attempt in [dict(rotational_reuse=try_reuse, juxtaposition=try_juxtapose)[operation]]:
         for k in ranked:
@@ -762,10 +806,13 @@ def run(object_name='B', workers=22, policy=POLICY):
     succeeded at that step (else one at the sample's own step) and draws again.  A sample stops after
     policy['retries'] failures in a row with no state yet at the next step.  Samples copy each other's states, so
     they often draw a join already made: a join is the same for the same group, task and operation, so it runs
-    once and every later draw of it (or one drawn while it runs) takes its result."""
+    once and every later draw of it takes its result; a draw of a join still running draws again (only when every
+    join left is running does it wait for one).  The search stops at policy['enough'] distinct supports holding
+    every task; the joins still running then are dropped."""
     began = time.monotonic(); c = context(object_name); folder = ROOT/'whole_task_2/data'/object_name/FOLDER
     folder.mkdir(parents=True, exist_ok=True); n = len(c.base.ids); rng = np.random.default_rng(policy['seed']); log = []
-    with pinned_pool(workers) as executor:
+    executor = pinned_pool(workers); done = {}                     # done: the distinct supports holding every task
+    try:
         start = list(executor.map(initial_one, [(object_name, i, folder) for i in range(n)]))
         samples, reached, running = [], {0: []}, {}               # reached[step]: (group, left, sample) that got there
         made, waiting, ready = {}, {}, []                          # (group file, task, operation): its result; samples waiting
@@ -774,14 +821,17 @@ def run(object_name='B', workers=22, policy=POLICY):
             reached[0].append((samples[-1]['group'], samples[-1]['left'], k))
 
         def submit(s):
-            i = int(rng.choice(s['left'])); first, last = policy['reuse_share']; share = first+(last-first)*s['step']/max(1, n-2)
-            o = 'rotational_reuse' if rng.random() < share else 'juxtaposition'; key = (s['group']['file'], i, o)
+            first, last = policy['reuse_share']; share = first+(last-first)*s['step']/max(1, n-2)
+            for _ in range(2*len(s['left'])):       # a join another sample is running: draw another (none waits)
+                i = int(rng.choice(s['left'])); o = 'rotational_reuse' if rng.random() < share else 'juxtaposition'
+                key = (s['group']['file'], i, o)
+                if key not in waiting: break
             if key in made: ready.append((s, i, made[key], True)); return
             if key in waiting: waiting[key].append((s, i)); return
             s['attempts'] += 1; file = folder/'groups'/f"s{s['id']:02d}_step{s['step']+1}_a{s['attempts']}.npz"; waiting[key] = []
             running[executor.submit(join, (object_name, s['group'], start[i], i, o, file, [policy['seed'], s['id'], s['step']+1, s['attempts']], policy))] = (s, i, key)
         for s in samples: submit(s)
-        while running or ready:
+        while (running or ready) and len(done) < policy['enough']:
             if not ready:
                 finished, _ = wait(running, return_when=FIRST_COMPLETED)
                 for job in finished:
@@ -806,9 +856,13 @@ def run(object_name='B', workers=22, policy=POLICY):
                     g, left, source = reached[at][int(rng.integers(len(reached[at])))]
                     s.update(group=g, left=list(left), step=at, copied_from=source)
                 if s['left']: submit(s)
+                else: done.setdefault(s['group']['file'], s['id'])
             write_json(folder/'search.json', plain(dict(policy=policy, start=start, log=log, seconds=time.monotonic()-began,
                        samples=[dict(id=s['id'], group=s['group'], left=s['left'], step=s['step'], copied_from=s.get('copied_from'),
                                      stopped=s.get('stopped', False)) for s in samples])))
+    finally:                                                       # enough: the joins still running are dropped
+        for process in list(getattr(executor, '_processes', {}).values()): process.terminate()
+        executor.shutdown(wait=False, cancel_futures=True)
     finals = [dict(s['group'], sample=s['id']) for s in samples if not s['left']]
     report = dict(object=object_name, policy=policy, start=start, samples=len(samples), samples_done=len(finals),
                   finals=best_first(finals), log=log, seconds=time.monotonic()-began)

@@ -17,16 +17,16 @@ import numpy as np
 import trimesh
 from PIL import Image, ImageDraw
 
-from whole_task.step1.common import ROOT, sha256, write_json
-from whole_task.step3 import independent_geometry as G
-from whole_task.step3.exit_geometry import whole_object_sweep
-from whole_task.step3.render_independent import BLUE, Renderer
-from whole_task.step5.video import raster
+from whole_task_2.step1.common import ROOT, sha256, write_json
+from whole_task_2.step3 import independent_geometry as G
+from whole_task_2.step3.exit_geometry import whole_object_sweep
+from whole_task_2.step3.render_independent import BLUE, Renderer
+from whole_task_2.step5.video import raster
 from .geometry import moved_mesh
 
 
 HERE = Path(__file__).parent
-DATA = ROOT / 'whole_task/data/B/operation_videos'
+DATA = ROOT / 'whole_task_2/data/B/operation_videos'
 REFERENCE = ROOT / 'slides/Co-optimize/operation_demo'
 POSES = ['pose_1', 'pose_2', 'pose_4', 'pose_6']
 VIEW = np.array([1.1, 1.4, .95])
@@ -219,10 +219,10 @@ class SweepOverlay:
 
 class Scene:
     def __init__(self):
-        archive = ROOT / 'whole_task/data/B/step3_connected_output_legacy/step3.2'
+        archive = ROOT / 'whole_task_2/data/B/step3_connected_output_legacy/step3.2'
         self.source_path = archive / 'initialization.npz'
         self.source = load_mesh(self.source_path, 'source_vertices_object', 'source_faces')
-        self.outer_path = ROOT / 'whole_task/data/B/step3_mold_plate/fitted_outer.npz'
+        self.outer_path = ROOT / 'whole_task_2/data/B/step3_mold_plate/fitted_outer.npz'
         self.outer = load_mesh(self.outer_path)
         self.record_path = REFERENCE / 'direction/vis/source_animation_record.json'
         self.record = json.loads(self.record_path.read_text())

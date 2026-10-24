@@ -5,14 +5,14 @@ import json
 import numpy as np
 import trimesh
 
-from whole_task.step1.common import ROOT, sha256, write_json
-from whole_task.step3 import independent_geometry as G
-from whole_task.step3.independent_physics import certificate
+from whole_task_2.step1.common import ROOT, sha256, write_json
+from whole_task_2.step3 import independent_geometry as G
+from whole_task_2.step3.independent_physics import certificate
 from .geometry import moved_mesh
 
 
 def wrapped_state(model, state, tag, index, owner=0):
-    folder = ROOT / 'whole_task/data/B/operation_videos' / tag
+    folder = ROOT / 'whole_task_2/data/B/operation_videos' / tag
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f'{index:03}.npz'
     record = path.with_suffix('.json')

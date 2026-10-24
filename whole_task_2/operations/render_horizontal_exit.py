@@ -7,7 +7,7 @@ import subprocess
 import numpy as np
 from PIL import Image
 
-from whole_task.step1.common import ROOT, sha256, write_json
+from whole_task_2.step1.common import ROOT, sha256, write_json
 from . import render_refinements as reference
 
 

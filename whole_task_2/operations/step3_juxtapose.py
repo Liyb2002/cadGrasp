@@ -5,18 +5,18 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-from whole_task.step1.common import ROOT, sha256, write_json
-from whole_task.step3 import independent_geometry as G
-from whole_task.step3.tool_membranes import load_model, stem
-from whole_task.step4 import fast_checks  # noqa: F401; same continuous exit test, faster broad phase
-from whole_task.step4.keepout import load as load_keepouts
+from whole_task_2.step1.common import ROOT, sha256, write_json
+from whole_task_2.step3 import independent_geometry as G
+from whole_task_2.step3.tool_membranes import load_model, stem
+from whole_task_2.step4 import fast_checks  # noqa: F401; same continuous exit test, faster broad phase
+from whole_task_2.step4.keepout import load as load_keepouts
 from .geometry import moved_mesh
 from .state import Layout
 from .render_refinements import condition_geometry, component_volumes, connected_shell
 
 
-DATA = ROOT / 'whole_task/data/B/operation_videos/juxtapose_step3'
-SOURCE = ROOT / 'whole_task/data/B/step3_tool_membranes'
+DATA = ROOT / 'whole_task_2/data/B/operation_videos/juxtapose_step3'
+SOURCE = ROOT / 'whole_task_2/data/B/step3_tool_membranes'
 TASKS = ['+X', '+Y']
 
 
@@ -49,7 +49,7 @@ class Pair:
                 mesh = trimesh.Trimesh(saved['vertices'], saved['faces'], process=False)
             self.shells.append(shifted(mesh, shift))
             self.inputs.append(path)
-        keep = ROOT / 'whole_task/data/B/step4_keepout'
+        keep = ROOT / 'whole_task_2/data/B/step4_keepout'
         self.inputs += [keep / name for name in ('report.json', 'validation.json', 'PX.npz', 'PY.npz')]
         self.solids = [G.solid(mesh) for mesh in self.shells]
         self.tasks = self.model.prepare(self.layout)

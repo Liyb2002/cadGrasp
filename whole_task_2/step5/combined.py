@@ -31,7 +31,10 @@ keep-out and exit sweep,
   - about every contact corner a task's paired-load certificate uses (as the peel's, preferring corners deep in
     the skin) the backed skin within 2r stays;
   - a piece the openings part (one holding such skin however small) is joined to the rest by the shortest
-    strut of radius r (its centre line where such a ball fits in the room, a geodesic).
+    strut of radius r (its centre line where such a ball fits in the room, a geodesic); a piece of the support
+    (at least 1e-3 of it) that no such strut reaches -- the room between it and the rest is narrower than 2r --
+    by the shortest centre line through that room, its strut an exact tube of radius r (not smoothed below),
+    cut to the legal space like the rest: as wide as the space lets it.
 All of it in the room, so the result stays in it; one pass.
 The surface is smoothed (a Gaussian of the signed distance, Taubin passes) and reaches 1.5 voxels into the
 objects only, then, as a solid again, is cut to the exact legal space: its contact faces are the objects' own
@@ -348,25 +351,39 @@ def touched(mesh, low, h, shape):
 def struts(O, room, r, h, must, share=1e-3):
     """O (voxels) with every piece of at least `share` of it, or holding any of must, joined to the largest by the
     shortest strut of radius r whose centre line stays where a ball of radius r fits in room, the nearest piece
-    first: (O, struts)."""
+    first; then every piece of at least `share` no such strut reaches (the room between it and the rest narrower
+    than 2r) by the shortest centre line through room, the strut as wide as room lets it: (O, struts, the centre
+    lines of those narrow ones, voxel indices)."""
     edt = lambda mask: ndimage.distance_transform_edt(mask, sampling=h)
     label, n = ndimage.label(O)
-    if n < 2: return O, 0
-    size = np.bincount(label.ravel()); size[0] = 0; joined = label == size.argmax()
-    fits = edt(room) > r; cost = np.where(fits, 1., np.inf); needed = set(np.unique(label[must]))
+    if n < 2: return O, 0, []
+    size = np.bincount(label.ravel()); size[0] = 0; joined = label == size.argmax(); needed = set(np.unique(label[must]))
     todo = [k for k in range(1, n+1) if k != size.argmax() and (size[k] >= share*size.sum() or k in needed)]
-    count = 0
-    while todo:
-        paths = MCP_Geometric(cost, fully_connected=True); far, _ = paths.find_costs(np.argwhere(joined & fits)); best = None
-        for k in todo:
-            ends = np.argwhere((label == k) & (fits | must))
-            if not len(ends): continue
-            d = far[tuple(ends.T)]; j = int(d.argmin())
-            if np.isfinite(d[j]) and (best is None or d[j] < best[0]): best = (d[j], k, tuple(ends[j]))
-        if best is None: break
-        line = np.zeros(O.shape, bool); line[tuple(np.asarray(paths.traceback(best[2])).T)] = True
-        joined |= (label == best[1]) | ((edt(~line) <= r) & room); todo.remove(best[1]); count += 1
-    return joined, count
+    count, narrow = 0, []
+    for space in (edt(room) > r, room):
+        if space is room: todo = [k for k in todo if size[k] >= share*size.sum()]
+        cost = np.where(space, 1., np.inf)
+        while todo:
+            paths = MCP_Geometric(cost, fully_connected=True); far, _ = paths.find_costs(np.argwhere(joined & space)); best = None
+            for k in todo:
+                ends = np.argwhere((label == k) & (space | must))
+                if not len(ends): continue
+                d = far[tuple(ends.T)]; j = int(d.argmin())
+                if np.isfinite(d[j]) and (best is None or d[j] < best[0]): best = (d[j], k, tuple(ends[j]))
+            if best is None: break
+            path = np.asarray(paths.traceback(best[2])); line = np.zeros(O.shape, bool); line[tuple(path.T)] = True
+            joined |= (label == best[1]) | ((edt(~line) <= r) & room); todo.remove(best[1]); count += 1
+            if space is room: narrow.append(path)
+    return joined, count, narrow
+
+
+def tubes(paths, low, h, r):
+    """Centre lines (voxel indices on the grid low + (index + 1/2) h) as exact tubes of radius r."""
+    ball = trimesh.creation.icosphere(subdivisions=2, radius=r).vertices; parts = []
+    for path in paths:
+        p = low+(np.asarray(path, float)+.5)*h; p = np.vstack([p, p]) if len(p) == 1 else p
+        parts += [md.Manifold.hull_points(np.vstack([ball+a, ball+b])/G.SCALE) for a, b in zip(p[:-1], p[1:])]
+    return G.union(parts)
 
 
 def holding(model, support, r, depth):
@@ -416,7 +433,8 @@ def rounded(c, model, group, support, r=ROUND):
         mesh = trimesh.Trimesh(v+low-.5*h, f, process=True)
         if mesh.volume < 0: mesh.invert()
         trimesh.smoothing.filter_taubin(mesh, iterations=r['taubin'])
-        out, share = largest(G.solid(mesh) ^ space)
+        body = G.solid(mesh) if not narrow else G.solid(mesh)+tubes(narrow, low, h, radius)
+        out, share = largest(body ^ space)
         for rounds in range(4):                 # a source face that no longer exits: what was added in its prism goes
             m = G.mesh(out); candidate = dict(layout=model.layout(m), support=m, tasks=None, construction={})
             candidate['tasks'] = model.prepare(candidate['layout']); rows, bad = model.path_checks(out, model.exit_paths(candidate))
@@ -432,11 +450,11 @@ def rounded(c, model, group, support, r=ROUND):
     closed = close(backed, r['close']) & room                                        # the teeth joined
     closed = opened(closed | (B & (near <= 2*spike+h)), spike) & room                 # what sticks out thinner than 2R goes
     O = opened(closed, radius) | own                                                 # no feature thinner than 2r
-    O, joins = struts(O, room | own, radius, h, own)
+    O, joins, narrow = struts(O, room | own, radius, h, own)
     out, share, rounds = solid(O); failed = holds(model, out)
     if failed is not None: raise ValueError(f'{failed}: the manufacturable support (features {radius*1000:g} mm, protrusions {spike*1000:g} mm) no longer holds its loads')
     return out, dict(radius_m=radius, spike_m=spike, grid=[int(n) for n in shape], kept_share=float(share), struts=joins,
-                     corners=len(points), exit_rounds=rounds,
+                     narrow_struts=len(narrow), corners=len(points), exit_rounds=rounds,
                      volume_cm3=[float(support.volume*1e6), float(out.volume*1e6)], seconds=time.monotonic()-began)
 
 
@@ -462,7 +480,10 @@ def wrap(c, group, foot=FOOT):
     candidate['tasks'] = model.prepare(candidate['layout']); model.refine_exits(candidate)
     record.append(dict(exit_refinement_rounds=candidate['construction']['exit_refinement_rounds'],
                        removed_cm3=float(support.volume-candidate['support'].volume)*1e6))
-    support = piece(G.solid(candidate['support']), 'the exit recut splits the support')
+    # The audit judges the support the recut checked last.  Every re-mesh can leave a sliver where two coincident
+    # surfaces meet (an inverted shell the audit counts: B+8pose, 1.7e-9 m^3 in a body after piece(), 1.7e-8 m^3 in
+    # an exit prism after settling again), so a support the recut left as it was is not re-meshed.
+    if candidate['construction']['exit_refinement_rounds']: support = piece(G.solid(candidate['support']), 'the exit recut splits the support')
     # The skin as it is: its least width (None: nothing narrower than 4 WIDTH) and the area narrower than WIDTH and
     # thinner than THICK (load-bearing skin the legal space lets be neither wider nor thicker).  Recorded.
     width = measure(c, group['slots'], support); steps['too_thin_m2'] = P.too_thin(c, group, support)

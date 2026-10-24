@@ -7,7 +7,7 @@ need not survive a Boolean retriangulation.
 """
 from threading import RLock
 import numpy as np
-from whole_task.step3.legacy import kernel as K
+from whole_task_2.step3.legacy import kernel as K
 
 _lock=RLock()
 

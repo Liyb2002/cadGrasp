@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 import numpy as np
-from whole_task.step3.legacy import kernel as K
+from whole_task_2.step3.legacy import kernel as K
 from .force_witness import classify_with_witness
 
 

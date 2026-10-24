@@ -15,16 +15,16 @@ import shapely
 import trimesh
 from scipy.spatial import ConvexHull
 
-from whole_task.step1.common import ROOT, DEFAULT_OUTPUT, sha256
-from whole_task.common.force_cone import tangent_frame
-from whole_task.step1.needle_geometry import geometric_mask
-from whole_task.step3 import independent_geometry as G
-from whole_task.step3.exit_geometry import (
+from whole_task_2.step1.common import ROOT, DEFAULT_OUTPUT, sha256
+from whole_task_2.common.force_cone import tangent_frame
+from whole_task_2.step1.needle_geometry import geometric_mask
+from whole_task_2.step3 import independent_geometry as G
+from whole_task_2.step3.exit_geometry import (
     whole_object_sweep, grounded_material, condition_exit, refine_face_prisms,
     continuous_checks,
 )
-from whole_task.step3.run_independent import make_domain
-from whole_task.step3.independent_physics import demands, certificate
+from whole_task_2.step3.run_independent import make_domain
+from whole_task_2.step3.independent_physics import demands, certificate
 from .state import Layout, transform
 
 
@@ -113,7 +113,7 @@ class OperationModel:
             self.source = trimesh.Trimesh(z['source_vertices_object'], z['source_faces'], process=False)
             self.initial_support = trimesh.Trimesh(z['support_vertices_m'], z['support_faces'], process=False)
         self.inputs = [self.folder / p for p in ('report.json', 'validation.json', 'initialization.npz', 'support.obj')]
-        outer_path = ROOT / 'whole_task/data' / name / 'step3_mold_plate/fitted_outer.npz'
+        outer_path = ROOT / 'whole_task_2/data' / name / 'step3_mold_plate/fitted_outer.npz'
         with np.load(outer_path) as z:
             self.outer = trimesh.Trimesh(z['vertices'], z['faces'], process=False)
         self.inputs.append(outer_path)
@@ -285,7 +285,7 @@ class OperationModel:
                         world_sweep,_=whole_object_sweep(row['body_world'],direction,sweep_length)
                         return G.mesh(world_sweep)
                     self.world_sweep_cache[sweep_key]=sweep_mesh(
-                        ROOT/'whole_task/data'/self.name/'step4_world_sweeps',
+                        ROOT/'whole_task_2/data'/self.name/'step4_world_sweeps',
                         row['body_world'],direction,sweep_length,construct_sweep,
                         self.sweep_cache_implementation)
                     if len(self.world_sweep_cache)>48:
@@ -400,8 +400,8 @@ class OperationModel:
                     raise ValueError(t['id'] + ': paired force/moment certificate failed ' + str(proof))
                 t['contact_data'] = data
             else:
-                from whole_task.step3.independent_physics import contacts
-                from whole_task.step3.legacy import kernel as K
+                from whole_task_2.step3.independent_physics import contacts
+                from whole_task_2.step3.legacy import kernel as K
                 from .contact_cache import query_contacts
                 cache=getattr(self,'actual_contact_cache',None)
                 if cache is None:self.actual_contact_cache=cache={}

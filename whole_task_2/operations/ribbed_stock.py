@@ -5,16 +5,16 @@ connectivity and the original complete load certificate are checked afterward.
 """
 from itertools import product
 import numpy as np
-from whole_task.step3 import independent_geometry as G
+from whole_task_2.step3 import independent_geometry as G
 from .geometry import moved_mesh
 
 
 def contact_skin(model):
     if not hasattr(model,'source'):return model.outer
     if not hasattr(model,'complete_contact_skin'):
-        from whole_task.step1.common import ROOT
+        from whole_task_2.step1.common import ROOT
         import trimesh
-        path=ROOT/'whole_task/data'/model.name/'step4_contact_skin_5mm.npz'
+        path=ROOT/'whole_task_2/data'/model.name/'step4_contact_skin_5mm.npz'
         if path.exists():
             with np.load(path)as z:
                 np.testing.assert_array_equal(z['source_vertices'],model.source.vertices)

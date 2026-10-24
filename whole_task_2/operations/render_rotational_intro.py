@@ -13,15 +13,15 @@ import trimesh
 import manifold3d as md
 from scipy.spatial.transform import Rotation, Slerp
 
-from whole_task.step1.common import ROOT, sha256, write_json
-from whole_task.step1.find_tasks_figure import cone
-from whole_task.step1.reach_video import slerp
-from whole_task.step3 import independent_geometry as G
-from whole_task.step3.exit_geometry import whole_object_sweep
-from whole_task.step3.render_independent import Renderer, BLUE
-from whole_task.step3.run_independent import make_domain
-from whole_task.step3.independent_physics import demands, certificate
-from whole_task.step5.video import raster
+from whole_task_2.step1.common import ROOT, sha256, write_json
+from whole_task_2.step1.find_tasks_figure import cone
+from whole_task_2.step1.reach_video import slerp
+from whole_task_2.step3 import independent_geometry as G
+from whole_task_2.step3.exit_geometry import whole_object_sweep
+from whole_task_2.step3.render_independent import Renderer, BLUE
+from whole_task_2.step3.run_independent import make_domain
+from whole_task_2.step3.independent_physics import demands, certificate
+from whole_task_2.step5.video import raster
 from .geometry import moved_mesh, contact_surface
 from .render_merge import mesh_digest, ease
 from .render_pose_rotation import VIEW
@@ -30,7 +30,7 @@ from . import render_rotational_reuse as reuse
 
 
 DATA = reuse.DATA / 'intro'
-VIDEO = ROOT / 'whole_task/operations/rotational_reuse.mp4'
+VIDEO = ROOT / 'whole_task_2/operations/rotational_reuse.mp4'
 FPS = 48
 PREFIX_GEOMETRY_FRAMES = 144
 PREFIX_FRAMES = 288
@@ -73,7 +73,7 @@ def geometry(source, fixture, proof):
     """Restore only the other task's window to form each independent shell."""
     archive = json.loads((reuse.ARCHIVE / 'report.json').read_text())
     assert sha256(reuse.ARCHIVE / 'report.json') == proof['input_step32_report_sha256']
-    outer_path = ROOT / 'whole_task/data/B/step3_mold_plate/fitted_outer.npz'
+    outer_path = ROOT / 'whole_task_2/data/B/step3_mold_plate/fitted_outer.npz'
     assert sha256(outer_path) == proof['fitted_outer_sha256']
     with np.load(outer_path) as saved:
         outer = trimesh.Trimesh(saved['vertices'], saved['faces'], process=False)

@@ -1,6 +1,6 @@
 # Whole task 2 当前重算流程（2026-10-22）
 
-输入采用 `whole_task/step1/` 的正方体工作窗口版本，示意资产复制自 `whole_task/idea/`。所有 B 结果已清理后重算；不使用旧五任务或十三任务缓存。源目录保持不变。
+输入采用 `whole_task/step1/` 的正方体工作窗口版本，示意资产复制自 `whole_task/idea/`。所有 B 结果已清理后重算；不使用旧五任务或十三任务缓存。`whole_task/` 已于 2026-10-24 删除，本目录不再依赖它。
 
 1. **Step1**：固定六个落桌姿态，在固定 77.393 mm 正方体内认证表面加工点。方向锥半角 25°；针长 100 mm、针半径 2 mm、头半径 20 mm。逐面复验针、头、IK、连杆和桌面，实际任务由认证交集互斥分配。
 2. **idea**：`find_tasks_figure` 显示 +X 的完整候选交集；`find_tasks_video` 沿全部三维边界描绘。完整候选区允许姿态间重叠，下游实际任务不重叠。
@@ -13,6 +13,6 @@
 
 Step1 重跑结果：6 个实际 task，2,456 个面，288.57 cm²，覆盖 51.56%；3,293 组认证通过复验。任务归属、可达掩码及世界工作框与源版本一致。57 项 Step1／Step3 接入测试通过。
 
-[Step1 计划](data/B/step1_reach/plan.json) · [Step1 复验](data/B/step1_reach/validation.json) · [运行状态](data/B/rerun_status.json) · [运行日志](data/B/logs/) · [复制与清理清单](copy_manifest_20261022.json)。
+B 的运行数据已于 2026-10-24 删除，只保留各 `B+` 工位 Step3 共用并记录哈希的 `data/B/step3_mold_plate/fitted_outer.npz`。[复制与清理清单](copy_manifest_20261022.json)。
 
 当前后续重算尚未全部完成，结果以本次生成的报告与复验为准。

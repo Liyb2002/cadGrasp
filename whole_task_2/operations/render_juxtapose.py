@@ -5,10 +5,10 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-from whole_task.step1.common import ROOT, sha256, write_json
-from whole_task.step3 import independent_geometry as G
-from whole_task.step3.render_independent import Renderer, BLUE
-from whole_task.step5.video import raster
+from whole_task_2.step1.common import ROOT, sha256, write_json
+from whole_task_2.step3 import independent_geometry as G
+from whole_task_2.step3.render_independent import Renderer, BLUE
+from whole_task_2.step5.video import raster
 from .geometry import moved_mesh
 from .render_merge import ease, mesh_digest
 from .render_pose_rotation import VIEW
@@ -140,7 +140,7 @@ def main():
     source_snapshot = DATA / 'render_source.py'
     source_snapshot.write_bytes(Path(__file__).read_bytes())
     metadata = dict(**media, sha256=media['video_sha256'], path=str(Path(__file__).with_name('juxtaposition.mp4')),
-        task_ids=TASKS, adjacent_step3_task_indices=[0, 1], source_step3='whole_task/data/B/step3_tool_membranes',
+        task_ids=TASKS, adjacent_step3_task_indices=[0, 1], source_step3='whole_task_2/data/B/step3_tool_membranes',
         actual_saved_step3_shells_used=True, final_connected=True, final_volume_cm3=proof['final_volume_cm3'],
         guest_translation_m=proof['guest_translation_m'], final_full_audit_passed=proof['audit']['passed'],
         validation=str((DATA / 'validation.json').relative_to(ROOT)), validation_sha256=sha256(DATA / 'validation.json'),

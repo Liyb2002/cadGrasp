@@ -8,7 +8,7 @@ candidate construction: the normal complete acceptance is still mandatory.
 """
 import numpy as np
 import manifold3d as md
-from whole_task.step3 import independent_geometry as G
+from whole_task_2.step3 import independent_geometry as G
 from .geometry import moved_mesh
 from .floors import planes
 

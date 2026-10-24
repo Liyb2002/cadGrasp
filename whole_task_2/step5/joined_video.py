@@ -252,6 +252,21 @@ class Plan:
     def world_stop(self, k, s):
         return s['tip']+[0, 0, self.off[k]], s['axis']
 
+    def lead(self, s):
+        """How far the needle leaves stop s straight back along its axis: the stop's own, else policy['straight_back_m'] (0)."""
+        return s.get('lead', self.policy.get('straight_back_m', 0.))
+
+    def away(self, s):
+        """Where the tip goes from stop s after its lead: the stop's own direction, else back along the needle tilted up
+        by policy['retreat_up'] (0: straight back)."""
+        if 'away' in s: return s['away']
+        d = -np.asarray(s['axis'], float)+[0, 0, self.policy.get('retreat_up', 0.)]; return d/np.linalg.norm(d)
+
+    def off_contact(self, k, s, t):
+        """The tool (tip, axis; world) t from stop s of task k: its lead straight back along the needle, then along away(s)."""
+        tip, axis = self.world_stop(k, s); lead = min(t, self.lead(s))
+        return tip-axis*lead+self.away(s)*(t-lead), axis
+
     def segment(self, q, a, b, off, depth=0):
         """Joints from tool pose a to b (tip, axis; world): tracked, cut into equal task-space sub-steps, again
         where needed, until no joint passes its speed limit in a frame.  Returns the joints and the restarts."""
@@ -276,19 +291,26 @@ class Plan:
         """Every stop of task k; between stops the tip lifts off along the needle, more until the hop is clear."""
         S = self.S[k]; B = S@self.model.X[self.model.seat_of[k]]; stops = self.stops[k]; restarts = 0
         for i, s in enumerate(stops):
-            tip, axis = self.world_stop(k, s); painted = self.painted.copy(); painted[s['faces']] = True
+            tip, axis = self.world_stop(k, s); painted = self.painted.copy(); painted[s['faces']] = True; tried = None
             for lift in self.policy['hop_lift_fractions'] if i else (0.,):
-                via = []
+                routes = [[]]
                 if i:
-                    a_tip, a_axis = self.world_stop(k, stops[i-1]); h = lift*self.D; d = slerp(a_axis, axis, .5)
-                    via = ([((a_tip+tip)/2-d*h, d)] if np.linalg.norm(tip-a_tip) <= 1.5*self.cell else
-                           [(a_tip-a_axis*h, a_axis), (tip-axis*h, axis)])
+                    a = stops[i-1]; a_tip, a_axis = self.world_stop(k, a); h = lift*self.D; d = slerp(a_axis, axis, .5)
+                    out = [self.off_contact(k, a, min(h, self.lead(a)))] if self.lead(a) else []   # leave and land straight
+                    land = [self.off_contact(k, s, min(h, self.lead(s)))] if self.lead(s) else []
+                    routes = [out+[self.off_contact(k, a, min(h, a.get('reach', h))), self.off_contact(k, s, min(h, s.get('reach', h)))]+land]  # along both retreats
+                    if np.linalg.norm(tip-a_tip) <= 1.5*self.cell:                                  # near: over the middle first
+                        m = self.away(a)+self.away(s); routes.insert(0, out+[((a_tip+tip)/2+m/np.linalg.norm(m)*h, d)]+land)
                 allowance = max(s['allowance'], stops[i-1]['allowance'] if i else 0.)
-                frames, p, n = self.follow(q, via+[(tip, axis)], self.off[k], S, B, k, allowance)
-                frames[-1].update(contact=True, painted=painted)
-                failure = self.first_failure(frames)
-                if failure is None: break
-            restarts += n; self.painted = painted; self.commit(frames, failure, f'stop {k}:{i}'); q = p
+                for via in routes:
+                    try: frames, p, n = self.follow(q, via+[(tip, axis)], self.off[k], S, B, k, allowance)
+                    except ValueError: continue                               # a hop the arm cannot reach: lift more
+                    frames[-1].update(contact=True, painted=painted)
+                    failure = self.first_failure(frames); tried = frames, p, n, failure
+                    if failure is None: break
+                if tried is not None and tried[3] is None: break
+            if tried is None: raise ValueError(f'No reachable hop to stop {k}:{i}')
+            frames, p, n, failure = tried; restarts += n; self.painted = painted; self.commit(frames, failure, f'stop {k}:{i}'); q = p
         return q, dict(task=self.model.records[k]['id'], stops=len(stops), ik_restarts=int(restarts))
 
     def change(self, k, k2, q):
@@ -299,16 +321,17 @@ class Plan:
         swap = seat != seat2; last = None
         for back in self.policy['back_off_needles']:
             b = back*self.L; head = []
-            if k is not None:
-                S, off = self.S[k], self.off[k]; B = S@model.X[seat]; tip, axis = self.world_stop(k, self.stops[k][-1])
-                head, p, _ = self.follow(q, [(tip-axis*b*u, axis) for u in steps(sec['back'], fps)], off, S, B, None,
-                                         self.stops[k][-1]['allowance'])
-                if back != self.policy['back_off_needles'][-1] and self.first_failure(head) is not None: continue
-                q_up = p
-            if k2 is not None:
-                tip2, axis2 = self.world_stop(k2, self.stops[k2][0])
-                q_h, _ = self.solve(tip2-axis2*b, axis2, self.off[k2], q_up if k is not None else None)
-                if k is None: q_up = q_h
+            try:
+                if k is not None:
+                    S, off = self.S[k], self.off[k]; B = S@model.X[seat]
+                    head, p, _ = self.follow(q, [self.off_contact(k, self.stops[k][-1], b*u) for u in steps(sec['back'], fps)], off, S, B, None,
+                                             self.stops[k][-1]['allowance'])
+                    if back != self.policy['back_off_needles'][-1] and self.first_failure(head) is not None: continue
+                    q_up = p
+                if k2 is not None:
+                    q_h, _ = self.solve(*self.off_contact(k2, self.stops[k2][0], b), self.off[k2], q_up if k is not None else None)
+                    if k is None: q_up = q_h
+            except ValueError: continue                                       # a back-off the arm cannot reach
             for rise in self.policy['rise_fractions']:
                 H = rise*D; frames = list(head)
                 if k is not None:
@@ -322,14 +345,16 @@ class Plan:
                 if k2 is not None:
                     S2 = self.S[k2]; B2 = S2@model.X[seat2]; off2 = self.off[k2]
                     frames += [self.frame(q_h, off2+H*(1-u), S2, B2, k2) for u in steps(sec['rise'], fps)]
-                    approach, p, _ = self.follow(q_h, [(tip2-axis2*b*(1-u), axis2) for u in steps(sec['approach'], fps)[:-1]], off2, S2, B2, k2,
-                                                 self.stops[k2][0]['allowance'])
+                    try: approach, p, _ = self.follow(q_h, [self.off_contact(k2, self.stops[k2][0], b*(1-u)) for u in steps(sec['approach'], fps)[:-1]], off2, S2, B2, k2,
+                                                      self.stops[k2][0]['allowance'])
+                    except ValueError: break
                     frames += approach
                 else: frames += [frames[-1]]*int(sec['end']*fps); p = frames[-1]['q']
                 failure = self.first_failure(frames); last = (f'change {k}->{k2} back {back} rise {rise}', frames, failure)
                 if failure is None:
                     self.commit(frames); self.events.append(dict(motion=f'change {k}->{k2}', back_off_m=b, rise_m=H, clear=True))
                     return p
+        if last is None: raise ValueError(f'No reachable back-off for change {k}->{k2}')
         what, frames, failure = last; self.commit(frames, failure, what); return frames[-1]['q']
 
     def swap(self, k, k2, q_up, q_h, H):

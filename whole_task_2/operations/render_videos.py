@@ -1,6 +1,6 @@
 """Render the five operation demonstrations with their recorded design timelines.
 
-Run as: python -m whole_task.operations.render_videos
+Run as: python -m whole_task_2.operations.render_videos
 This is a sequence of design states, not a robot motion/assembly certificate.
 """
 from pathlib import Path
@@ -11,20 +11,20 @@ import numpy as np
 import trimesh
 from PIL import Image, ImageDraw, ImageFont
 
-from whole_task.step1.common import ROOT, sha256, write_json
-from whole_task.step1.needle_render import sector_lines
-from whole_task.step3.render_independent import Renderer, head_context, BLUE
-from whole_task.step5.video import raster
+from whole_task_2.step1.common import ROOT, sha256, write_json
+from whole_task_2.step1.needle_render import sector_lines
+from whole_task_2.step3.render_independent import Renderer, head_context, BLUE
+from whole_task_2.step5.video import raster
 from .geometry import OperationModel, moved_mesh
 from .state import transform
 from .pose_change import pose_change
 from .wrapped_shell import wrapped_state
-from whole_task.step3.run_independent import make_domain
-from whole_task.step3.independent_physics import demands, certificate
-from whole_task.step1.needle_geometry import geometric_mask
+from whole_task_2.step3.run_independent import make_domain
+from whole_task_2.step3.independent_physics import demands, certificate
+from whole_task_2.step1.needle_geometry import geometric_mask
 
 HERE = Path(__file__).parent
-DATA = ROOT / 'whole_task/data/B/operation_videos'
+DATA = ROOT / 'whole_task_2/data/B/operation_videos'
 FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
 
 
