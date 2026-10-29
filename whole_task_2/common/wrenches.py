@@ -66,7 +66,10 @@ class WrenchDomain:
         # sampled processing-force direction in the local-cone model.
         self.direction_model=data['load'].get('direction_model','fixed_world_needle_axis')
         self.half_angle=np.radians(data['load'].get('cone_half_deg',0.))
+        # local_axis_cone: each face's own axis (its needle's, step2/seats.py's robot-free areas; the inward normal
+        # where none is given).
         self.force_axes=(self.inward if self.direction_model=='local_inward_normal_cone'
+                         else np.asarray(geometry['force_axes']) if self.direction_model=='local_axis_cone'
                          else np.broadcast_to(self.axis,self.inward.shape))
         self.tangent1,self.tangent2=tangent_frame(self.force_axes)
         self.k = float(data["load"]["K"])
@@ -88,7 +91,7 @@ class WrenchDomain:
         triangles = self.triangles[ids]
         q = triangles[..., 0, :]+u[..., None]*(triangles[..., 1, :]-triangles[..., 0, :])
         q += v[..., None]*(triangles[..., 2, :]-triangles[..., 0, :])
-        if self.direction_model in ('local_inward_normal_cone','world_needle_direction_cone'):
+        if self.direction_model in ('local_inward_normal_cone','local_axis_cone','world_needle_direction_cone'):
             direction=np.cos(theta)[...,None]*self.force_axes[ids]+np.sin(theta)[...,None]*(
                 np.cos(phi)[...,None]*self.tangent1[ids]+np.sin(phi)[...,None]*self.tangent2[ids])
         else:
@@ -133,14 +136,14 @@ class WrenchDomain:
 
 def resolve_policy(policy,robot_config):
     policy=dict(policy)
-    if policy['force_direction_model'] in ('local_inward_normal_cone','world_needle_direction_cone'):
+    if policy['force_direction_model'] in ('local_inward_normal_cone','local_axis_cone','world_needle_direction_cone'):
         policy['direction_half_angle_deg']=float(robot_config['task_constraint']['cone_half_angle_deg'])
         if not 0<policy['direction_half_angle_deg']<90:raise ValueError('Expected inward force cone half angle between 0 and 90')
     return policy
 
 
 def build_domain(mesh, pose, station, physical, policy):
-    if policy['force_direction_model'] not in ('fixed_world_needle_axis','local_inward_normal_cone','world_needle_direction_cone'):
+    if policy['force_direction_model'] not in ('fixed_world_needle_axis','local_inward_normal_cone','local_axis_cone','world_needle_direction_cone'):
         raise ValueError('Unsupported force direction model')
     transform = np.asarray(pose["world_from_object"])
     np.testing.assert_allclose(transform, rigid_transform(transform[:3, :3], transform[:3, 3]), atol=1e-12)
@@ -164,6 +167,12 @@ def build_domain(mesh, pose, station, physical, policy):
     vertices = points(transform, mesh.vertices)
     com = points(transform, local_com)
     inward = -directions(transform, mesh.face_normals[ids])
+    force_axes = inward
+    if policy['force_direction_model'] == 'local_axis_cone':
+        given = np.asarray(pose.get('force_axes_object', np.full((len(ids), 3), np.nan)), float).reshape(len(ids), 3)
+        ok = np.isfinite(given).all(1) & (np.linalg.norm(np.nan_to_num(given), axis=1) > 0)
+        world = directions(transform, np.where(ok[:, None], given, 0.))
+        force_axes = np.where(ok[:, None], world/np.maximum(np.linalg.norm(world, axis=1, keepdims=True), 1e-300), inward)
     passed = pose["geometry_audit"]["geometrically_passed_face_ids"]
     data = dict(schema="cadgrasp_current_pose_direction_domain_v2", pose_id=pose["id"],
         frame=dict(name="world", T_world_mesh=transform.tolist(), moment_origin_m=com.tolist()),
@@ -178,7 +187,9 @@ def build_domain(mesh, pose, station, physical, policy):
         pair_order=policy["reaction_target_order"],
         units=dict(position="m", force="mg", moment="mg*m", SI_conversion="multiply both wrench blocks by weight_N"),
         mapping=dict(process_force="P=m*d; d lies in the declared cone about its axis",
-            cone_axis="current face inward normal" if policy['force_direction_model']=='local_inward_normal_cone' else "robot nominal direction in world coordinates",
+            cone_axis=("current face inward normal" if policy['force_direction_model']=='local_inward_normal_cone' else
+                       "each face's own needle axis (inward normal where none)" if policy['force_direction_model']=='local_axis_cone'
+                       else "robot nominal direction in world coordinates"),
             external_wrench="[P+g, cross(q-COM,P)]",
             need_wrench="[-g-P, -cross(q-COM,P)]", moment_origin="current workpiece COM",
             pairing="same application point q and complete P produce both blocks"),
@@ -191,7 +202,7 @@ def build_domain(mesh, pose, station, physical, policy):
             escape_direction="negative nominal needle axis; geometric screening independent of force uncertainty", force_applied_at="q, never the offset ray origin",
             rejection_sampling=False, unresolved_faces_retained=True),
         geometry=dict(vertices_m=vertices.tolist(), faces=mesh.faces.tolist(), work_face_ids=ids.tolist(),
-            inward_normals=inward.tolist(), work_face_areas_m2=mesh.area_faces[ids].tolist(),
+            inward_normals=inward.tolist(), force_axes=force_axes.tolist(), work_face_areas_m2=mesh.area_faces[ids].tolist(),
             face_passes_pose_geometry=np.isin(ids, passed).tolist(), filled_face_ids=pose["filled_face_ids"],
             selected_area_m2=float(mesh.area_faces[ids].sum()), total_area_m2=float(mesh.area)),
         ground_state_independent=True, ground_contact_assumed=False,
@@ -261,12 +272,12 @@ def endpoint_demands(domain):
             endpoint_need_wrench=values,endpoint_need_wrench_SI=values*domain.weight_N,
             application_hull_vertex_ids=source,application_hull_maximum_residual_m=np.asarray(proof['maximum_residual_m']),
             unreduced_source_vertex_count=np.asarray(proof['source_point_count']))
-    if domain.direction_model=='local_inward_normal_cone':
+    if domain.direction_model in ('local_inward_normal_cone','local_axis_cone'):
         cfg=domain.data['load']['continuous_cover']
         vertices,_,_=outer_cap(np.degrees(domain.half_angle),cfg['azimuth_sides'],cfg['polar_intervals'])
         vertices=vertices[np.linalg.norm(vertices,axis=1)>1e-12]
         force=domain.k*(vertices[None,:,0,None]*domain.tangent1[:,None,:]+
-            vertices[None,:,1,None]*domain.tangent2[:,None,:]+vertices[None,:,2,None]*domain.inward[:,None,:])
+            vertices[None,:,1,None]*domain.tangent2[:,None,:]+vertices[None,:,2,None]*domain.force_axes[:,None,:])
         q=domain.triangles[:,:,None,:]
         rows=demand(q,force[:,None,:,:],domain.com,domain.gravity).reshape(-1,6)
         ids=np.repeat(domain.mesh.faces[domain.work_ids].reshape(-1),len(vertices))

@@ -39,4 +39,4 @@ export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 PYTHON
 .venv/bin/python -B -m whole_task_2.run_station B --start step4_keepout
 ```
 
-具体流程见 [PROCESS.md](PROCESS.md)。
+具体流程见 [PROCESS.md](PROCESS.md)。工位、工作臂与搬运臂的当前状态（实机 demo 交接）见 [idea/demo/README.md](idea/demo/README.md)。

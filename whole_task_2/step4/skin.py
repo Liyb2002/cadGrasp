@@ -21,12 +21,13 @@ mid-layer point is nearest: a seat's thin cells are only its own; another seat's
 counts as covered (it is no rim), and that seat judges it.  A cell whose mid-layer point leaves the layer
 (where the fitted outer folds over in a crevice) is judged by none.
 
-pruned():  what is not joined to the support's largest piece goes, and the skin narrower than WIDTH, again while
-           that leaves more of either; nothing is added.  The Step4 oracle then judges the support (and requires
-           a wide skin).
+pruned():  the support's largest piece without its skin narrower than WIDTH, cut once; nothing is added.  The
+           Step4 oracle then judges what is left, and Step5 makes every skin narrower than its own least width
+           (step5/peel.THICK) that thick.
 Material is cut cell by cell: each cell's prism (the cell, its vertices moved along their normals from just
 inside the object to past the layer) clipped to the seat's outer layer.
 """
+import hashlib
 from functools import lru_cache
 import numpy as np
 import trimesh
@@ -39,8 +40,8 @@ from whole_task_2.step3 import independent_geometry as G
 from whole_task_2.step3.membranes import positive_components
 from .merge import move
 
-WIDTH = .010                    # the skin's least width along the surface (m)
-CELL = WIDTH/3                  # surface cells: the object subdivided to edges of at most this
+WIDTH = .020                    # Step4: skin narrower than this along the surface holds nothing (m)
+CELL = .010/3                   # surface cells: the object subdivided to edges of at most this (m)
 SEAM = 1e-9                     # edges shorter than this (m), left where many prisms meet, are collapsed
 PROBE = 1e-5                    # the coverage cube must lie inside its cell's cutting prism
 TETRA = np.array([[1., 1., 1.], [1., -1., -1.], [-1., 1., -1.], [-1., -1., 1.]])   # alternate corners of a cube
@@ -97,9 +98,15 @@ class Skin:
         """For every cell ids: is one of points (with normals) within radius, facing the same way?"""
         out = np.zeros(len(ids), bool)
         if not len(points) or not len(ids): return out
-        tree = cKDTree(points)
-        for n, (k, found) in enumerate(zip(ids, tree.query_ball_point(self.centers[ids], radius))):
-            out[n] = bool(found) and bool((normals[found]@self.normals[k] > 0).any())
+        tree = cKDTree(points); k = min(8, len(points))
+        # The nearest few within radius first, all at once: one of them almost always faces the same way.  The ball
+        # decides only where all of them are within radius and none does (the same answer, 2-3x faster).
+        d, j = tree.query(self.centers[ids], k, distance_upper_bound=np.nextafter(radius, np.inf))
+        d, j = d.reshape(len(ids), k), j.reshape(len(ids), k); found = np.isfinite(d)
+        facing = np.zeros(d.shape, bool); facing[found] = np.einsum('ij,ij->i', normals[j[found]], np.repeat(self.normals[ids][:, None], k, 1)[found]) > 0
+        out = facing.any(1); rest = np.flatnonzero(~out & found.all(1))
+        for n, ball in zip(rest, tree.query_ball_point(self.centers[ids[rest]], radius)):
+            out[n] = bool((normals[ball]@self.normals[ids[n]] > 0).any())
         return out
 
     def rim(self, R):
@@ -209,11 +216,24 @@ def regions(c, slots, support):
     return [(X, S.covered(value, X), own) for (X, _), own in zip(seats_of(slots), owners(c, slots))]
 
 
+_thin = {}
+
+
 def thin_cells(c, slots, support):
-    """Per slot, its seat's own skin cells narrower than WIDTH (bool over the cells): one coverage pass, nothing cut."""
-    S, _ = skin(c); masks = [None]*len(slots)
-    for (X, ks), (_, R, own) in zip(seats_of(slots), regions(c, slots, support)):
-        T = S.thin(R, own=own)
+    """Per slot, its seat's own skin cells narrower than WIDTH, the ones pruned() cuts (bool over the cells): one
+    coverage pass, nothing cut.  Kept per support mesh and seats to the bit: the turns of a Rotational reuse share
+    both (the turned slot sits in a seat already there)."""
+    S, _ = skin(c); masks = [None]*len(slots); seats = seats_of(slots); key = None
+    if isinstance(support, trimesh.Trimesh):
+        key = (c.object_name, hashlib.sha1(b''.join(np.ascontiguousarray(a).tobytes() for a in
+                                                     (support.vertices, support.faces, *[X for X, _ in seats]))).digest())
+    thin = _thin.get(key) if key is not None else None
+    if thin is None:
+        thin = [S.thin(R, own=own) for _, R, own in regions(c, slots, support)]
+        if key is not None:
+            if len(_thin) > 64: _thin.pop(next(iter(_thin)))
+            _thin[key] = thin
+    for (X, ks), T in zip(seats, thin):
         for k in ks: masks[k] = T
     return masks
 
@@ -273,24 +293,26 @@ def cut_thin(c, slots, support, rounds=8):
     return value, area
 
 
-def pruned(c, slots, support, forbidden=None, rounds=8):
-    """support without what is not joined to its largest piece and without its skin narrower than WIDTH, again
-    while a cut leaves more of either -- such material holds nothing: its contacts do not count -- and, given
-    `forbidden`, the seams the prisms leave collapsed (SEAM) and `forbidden` cut again, so the support settles
-    under further Booleans, and pruned once more after that: (support, record).  Nothing is added; the oracle
-    (and its paired loads) then judges what is left."""
-    S, _ = skin(c); value = G.solid(support); start = G.volume(value); area = 0.
+def largest_mesh(value, tries=3):
+    """value's largest piece as a mesh that reads back as one piece: the export may part a crumb that touched it
+    at a point, and it goes too (B+8pose S1 at 30 mm: 1e-4 cm^3, which the audit counts as a second body)."""
+    for _ in range(tries):
+        parts = positive_components(value)
+        if not parts: raise ValueError('pruning leaves no support')
+        support = G.mesh(max(parts, key=lambda p: float(p.volume())).simplify(0.)); value = G.solid(support)
+        if len(positive_components(value)) == 1: break
+    return support
 
-    def prune(value, area):
-        for _ in range(rounds):
-            parts = positive_components(value)
-            if not parts: raise ValueError('pruning leaves no support')
-            support = G.mesh(max(parts, key=lambda p: float(p.volume())).simplify(0.))
-            thin = [(X, np.flatnonzero(S.thin(R, own=own))) for X, R, own in regions(c, slots, support)]
-            if not any(len(ids) for _, ids in thin): return support, area
-            value = G.solid(support)
-            for X, ids in thin: value = cut(c, value, X, ids); area += float(S.area[ids].sum())
-        raise ValueError(f'skin narrower than {WIDTH*1000:.0f} mm after {rounds} prunings')
-    support, area = prune(value, area)
-    if forbidden is not None: support, area = prune(G.solid(support).simplify(SEAM/G.SCALE)-forbidden, area)
+
+def pruned(c, slots, support, forbidden=None):
+    """support's largest piece without its skin narrower than WIDTH, cut once -- such material holds nothing: its
+    contacts do not count -- and, given `forbidden`, the seams the prisms leave collapsed (SEAM) and `forbidden` cut
+    again, so the support settles under further Booleans; then its largest piece: (support, record).  Nothing is
+    added and nothing is cut again: the oracle judges what is left (narrow skin a cut leaves, Step5 makes thick)."""
+    S, _ = skin(c); start = G.volume(G.solid(support)); support = largest_mesh(G.solid(support))
+    value = G.solid(support); area = 0.
+    for X, R, own in regions(c, slots, support):
+        ids = np.flatnonzero(S.thin(R, own=own)); value = cut(c, value, X, ids); area += float(S.area[ids].sum())
+    support = largest_mesh(value)
+    if forbidden is not None: support = largest_mesh(G.solid(support).simplify(SEAM/G.SCALE)-forbidden)
     return support, dict(thin_cut_m2=area, removed_cm3=float(start-G.volume(G.solid(support)))*1e6)

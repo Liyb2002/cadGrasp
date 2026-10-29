@@ -1,73 +1,48 @@
-"""Step5: every distinct support of step4/combine.py peeled, with its feet, certified for every task, and its
-figure.
+"""Step5: every distinct support of step4/combine.py rebuilt as a frame, with its feet, certified for every task, and
+its figure.
 
 The placing arm installs the support for each task so that the task faces the work arm at its certified
 pose, and the support rests on the table.
 
-The skin is at least skin.WIDTH (10 mm) wide along the object's surface everywhere (step4/skin.py; width is
-across the skin, not its thickness): Step4 prunes every support to it before its oracle.
-
-Then the peel (step5/peel.py), as Co-optimize's Step5.2: the material deleted a piece at a time -- plane cuts
-of the outer material toward the bunnies, then boxes, the ones holding the most skin first -- each kept when
-every task's paired forces and moments still hold (an LP certificate on the contact corners, solved again
-only where a deletion takes a corner it uses), with the skin it leaves thinner than WIDTH and what falls off,
-and no hole opens in the skin (from the periphery inward).
-
-Then the support is made manufacturable: its least feature is 2r (ROUND['radius']).  Cutting it cell by cell
-(Step4's thin skin, the peel's), by the keep-outs (hundreds of needle and head cylinders) and by planes leaves
-thin teeth, spikes, knife edges and skin thin through the layer.  The rule, as the minimum length scale of
-topology optimization (Sigmund 2007, open-close filters): every point of the support lies in a ball of radius r
-inside it -- the support is its own morphological opening by that ball -- so no spike, fin or wall is thinner
-than 2r and every convex edge is rounded to radius r at least.  On a grid ROUND['grid'] fine (a voxel is material
-when the support holds its centre or one of its vertices, so a tooth thinner than a voxel counts), in the room:
-the seats' layers (or the support, where the peel thickened it), above every floor, out of every body,
-keep-out and exit sweep,
-  - every contact is backed 2r thick (the material on the object thickened outward in the room: a thin wedge
-    a plane cut leaves on the object holds loads, so it is thickened, not cut);
-  - the support is closed by ROUND['close'] (the teeth join, small holes fill);
-  - what sticks out from the objects thinner than 2R (ROUND['spike']: fins, hooks, fingers) goes: the support
-    with the objects under it is opened by R, so the skin the objects back stays;
-  - it is opened by r (ROUND['radius']): no spike, fin or wall thinner than 2r, every convex edge rounded;
-  - about every contact corner a task's paired-load certificate uses (as the peel's, preferring corners deep in
-    the skin) the backed skin within 2r stays;
-  - a piece the openings part (one holding such skin however small) is joined to the rest by the shortest
-    strut of radius r (its centre line where such a ball fits in the room, a geodesic); a piece of the support
-    (at least 1e-3 of it) that no such strut reaches -- the room between it and the rest is narrower than 2r --
-    by the shortest centre line through that room, its strut an exact tube of radius r (not smoothed below),
-    cut to the legal space like the rest: as wide as the space lets it.
-All of it in the room, so the result stays in it; one pass.
-The surface is smoothed (a Gaussian of the signed distance, Taubin passes) and reaches 1.5 voxels into the
-objects only, then, as a solid again, is cut to the exact legal space: its contact faces are the objects' own
-(at an obtuse rim), nothing enters a body, keep-out or exit or goes below a floor.  What it adds in the prism
-of a source face that then no longer exits goes again (the support's own material there stays).  The support is
-audited like any other.
+The frame (step5/frame.py): Step4's skin kept as big contact faces.  The peel deletes from the outside in (plane
+cuts toward the bunnies, then boxes), each deletion kept when every task's paired forces and moments still hold and
+it leaves no skin narrower than WIDTH where it was not; the narrow pieces left (the whiskers) go where the loads
+let them; every seat's faces are then rebuilt from its layer with round edges (no cut steps, flaps or curtains)
+and no holes, and faces left apart are joined by straight rods on cones.
 
 Then feet (as Co-optimize's Step5, "wrap the pressure hull"): the ground faces enclose a task's pressure
-hull when their convex hull does, so a few feet do, not a band around it.  For every task whose hull the
-actual ground faces do not already enclose, in its installation:
+hull when their convex hull does, so a few feet do, not a band around it.  The support turns and slides on
+one table (every installation has the same table plane in the support frame), so it stands on the same ground
+faces in every installation: the feet are planned once, about the convex hull of every task's pressure hull the
+actual ground faces do not already enclose (all in one installation), not task by task (which left feet of two
+tasks side by side, a fork):
 
-  candidate feet stand on the table every FOOT['spacing'] around the hull, centred FOOT['outward'] outside it
-  (a little inside too: the pad still covers the hull's edge), where a pad FOOT['radius'] in radius and
-  FOOT['height'] high fits in the legal space -- above every
-  installation's floor, out of every task's body, keep-out and exit sweep (Step4's forbidden region), so a
-  foot never blocks another task;
-  a foot is its pad and a leg, the hull of the pad and a ball of the same radius at the support's nearest
-  point (2 FOOT['radius'] = WIDTH wide everywhere), clipped to the legal space;
+  candidate feet stand on the table every FOOT['spacing'] around that hull, centred FOOT['outward'] outside it
+  (a stance wider than the hull), where the tip of a foot (a disc FOOT['tip'] in radius, FOOT['thick'] high)
+  fits in the legal space -- above every installation's floor, out of every task's body, keep-out and exit sweep
+  (Step4's forbidden region), so a foot never blocks another task;
+  a foot is one flat cone, straight from the support's point nearest its site down to the site (when the legal
+  space cuts that leg off, from the next nearest point that keeps it: strut): the hull of two
+  round-edged discs FOOT['thick'] thick in one plane (the plane through the leg, level across it), FOOT['tip'] in
+  radius, the one on the table wider by FOOT['taper'] of the height it holds up, the one at the support by that of
+  the reach (at most FOOT['base']: widest where it bears); a candidate the support comes nearer than FOOT['least']
+  moves out until its leg is that long, else is none (no stubs: a low leg lies on the table); cut flat by the table,
+  clipped to the legal space;
   the feet are the cheapest cycle of candidates (and of the actual ground faces' corners, free) about the
-  hull with the hull left of every step but for a pad's radius, so their pads' convex hull holds it; a foot
-  costs its material (its leg, pad and ball cap); the candidates nearest the hull first (the rings inside,
-  on and just outside its edge together, then each further ring), so the feet hug it;
+  hull with the hull left of every step, so their tips' convex hull holds it; a foot costs its material (its
+  plate's area); the candidates nearest the hull first (the first FOOT['first'] rings together, then each further
+  ring);
   a foot's leg may touch the object in another seat: the skin narrower than WIDTH it adds there is cut from it
   (as Step4 cuts thin skin);
-  a foot the legal space or that cut cuts off the support or its pad is dropped and the cycle chosen again.
+  a foot the legal space or that cut cuts off the support or its tip is dropped and the cycle chosen again.
 
-The whole peeled membrane and every foot stay.  As before every Step4 audit, the
+The whole frame and every foot stay.  As before every Step4 audit, the
 original face cells at each task's final exit travel are recut (MembraneModel.refine_exits), removing the
 Boolean slivers (~1e-10 m^3) the joins can leave on an exit.  Every task is then audited in full on
-the support with its feet (32,768 paired samples and the continuous outer targets, the continuous exit of
+the support with its feet (more than 99% of the 32,768 paired samples, the continuous exit of
 every source face, body and keep-out, the KUKA at every stored joint set), and in every installation the
 actual ground faces must enclose the task's pressure hull.  Validation rebuilds every support from Step4's
-membrane (peel, rounding and feet) and audits it again.
+membrane (frame and feet) and audits it again.
 
 For the real station, next to every figure a folder output/<object>/step5/<name>/ (package): the support and
 the object as STL (mm), info.json and tasks.npz.  support.stl is the certified support enlarged PRINT along x,
@@ -79,7 +54,8 @@ result (clear()), so step5/ holds this run's results only, with no copies.
 One figure per support, output/<object>/step5/<name>.png, no text: the top row, the support with the bunny
 in each seat (pink: the areas of the seat's tasks), then the support alone; the bottom row, every task at
 the station, the support as the placing arm installs it and the KUKA holding the needle on the task's
-central certified face.
+central certified face.  Beside it, Step4's support the result starts from, output/<object>/step4/<name>.png,
+drawn the same way.
 """
 import argparse
 import json
@@ -89,35 +65,32 @@ import time
 import numpy as np
 import trimesh
 import manifold3d as md
-from PIL import Image, ImageDraw
-from scipy import ndimage
-from skimage.measure import marching_cubes
-from skimage.graph import MCP_Geometric
+from PIL import Image
 from shapely.geometry import Polygon
 from shapely.geometry.polygon import orient
+from scipy.spatial import ConvexHull
 
 from whole_task_2.step1.common import ROOT, DEFAULT_OUTPUT, sha256, write_json
 from whole_task_2.step3 import independent_geometry as G
 from whole_task_2.step3.membranes import positive_components
-from whole_task_2.operations.geometry import moved_mesh
 from whole_task_2.step4.ground_oracle import pressure_rows, ground_enclosure
 from whole_task_2.step4.seats import context, read_mesh
 from whole_task_2.step4.merge import move
 from whole_task_2.step4.combine import FOLDER as COMBINE, ExitModel, largest, plain, seats, solids, obb
 from whole_task_2.step4.skin import WIDTH, SEAM, transform, piece, measure, legal, skin, regions, cut
 from whole_task_2.step5 import peel as P
+from whole_task_2.step5 import frame as FR
 
 FOLDER = 'step5_combined'
-FOOT = dict(radius=WIDTH/2, height=.005,             # pads and legs as wide as the skin's least width; pads 5 mm high
-            outward=(-.004, 0., .004, .008, .016, .032, .064),   # candidate feet centred this far outside the
-                                                     # pressure hull (inside: the pad still covers its edge)
-            spacing=WIDTH/2,                         # and this far apart along it
-            first=3,                                 # the nearest rings tried together first (inside, on, outside)
+FOOT = dict(thick=.006,                              # flat cones this thick, straight from the support's nearest point
+            tip=.008,                                # to the table, this big in radius at either end, widened by
+            taper=.35, base=.020,                    # this share of the height (ground end) or reach (support end), at most this
+            least=WIDTH,                             # legs at least this long
+            outward=(.012, .024, .036, .048, .064),  # candidate feet centred this far outside the pressure hull
+            spacing=.012,                            # and this far apart along it
+            first=2,                                 # the nearest rings tried together first
             attempts=24,                             # cycles chosen again after feet the legal space cut off
             padding=.03)                             # the legal space: a box this much around the farthest feet
-ROUND = dict(grid=WIDTH/12, close=WIDTH/5, radius=.15*WIDTH,           # least feature radius r
-             spike=.3*WIDTH,                                             # least protrusion radius R, the object backing it
-             blur=1., taubin=10)                                         # (blur: voxels)
 PRINT = 1.01                                         # support.stl: the certified support enlarged this much
 
 
@@ -158,14 +131,13 @@ def resample(ring, spacing):
     return np.vstack(out)
 
 
-def enclosing(points, cost, hull, reach, margin=1e-6):
+def enclosing(points, cost, hull, margin=1e-6):
     """The cheapest of points (each its cost) whose ground holds hull: a cycle about the hull with the hull
-    left of every step, at most the smaller reach (m: the radius of a foot's pad, 0 for a point) to its right
-    (by margin).  Their ids, or None."""
+    left of every step (by margin).  Their ids, or None."""
     centre = hull.mean(0); order = np.argsort(np.arctan2(points[:, 1]-centre[1], points[:, 0]-centre[0]), kind='stable')
-    P, w, r = points[order], cost[order], reach[order]; n = len(P); d = P[None]-P[:, None]; h = hull[None, None]-P[:, None, None]
-    length = np.linalg.norm(d, axis=-1); slack = (margin-np.minimum(r[:, None], r[None]))[..., None]
-    left = (d[..., None, 0]*h[..., 1]-d[..., None, 1]*h[..., 0] >= slack*length[..., None]).all(-1) & (length > 1e-12)
+    P, w = points[order], cost[order]; n = len(P); d = P[None]-P[:, None]; h = hull[None, None]-P[:, None, None]
+    length = np.linalg.norm(d, axis=-1)
+    left = (d[..., None, 0]*h[..., 1]-d[..., None, 1]*h[..., 0] >= margin*length[..., None]).all(-1) & (length > 1e-12)
     # Every step of a cycle turns at most `span` about the hull's centre, so a cycle passes through every window
     # that wide: its points are the only starts needed, the sparsest window's.
     angle = np.arctan2(P[:, 1]-centre[1], P[:, 0]-centre[0]); i, j = np.nonzero(left)
@@ -187,8 +159,8 @@ def enclosing(points, cost, hull, reach, margin=1e-6):
 
 
 def section(row, legal, foot=FOOT):
-    """The legal space through a pad's height on a task's table (its world xy, manifold units)."""
-    world = move(row['world_from_support'], legal); h = foot['height']/G.SCALE
+    """The legal space through a tip's height on a task's table (its world xy, manifold units)."""
+    world = move(row['world_from_support'], legal); h = foot['thick']/G.SCALE
     return world.slice(1e-3*h) ^ world.slice((1-1e-3)*h)
 
 
@@ -206,16 +178,63 @@ def own_thin(c, base, part):
     return part
 
 
+def widths(d, foot=FOOT):
+    """The radii of a foot's ends, d (world) from its site up to its anchor: (on the table, at the support).  A foot
+    is widest where it bears: its end on the table widens with the height it holds up (a tall foot stands like a
+    cone on its base), its end at the support with the reach it spans (a low foot lies on the table like the
+    reference's ground plates, tapering away from the support)."""
+    grow = lambda x: np.minimum(foot['base'], foot['tip']+foot['taper']*np.maximum(x, 0.))
+    return grow(d[..., 2]), grow(np.linalg.norm(d[..., :2], axis=-1))
+
+
+def plate(row, site, anchor, foot=FOOT):
+    """A flat cone from anchor (support frame, the support's point nearest the site) straight down to site (world xy
+    of the task's table): the hull of two discs FOOT['thick'] thick with round edges, in the plane through the leg
+    that is level across it (a plate lying on the table when the leg is low), their radii widths(), the one at the
+    anchor sunk half the thickness into the support; cut flat by the table.  (the plate, the part of it that must
+    stay: its disc FOOT['tip'] in radius at the site), support frame, manifold units."""
+    a = transform(anchor[None], row['world_from_support'])[0]; s = np.r_[site, 0.]; d = a-s; length = np.linalg.norm(d)
+    inward = np.r_[d[:2], 0.] if np.linalg.norm(d[:2]) > 1e-9 else np.r_[np.asarray(row['hull']).mean(0)-site, 0.]
+    u = np.cross([0., 0., 1.], inward); u /= np.linalg.norm(u)
+    n = np.cross(d, u) if length > foot['thick'] else np.array([0., 0., 1.]); n /= np.linalg.norm(n); v = np.cross(n, u)
+    t = foot['thick']/2; phi = np.linspace(0., 2*np.pi, 64, endpoint=False)[:, None, None]
+    psi = np.linspace(-np.pi/2, np.pi/2, 13)[None, :, None]
+    table = row['world_from_support'][2]                           # world z of a support-frame point: table[:3]@p+table[3]
+
+    def disc(centre, radius):
+        p = (centre+(radius-t+t*np.cos(psi))*(np.cos(phi)*u+np.sin(phi)*v)+t*np.sin(psi)*n).reshape(-1, 3)
+        return transform(p, row['material'])/G.SCALE
+
+    def hull(points):
+        return md.Manifold.hull_points(np.vstack(points)).trim_by_plane(tuple(table[:3]), -table[3]/G.SCALE)
+    ground, top = widths(d, foot); keep = disc(s, foot['tip'])
+    return hull([disc(s, ground), disc(a+t*d/max(length, 1e-9), top), keep]), hull([keep])
+
+
 def foot_at(row, site, anchor, legal, stock, foot=FOOT, thin=lambda part: part):
-    """A foot on a task's table at site (world xy): its pad, joined to anchor (support frame) by the hull of
-    the pad and a ball of its radius, in the legal space, without the thin skin it adds (thin), support frame;
-    None if the legal space or that cut cuts the pad or cuts it off the stock."""
-    pad = md.Manifold.cylinder(foot['height']/G.SCALE, foot['radius']/G.SCALE, -1., 32).translate((site[0]/G.SCALE, site[1]/G.SCALE, 0.))
-    ball = md.Manifold.sphere(foot['radius']/G.SCALE, 32).translate(tuple(transform(anchor[None], row['world_from_support'])[0]/G.SCALE))
-    pad = move(row['material'], pad); parts = positive_components(thin((pad+move(row['material'], ball)).hull() ^ legal))
+    """A foot on a task's table at site (world xy): the flat cone (plate) from anchor, in the legal space, without
+    the thin skin it adds (thin), support frame; None if the legal space or that cut cuts its tip or cuts it off
+    the stock."""
+    whole, tip = plate(row, site, anchor, foot)
+    parts = positive_components(thin(whole ^ legal))
     if not parts: return None
-    part = max(parts, key=lambda p: G.volume(p ^ pad))
-    return part if G.volume(pad-part) <= 1e-3*G.volume(pad) and joined(stock+part) else None
+    part = max(parts, key=lambda q: G.volume(q ^ tip))
+    return part if G.volume(tip-part) <= 1e-3*G.volume(tip) and joined(stock+part) else None
+
+
+def strut(row, site, anchor, mesh, legal, stock, foot=FOOT, thin=lambda part: part, tries=6):
+    """foot_at from the support's point nearest the site, else from its next nearest vertices (each at least two
+    tips from those tried, at most `tries`): still one straight leg, around another seat's keep-out instead of
+    through it (B+big_01 B1's table: the leg from the nearest point crossed A1's tool space and was cut off)."""
+    out = foot_at(row, site, anchor, legal, stock, foot, thin)
+    if out is not None: return out
+    p = transform(np.r_[site, foot['thick']/2][None], row['material'])[0]; tried = [np.asarray(anchor)]
+    for v in np.argsort(np.linalg.norm(mesh.vertices-p, axis=1))[:512]:
+        q = mesh.vertices[v]
+        if min(np.linalg.norm(q-x) for x in tried) < 2*foot['tip']: continue
+        tried.append(q); out = foot_at(row, site, q, legal, stock, foot, thin)
+        if out is not None or len(tried) > tries: return out
+    return None
 
 
 def legal_space(c, group, q, points, pad):
@@ -230,265 +249,161 @@ def settled(c, group, support):
     return piece(G.solid(support).simplify(SEAM/G.SCALE)-solids(c.object_name, group)['F'], 'settling splits the support')
 
 
-def grounds(c, model, group, membrane, foot=FOOT):
-    """The points of membrane that must stay on the tables: in every installation where no ring of legal feet
-    (step 5.3's candidates, legs aside) encloses the task's pressure hull, the corners of its ground faces."""
-    q = model.layout(membrane); rows = pressure_rows(model, q); out = [np.zeros((0, 3))]
-    legal = legal_space(c, group, q, np.vstack([membrane.vertices, *[r['ground_material'] for r in rows]]), max(foot['outward'])+foot['padding'])
-    disc = md.CrossSection.circle(foot['radius']/G.SCALE, 32); pad = foot['radius']*np.cos(np.pi/32)-1e-4
-    for r in rows:
-        hull = np.asarray(r['hull']); free = section(r, legal, foot)
-        sites = np.vstack([resample(np.asarray(g.exterior.coords)[:-1], foot['spacing']) for d in foot['outward']
-                           for ring in [orient(Polygon(hull).buffer(d, join_style=2), sign=1.)] for g in getattr(ring, 'geoms', [ring]) if not g.is_empty])
-        sites = sites[np.array([(disc.translate(tuple(s/G.SCALE))-free).area() <= 1e-6*disc.area() for s in sites], bool)]
-        if len(sites) >= 3 and enclosing(sites, np.ones(len(sites)), hull, np.full(len(sites), pad)) is not None: continue
+def grounds(c, model, group, membrane, legs=False):
+    """What the peel keeps for the tables, by Step4's own stance check (step4/combine.foot_ring, the rule combine
+    accepted the support by): (points of membrane it keeps, a check of every deletion or None).  Where no ring of feet
+    encloses a task's pressure hull, the corners of its ground faces stay.  Elsewhere a deletion is kept while every
+    table keeps its ring (the check: the peel is otherwise free; points kept at the legs' starts, on the support's rim,
+    stopped every cut from outside in); with legs, the points the rings' legs start from stay instead (wrap's second
+    try, when the feet do not stand on the free frame)."""
+    from whole_task_2.step4.combine import foot_ring
+
+    def rings(mesh):
+        q = model.layout(mesh); candidate = dict(layout=q, support=mesh, construction={}); candidate['tasks'] = model.prepare(q)
+        return foot_ring(c, group['slots'], model, candidate)
+    failed, starts = rings(membrane); q = model.layout(membrane); out = [starts if legs else np.zeros((0, 3))]
+    for r in pressure_rows(model, q):
+        if r['id'] not in failed: continue
         corners = np.asarray(ground_enclosure(membrane, [r])[0]['ground_contact_hull_xy_m'], float).reshape(-1, 2)
         out.append(transform(np.c_[corners, np.zeros(len(corners))], r['material']))
-    return np.vstack(out)
-
-
-def pare(c, model, group, support):
-    """The support after the peel (step5/peel.py), its skin's holes filled in the legal space, as the mesh it is
-    saved as (its largest piece, should the export part a piece touching it at a seam; export crumbs dropped):
-    (support, record)."""
-    bunnies = np.vstack([transform(model.source.vertices, X) for X in model.X])
-    pad = WIDTH+2*c.base.policy['mold_outward_displacement_m']; legal = legal_space(c, group, model.layout(support), support.vertices, pad)
-    peeled, record = P.Peel(c, model, group, support, grounds(c, model, group, support)).run(bunnies, legal)
-    peeled, record['filled_m2'] = P.fill(c, group, peeled, legal)
-    value, record['saved_share'] = largest(G.solid(peeled))
-    return piece(value, 'the peel splits the support'), record
+    return np.vstack(out), None if legs else (lambda value: set(rings(G.mesh(value))[0]) <= set(failed))
 
 
 def feet(c, model, group, membrane, foot=FOOT):
-    """membrane with every task's feet joined to it: (the solid, the record of every task's feet, whether
-    every pressure hull is enclosed).  The candidates nearest the hull are tried first: the first
-    FOOT['first'] rings of FOOT['outward'] together, then each further ring in turn."""
+    """membrane with its feet joined to it: (the solid, the record of every table's feet, whether every pressure
+    hull is enclosed).  The installations with one table plane in the support frame (here all) stand on the same
+    ground faces, so their feet are planned once, about the convex hull of the pressure hulls (in the first one's
+    world) of all their tasks the ground faces do not yet enclose.  The candidates nearest that hull are tried
+    first: the first FOOT['first'] rings of FOOT['outward'] together, then each further ring in turn."""
     q = model.layout(membrane)
     rows = pressure_rows(model, q)
     legal = legal_space(c, group, q, np.vstack([membrane.vertices, *[r['ground_material'] for r in rows]]), max(foot['outward'])+foot['padding'])
     stock, share = largest(G.solid(membrane))
     if share < 1-1e-9: raise ValueError('Step4 membrane is not one piece')
     base = regions(c, group['slots'], membrane); thin = lambda part: own_thin(c, base, part)
-    record = []; enclosed = True; disc = md.CrossSection.circle(foot['radius']/G.SCALE, 32)
-    pad = foot['radius']*np.cos(np.pi/32)-1e-4                     # the pad polygon's inner radius, less a margin
+    tables = []
     for r in rows:
-        ground = ground_enclosure(G.mesh(stock), [r])[0]
-        if ground['passed']:
-            on = transform(np.c_[np.asarray(ground['ground_contact_hull_xy_m']).reshape(-1, 2), np.zeros(len(ground['ground_contact_hull_xy_m']))], r['material'])
-            record.append(dict(task=r['id'], feet=[], ground_corners=len(on), held_m=on.tolist())); continue
-        hull = np.asarray(r['hull']); corners = np.asarray(ground['ground_contact_hull_xy_m'], float).reshape(-1, 2)
+        same = next((t for t in tables if np.allclose(t[0]['world_from_support'][2], r['world_from_support'][2], atol=1e-9)), None)
+        if same is None: tables.append([r])
+        else: same.append(r)
+    record = []; enclosed = True; disc = md.CrossSection.circle(foot['tip']/G.SCALE, 32)
+    for same in tables:
+        r = same[0]; ids = [s['id'] for s in same]
+        need = [s for s, g in zip(same, ground_enclosure(G.mesh(stock), same)) if not g['passed']]
+        if not need: record.append(dict(tasks=ids, feet=[])); continue
+        hull = np.vstack([transform(s['ground_material'], r['world_from_support'])[:, :2] for s in need]); hull = hull[ConvexHull(hull).vertices]
+        corners = np.asarray(ground_enclosure(G.mesh(stock), [r])[0]['ground_contact_hull_xy_m'], float).reshape(-1, 2)
         sites, level = [np.empty((0, 2))], [np.empty(0, int)]
         for k, d in enumerate(foot['outward']):
             ring = orient(Polygon(hull).buffer(d, join_style=2), sign=1.)
             for g in getattr(ring, 'geoms', [ring]):
                 if g.is_empty: continue
                 p = resample(np.asarray(g.exterior.coords)[:-1], foot['spacing']); sites.append(p); level.append(np.full(len(p), k))
-        sites, level = np.vstack(sites), np.concatenate(level); free = section(r, legal, foot)
-        ok = np.array([(disc.translate(tuple(s/G.SCALE))-free).area() <= 1e-6*disc.area() for s in sites], bool).reshape(-1)
-        sites, level = sites[ok], level[ok]
-        tops = transform(np.c_[sites, np.full(len(sites), foot['height'])], r['material'])
-        anchor, length, _ = trimesh.proximity.closest_point(G.mesh(stock), tops) if len(sites) else (np.empty((0, 3)), np.empty(0), None)
-        # A foot's material, as a length of leg: its leg, its pad and the cap of the ball.
-        points = np.vstack([corners, sites]); cost = np.r_[np.zeros(len(corners)), length+foot['height']+2/3*foot['radius']]
-        reach = np.r_[np.zeros(len(corners)), np.full(len(sites), pad)]; level = np.r_[np.full(len(corners), -1), level]
+        sites, level = np.vstack(sites), np.concatenate(level); free = section(r, legal, foot); mesh = G.mesh(stock)
+        nearest = lambda xy: trimesh.proximity.closest_point(mesh, transform(np.c_[xy, np.full(len(xy), foot['thick']/2)], r['material']))[:2]
+        # A leg is at least FOOT['least'] long (no stub): a site the support comes nearer than that moves out, along
+        # the level line from its anchor (or from the hull), until it is that far -- again from the new nearest
+        # point, at most thrice; a site still nearer is no candidate.
+        anchor, length = nearest(sites) if len(sites) else (np.empty((0, 3)), np.empty(0))
+        for _ in range(3):
+            short = length < foot['least']*(1-1e-3)
+            if not short.any(): break
+            above = transform(anchor[short], r['world_from_support']); out = sites[short]-above[:, :2]
+            out = np.where(np.linalg.norm(out, axis=1)[:, None] > 1e-9, out, sites[short]-hull.mean(0)); out /= np.linalg.norm(out, axis=1)[:, None]
+            rise = np.clip(above[:, 2]-foot['thick']/2, 0., foot['least'])
+            sites[short] = above[:, :2]+out*np.sqrt(foot['least']**2-rise**2)[:, None]; anchor, length = nearest(sites)
+        ok = (length >= foot['least']*(1-1e-3)) & np.array([(disc.translate(tuple(s/G.SCALE))-free).area() <= 1e-6*disc.area() for s in sites], bool).reshape(-1)
+        sites, level, anchor, length = sites[ok], level[ok], anchor[ok], length[ok]
+        # A foot's material, as its plate's area.
+        ground, top = widths(transform(anchor, r['world_from_support'])-np.c_[sites, np.zeros(len(sites))], foot)
+        points = np.vstack([corners, sites]); cost = np.r_[np.zeros(len(corners)), np.maximum(length, foot['least'])*(ground+top)+np.pi*ground**2]
+        level = np.r_[np.full(len(corners), -1), level]
         built = {}; found = None
         for top in range(min(foot['first'], len(foot['outward']))-1, len(foot['outward'])):
             for _ in range(foot['attempts']):
                 use = np.flatnonzero((level <= top) & np.isfinite(cost))
-                ids = enclosing(points[use], cost[use], hull, reach[use]) if len(use) >= 3 else None
-                if ids is None: break
-                ids = use[ids]; new = [int(k) for k in ids if k >= len(corners)]
+                picked = enclosing(points[use], cost[use], hull) if len(use) >= 3 else None
+                if picked is None: break
+                picked = use[picked]; new = [int(k) for k in picked if k >= len(corners)]
                 for k in new:
-                    if k not in built: built[k] = foot_at(r, sites[k-len(corners)], anchor[k-len(corners)], legal, stock, foot, thin)
+                    if k not in built: built[k] = strut(r, sites[k-len(corners)], anchor[k-len(corners)], mesh, legal, stock, foot, thin)
                     if built[k] is None: cost[k] = np.inf
                 if any(built[k] is None for k in new): continue
                 grown = G.union([stock]+[built[k] for k in new])
-                if joined(grown) and ground_enclosure(G.mesh(grown), [r])[0]['passed']: found = grown, new, len(ids)-len(new), top
+                if joined(grown) and all(g['passed'] for g in ground_enclosure(G.mesh(grown), need)): found = grown, new, len(picked)-len(new), top
                 break
             if found is not None: break
-        if found is None: enclosed = False; record.append(dict(task=r['id'], feet=None)); continue
+        if found is None: enclosed = False; record.append(dict(tasks=ids, feet=None)); continue
         stock = found[0]
-        used = [int(k) for k in ids if k < len(corners)]
-        record.append(dict(task=r['id'], ground_corners=found[2], outward_m=foot['outward'][found[3]],
-                           feet=[dict(site_m=sites[k-len(corners)].tolist(), leg_m=float(length[k-len(corners)])) for k in found[1]],
+        used = [int(k) for k in picked if k < len(corners)]; on = [k-len(corners) for k in found[1]]
+        record.append(dict(tasks=ids, need=[s['id'] for s in need], ground_corners=found[2], outward_m=foot['outward'][found[3]],
+                           feet=[dict(site_support_m=transform(np.c_[sites[on], np.zeros(len(on))], r['material'])[k].tolist(),
+                                      leg_m=float(length[j])) for k, j in enumerate(on)],
                            # The support's points the feet stand on: each leg's anchor, each ground corner used.
-                           held_m=np.vstack([anchor[[k-len(corners) for k in found[1]]].reshape(-1, 3),
+                           held_m=np.vstack([anchor[on].reshape(-1, 3),
                                              transform(np.c_[corners[used], np.zeros(len(used))], r['material']).reshape(-1, 3)]).tolist()))
     return stock, record, enclosed
 
 
 def leg_skin(c, group, membrane, support):
-    """support without the skin its feet add narrower than WIDTH (a leg touching the object in another seat), cut
-    as Step4 cuts thin skin: (support, the area cut, m^2)."""
-    S, _ = skin(c); value = G.solid(support); area = 0.
-    for (X, R, own), (_, old, _) in zip(regions(c, group['slots'], support), regions(c, group['slots'], membrane)):
-        ids = np.flatnonzero(S.thin(R, own=own) & ~old)
-        if len(ids): value = cut(c, value, X, ids); area += float(S.area[ids].sum())
-    return (piece(value, 'cutting the thin skin of the feet splits the support') if area else support), area
-
-
-def occupancy(solid, low, h, shape):
-    """The voxel centres (grid low + (index + 1/2) h) inside solid: every z slice's cross-section filled, holes by
-    even-odd."""
-    nx, ny, nz = shape; out = np.zeros(shape, bool)
-    for k in range(nz):
-        polygons = solid.slice(float((low[2]+(k+.5)*h)/G.SCALE)).to_polygons(); inside = np.zeros((ny, nx), bool)
-        for polygon in polygons:
-            p = (np.asarray(polygon)*G.SCALE-low[:2])/h-.5
-            if len(p) < 3: continue
-            image = Image.new('1', (nx, ny), 0); ImageDraw.Draw(image).polygon([tuple(q) for q in p], fill=1); inside ^= np.asarray(image, bool)
-        out[:, :, k] = inside.T
-    return out
-
-
-def touched(mesh, low, h, shape):
-    """The voxels (grid low + index h) holding a vertex or a triangle's centre of mesh."""
-    i = np.floor((np.vstack([mesh.vertices, mesh.triangles_center])-low)/h).astype(int)
-    out = np.zeros(shape, bool); out[tuple(i[((i >= 0) & (i < shape)).all(1)].T)] = True
-    return out
-
-
-def struts(O, room, r, h, must, share=1e-3):
-    """O (voxels) with every piece of at least `share` of it, or holding any of must, joined to the largest by the
-    shortest strut of radius r whose centre line stays where a ball of radius r fits in room, the nearest piece
-    first; then every piece of at least `share` no such strut reaches (the room between it and the rest narrower
-    than 2r) by the shortest centre line through room, the strut as wide as room lets it: (O, struts, the centre
-    lines of those narrow ones, voxel indices)."""
-    edt = lambda mask: ndimage.distance_transform_edt(mask, sampling=h)
-    label, n = ndimage.label(O)
-    if n < 2: return O, 0, []
-    size = np.bincount(label.ravel()); size[0] = 0; joined = label == size.argmax(); needed = set(np.unique(label[must]))
-    todo = [k for k in range(1, n+1) if k != size.argmax() and (size[k] >= share*size.sum() or k in needed)]
-    count, narrow = 0, []
-    for space in (edt(room) > r, room):
-        if space is room: todo = [k for k in todo if size[k] >= share*size.sum()]
-        cost = np.where(space, 1., np.inf)
-        while todo:
-            paths = MCP_Geometric(cost, fully_connected=True); far, _ = paths.find_costs(np.argwhere(joined & space)); best = None
-            for k in todo:
-                ends = np.argwhere((label == k) & (space | must))
-                if not len(ends): continue
-                d = far[tuple(ends.T)]; j = int(d.argmin())
-                if np.isfinite(d[j]) and (best is None or d[j] < best[0]): best = (d[j], k, tuple(ends[j]))
-            if best is None: break
-            path = np.asarray(paths.traceback(best[2])); line = np.zeros(O.shape, bool); line[tuple(path.T)] = True
-            joined |= (label == best[1]) | ((edt(~line) <= r) & room); todo.remove(best[1]); count += 1
-            if space is room: narrow.append(path)
-    return joined, count, narrow
-
-
-def tubes(paths, low, h, r):
-    """Centre lines (voxel indices on the grid low + (index + 1/2) h) as exact tubes of radius r."""
-    ball = trimesh.creation.icosphere(subdivisions=2, radius=r).vertices; parts = []
-    for path in paths:
-        p = low+(np.asarray(path, float)+.5)*h; p = np.vstack([p, p]) if len(p) == 1 else p
-        parts += [md.Manifold.hull_points(np.vstack([ball+a, ball+b])/G.SCALE) for a, b in zip(p[:-1], p[1:])]
-    return G.union(parts)
-
-
-def holding(model, support, r, depth):
-    """Every contact corner a task's paired-load certificate on support uses (the peel's), the certificate preferring
-    corners deep in the skin (a corner costs exp(-depth/r)): (the corners, the object's outward normals there),
-    support frame."""
-    points, normals = [np.zeros((0, 3))], [np.zeros((0, 3))]
-    for t in model.prepare(model.layout(support)):
-        hold = P.Hold(t, support, lambda p: depth(p)*WIDTH/r)
-        used = np.unique(np.concatenate([b for b in hold.bases if b is not None])); used = used[used > 0]-1
-        _, _, faces = trimesh.proximity.closest_point(t['body'], hold.points[used])
-        points.append(hold.points[used]); normals.append(t['body'].face_normals[faces])
-    return np.vstack(points), np.vstack(normals)
-
-
-def holds(model, support):
-    """The first task whose contact corners on support no longer hold all its outer targets (the peel's
-    certificate), or None."""
-    for t in model.prepare(model.layout(support)):
-        try: P.Hold(t, support, lambda p: np.zeros(len(p)))
-        except ValueError: return t['id']
-    return None
-
-
-def rounded(c, model, group, support, r=ROUND):
-    """support made manufacturable (above): (support, record)."""
-    began = time.monotonic(); h = r['grid']; slots = group['slots']; F = solids(c.object_name, group)['F']; delta = 1.5*h
-    pad = r['close']+2*r['radius']+2*r['spike']+delta+6*h; low = support.bounds[0]-pad; shape = np.ceil((support.bounds[1]+pad-low)/h).astype(int)
-    box = G.box(low, low+shape*h); edt = lambda mask: ndimage.distance_transform_edt(mask, sampling=h)
-    close = lambda mask, d: edt(edt(~mask) <= d) > d
-    opened = lambda mask, d: edt(~(edt(mask) > d)) <= d
-    voxel = lambda p: tuple(np.clip(np.floor((np.asarray(p)-low)/h).astype(int), 0, shape-1).T)
-    def balls(centres, d):
-        seed = np.zeros(shape, bool); seed[voxel(centres)] = True; return edt(~seed) <= d
-    bodies = G.union([move(np.asarray(s['X'], float), G.solid(c.base.source)) for s in slots]) ^ box
-    _, outer = skin(c); value = G.solid(support); material = model.layout(support).material
-    space = legal(support.vertices, WIDTH, material, F)                                   # exact: floors, out of F
-    A = occupancy(value, low, h, shape) | touched(support, low, h, shape); B = occupancy(bodies, low, h, shape)
-    hard = ~occupancy(legal(support.vertices, WIDTH, material, md.Manifold()) ^ box, low, h, shape) | (occupancy(F ^ box, low, h, shape) & ~B)
-    room = occupancy((G.union([move(np.asarray(s['X'], float), outer) for s in slots])+value) ^ box, low, h, shape) & ~B & ~hard
-    near = edt(~B); reach = np.clip(1-(near-delta)/(2*h), 0, 1); air = edt(A | B)
-
-    def solid(O):
-        """O smoothed, as a solid in the legal space, the exit kept: (support, share kept, exit rounds)."""
-        field = ndimage.gaussian_filter(edt(O)-edt(~O), r['blur'])+delta*reach          # into the objects only
-        v, f, _, _ = marching_cubes(np.pad(field, 1, constant_values=-1.), 0., spacing=(h, h, h))
-        mesh = trimesh.Trimesh(v+low-.5*h, f, process=True)
-        if mesh.volume < 0: mesh.invert()
-        trimesh.smoothing.filter_taubin(mesh, iterations=r['taubin'])
-        body = G.solid(mesh) if not narrow else G.solid(mesh)+tubes(narrow, low, h, radius)
-        out, share = largest(body ^ space)
-        for rounds in range(4):                 # a source face that no longer exits: what was added in its prism goes
-            m = G.mesh(out); candidate = dict(layout=model.layout(m), support=m, tasks=None, construction={})
-            candidate['tasks'] = model.prepare(candidate['layout']); rows, bad = model.path_checks(out, model.exit_paths(candidate))
-            if all(row['passed'] for row in rows) or not bad: break
-            for _, _, prism in bad: out = out-(prism-value)
-            out = largest(out)[0]
-        return piece(out, 'rounding splits the support'), share, rounds
-    radius, spike = r['radius'], r['spike']
-    contact = A & (near <= 1.5*h)
-    backed = A | ((edt(~contact) <= 2*radius) & (near <= 2*radius+h) & room)        # every contact backed 2r thick
-    points, normals = holding(model, support, radius, lambda p: air[voxel(p)])
-    own = balls(points+.5*h*normals, 2*radius) & backed               # the backed skin about every corner the loads use
-    closed = close(backed, r['close']) & room                                        # the teeth joined
-    closed = opened(closed | (B & (near <= 2*spike+h)), spike) & room                 # what sticks out thinner than 2R goes
-    O = opened(closed, radius) | own                                                 # no feature thinner than 2r
-    O, joins, narrow = struts(O, room | own, radius, h, own)
-    out, share, rounds = solid(O); failed = holds(model, out)
-    if failed is not None: raise ValueError(f'{failed}: the manufacturable support (features {radius*1000:g} mm, protrusions {spike*1000:g} mm) no longer holds its loads')
-    return out, dict(radius_m=radius, spike_m=spike, grid=[int(n) for n in shape], kept_share=float(share), struts=joins,
-                     narrow_struts=len(narrow), corners=len(points), exit_rounds=rounds,
-                     volume_cm3=[float(support.volume*1e6), float(out.volume*1e6)], seconds=time.monotonic()-began)
+    """support without the skin narrower than WIDTH its feet make that the membrane has not (peel.fresh, every such
+    cell: a leg touching the object in another seat, or widening what a corner of the membrane touches): the
+    feet's own layer there cut, until none is left; the membrane's material stays.  (support, the area cut, m^2)"""
+    _, outer = skin(c); base = G.solid(membrane); old = P.thin_cells(c, group, membrane, WIDTH/2); value = G.solid(support); area = 0.
+    while True:
+        found, a = P.fresh(c, group, old, value, made=True, pieces=False)
+        if not a: break
+        layer = G.union([P.prisms(c, [(X, cells)]) ^ move(X, outer) for X, cells in found if len(cells)])
+        if (layer ^ value).is_empty() or G.volume((layer ^ value)-base) < c.base.tolerance: break      # the feet have none there
+        value = value-(layer-base); area += a
+    return (piece(value.simplify(SEAM/G.SCALE), 'cutting the thin skin of the feet splits the support') if area else support), area
 
 
 def wrap(c, group, foot=FOOT):
     """The support peeled, with its feet: (support, model, layout, record of every task's feet, record of the
     steps: the peel and the skin's least width)."""
-    model = ExitModel(c, group['slots']); membrane = read_mesh(ROOT/group['file']); steps = {}
-    began = time.monotonic(); before = membrane.volume; membrane, steps['peeled'] = pare(c, model, group, membrane)
-    steps['peeled'].update(removed_cm3=float(before-membrane.volume)*1e6, seconds=time.monotonic()-began)
-    membrane, steps['rounded'] = rounded(c, model, group, membrane)
-    steps.update(membrane_cm3=float(membrane.volume*1e6), peeled_bbx_m3=obb(membrane.vertices))
-    began = time.monotonic(); stock, record, _ = feet(c, model, group, membrane, foot); steps['feet_seconds'] = time.monotonic()-began
-    support = piece(stock, 'the feet split the support')
-    # The feet only add.  (A Boolean difference cannot show it: cell prisms leave seams where one of the membrane
-    # even with itself differs by mm^3 either way; the audit below judges the support as it is.)
-    if G.volume(G.solid(support)) < G.volume(G.solid(membrane))-c.base.tolerance: raise ValueError('the feet lost membrane')
-    support, steps['feet_thin_cut_m2'] = leg_skin(c, group, membrane, support)
-    # The forbidden region cut again: a union can leave a contact face triangulated unlike the object (the same
-    # vertices, other diagonals), a thin lens between the two that the audit counts as overlap.
-    support = settled(c, group, support)
-    # Step4's own recut before an audit: every original face cell at the final exit travel.
-    candidate = dict(layout=model.layout(support), support=support, tasks=None, construction={})
-    candidate['tasks'] = model.prepare(candidate['layout']); model.refine_exits(candidate)
-    record.append(dict(exit_refinement_rounds=candidate['construction']['exit_refinement_rounds'],
-                       removed_cm3=float(support.volume-candidate['support'].volume)*1e6))
-    # The audit judges the support the recut checked last.  Every re-mesh can leave a sliver where two coincident
-    # surfaces meet (an inverted shell the audit counts: B+8pose, 1.7e-9 m^3 in a body after piece(), 1.7e-8 m^3 in
-    # an exit prism after settling again), so a support the recut left as it was is not re-meshed.
-    if candidate['construction']['exit_refinement_rounds']: support = piece(G.solid(candidate['support']), 'the exit recut splits the support')
-    # The skin as it is: its least width (None: nothing narrower than 4 WIDTH) and the area narrower than WIDTH and
-    # thinner than THICK (load-bearing skin the legal space lets be neither wider nor thicker).  Recorded.
+    model = ExitModel(c, group['slots']); start = read_mesh(ROOT/group['file']); steps = {}
+    for legs in (False, True):
+        # The peel free of the tables but for every ring of feet staying; where the feet then do not stand on the frame,
+        # once more keeping the points Step4's rings' legs start from (grounds).
+        ground, stance = grounds(c, model, group, start, legs)
+        membrane, steps['frame'] = FR.frame(c, model, group, start, ground, solids(c.object_name, group)['F'], stance=stance)
+        steps.update(membrane_cm3=float(membrane.volume*1e6), peeled_bbx_m3=obb(membrane.vertices), legs_kept=legs)
+        support, record = feet_on(c, model, group, membrane, foot, steps)
+        if all(r['passed'] for r in ground_enclosure(support, pressure_rows(model, model.layout(support)))): break
     width = measure(c, group['slots'], support); steps['too_thin_m2'] = P.too_thin(c, group, support)
     steps['skin_width_m'] = width[0] if np.isfinite(width[0]) else None
     return support, model, model.layout(support), record, steps
+
+
+def feet_on(c, model, group, membrane, foot, steps):
+    """wrap's feet on the frame membrane: (support, record)."""
+    # Feet, then the cuts after them (the thin skin the legs add, the settling, Step4's exit recut); a task those
+    # leave off its ground gets feet again (at most twice more).
+    began = time.monotonic(); support, record = membrane, []
+    for rounds in range(3):
+        stock, more, _ = feet(c, model, group, support, foot); record += more if not rounds else [f for f in more if f.get('feet')]
+        stock = piece(stock, 'the feet split the support')
+        # The feet only add.  (A Boolean difference cannot show it: cell prisms leave seams where one of the membrane
+        # even with itself differs by mm^3 either way; the audit below judges the support as it is.)
+        if G.volume(G.solid(stock)) < G.volume(G.solid(support))-c.base.tolerance: raise ValueError('the feet lost membrane')
+        support, cut = leg_skin(c, group, membrane, stock); steps['feet_thin_cut_m2'] = steps.get('feet_thin_cut_m2', 0.)+cut
+        # The forbidden region cut again: a union can leave a contact face triangulated unlike the object (the same
+        # vertices, other diagonals), a thin lens between the two that the audit counts as overlap.
+        support = settled(c, group, support)
+        # Step4's own recut before an audit: every original face cell at the final exit travel.
+        candidate = dict(layout=model.layout(support), support=support, tasks=None, construction={})
+        candidate['tasks'] = model.prepare(candidate['layout']); model.refine_exits(candidate)
+        record.append(dict(exit_refinement_rounds=candidate['construction']['exit_refinement_rounds'],
+                           removed_cm3=float(support.volume-candidate['support'].volume)*1e6))
+        # The audit judges the support the recut checked last.  Every re-mesh can leave a sliver where two coincident
+        # surfaces meet (an inverted shell the audit counts: B+8pose, 1.7e-9 m^3 in a body after piece(), 1.7e-8 m^3 in
+        # an exit prism after settling again), so a support the recut left as it was is not re-meshed.
+        if candidate['construction']['exit_refinement_rounds']: support = piece(G.solid(candidate['support']), 'the exit recut splits the support')
+        q = model.layout(support)
+        if all(r['passed'] for r in ground_enclosure(support, pressure_rows(model, q))): break
+    steps.update(feet_seconds=time.monotonic()-began, feet_rounds=rounds+1)
+    return support, record
 
 
 def certify(model, q, support):
@@ -505,18 +420,24 @@ def inputs(object_name):
     data = ROOT/'whole_task_2/data'/object_name
     files = [data/COMBINE/'report.json', data/'step4_keepout/report.json', data/'step3_tool_membranes/report.json',
              *[ROOT/'whole_task_2'/p for p in ('step4/combine.py', 'step4/merge.py', 'step4/seats.py', 'step4/keepout.py',
-                                             'step4/ground_oracle.py', 'step4/skin.py', 'step5/peel.py', 'step5/combined.py')]]
+                                             'step4/ground_oracle.py', 'step4/skin.py', 'step5/peel.py', 'step5/frame.py', 'step5/combined.py')]]
     return {str(p.relative_to(ROOT)): sha256(p) for p in files}
 
 
 def clear(object_name, output_root=DEFAULT_OUTPUT):
     """Every result of an earlier run, so that this one overwrites them: the supports, report and validation under
-    data/<object>/step5_combined/, the figures rNN.png and packages rNN/ under output/<object>/step5/ (nothing else
-    there is touched).  No copies are kept."""
-    for path in [ROOT/'whole_task_2/data'/object_name/FOLDER, output_root/object_name/'step5']:
+    data/<object>/step5_combined/, the figures rNN.png and packages rNN/ under output/<object>/step5/ and Step4's
+    figures rNN.png under output/<object>/step4/ (nothing else there is touched).  No copies are kept."""
+    for path in [ROOT/'whole_task_2/data'/object_name/FOLDER, output_root/object_name/'step5', output_root/object_name/'step4']:
         for p in (path.iterdir() if path.exists() else []):
             if re.fullmatch(r'r\d\d(\.png|\.npz|\.obj)?', p.name) or p.name in ('report.json', 'validation.json'):
                 shutil.rmtree(p) if p.is_dir() else p.unlink()
+
+
+def step4_figure(c, group, path):
+    """Step4's support of a result, drawn as render() draws Step5's."""
+    membrane = read_mesh(ROOT/group['file']); model = ExitModel(c, group['slots'])
+    render(group, model, model.layout(membrane), membrane, path)
 
 
 def run(object_name='B', output_root=DEFAULT_OUTPUT):
@@ -528,9 +449,9 @@ def run(object_name='B', output_root=DEFAULT_OUTPUT):
                    membrane_cm3=group['volume_cm3'], bbx_m3=group['bbx_m3'], seats=[len(ks) for _, ks in seats(group)],
                    joins=[dict(task=s['parents'][1], operation=s['operation'], seat=s['seat'], bbx_ratio=s['bbx_ratio'])
                           for s in group['chain']])
+        step4_figure(c, group, output_root/object_name/'step4'/f'{name}.png')
         try:
             support, model, q, pieces, steps = wrap(c, group); row.update(pieces=pieces, **steps)
-            row.update(peeled_cm3=steps['peeled']['removed_cm3'])
             proof, ground = certify(model, q, support)
         except (ValueError, RuntimeError, AssertionError, np.linalg.LinAlgError) as ex:
             rows.append(dict(row, status='failed', reason=str(ex)[:300], seconds=time.monotonic()-t0))
@@ -545,12 +466,12 @@ def run(object_name='B', output_root=DEFAULT_OUTPUT):
                                      exit_length_m=t['exit_length_m']) for t in proof['tasks']],
                          ground=[dict(id=r['id'], passed=r['passed'], pressure_hull_gap_m=r['pressure_hull_gap_m']) for r in ground],
                          seconds=time.monotonic()-t0))
-        print('STEP5', name, 'PASS', round(support.volume*1e6, 1), 'cm3,', round(row['peeled_cm3'], 1), 'cm3 peeled (bbx',
+        print('STEP5', name, 'PASS', round(support.volume*1e6, 1), 'cm3,', round(steps['frame']['peel']['removed_cm3'], 1), 'cm3 peeled (bbx',
               round(group['bbx_m3']*1e6), '->', round(row['peeled_bbx_m3']*1e6), 'cm3),',
               round(rows[-1]['feet_cm3'], 1), 'cm3 of feet, skin', 'over 40' if steps['skin_width_m'] is None else round(steps['skin_width_m']*1000, 1), 'mm wide,', round(time.monotonic()-t0), 's', flush=True)
         render(group, model, q, support, output_root/object_name/'step5'/f'{name}.png')
         package(c, group, model, q, support, rows[-1], output_root/object_name/'step5'/name)
-    report = dict(object=object_name, peel=dict(trim=P.TRIM, grids=P.GRIDS, budget=P.BUDGET), skin_width_m=WIDTH, foot=FOOT, results=rows, input_sha256=inputs(object_name), seconds=time.monotonic()-began)
+    report = dict(object=object_name, peel=dict(trim=P.TRIM, grids=P.GRIDS, budget=P.BUDGET), skin_width_m=WIDTH, least_width_m=P.THICK, foot=FOOT, results=rows, input_sha256=inputs(object_name), seconds=time.monotonic()-began)
     write_json(folder/'report.json', plain(report))
     validate(object_name)
     return report
@@ -665,7 +586,9 @@ def package(c, group, model, q, support, row, out):
     bounds = np.asarray(limits['ranges'], float); bounds = np.degrees(bounds) if limits['unit'] == 'rad' else bounds
     tcp = config['feasibility'].get('tcp_transform'); tip = setup['needle_length_m']+.07    # step1.reach_video: flange 70 mm behind the needle root
     proofs = {t['id']: t for t in row['tasks']}; ground = {r['id']: r for r in row['ground']}
-    feet = {f['task']: f for f in row['pieces'] if 'task' in f}
+    feet = {}
+    for f in row['pieces']:
+        for t in f.get('tasks', []): feet.setdefault(t, []).extend(f['feet'] or [])
     for k, r in enumerate(model.records):
         X = model.X[k]; P = np.asarray(r['pose']); W, ground_z = stand(P, X); faces = np.asarray(r['certified_face_ids'])
         f = contact(model.source, faces, P); j = int(np.flatnonzero(faces == f)[0])
@@ -682,8 +605,8 @@ def package(c, group, model, q, support, row, out):
             certified_faces=len(faces),
             central_face=dict(face=int(f), test_points_world_mm=(test_points(model.source)[f]@P[:3, :3].T+P[:3, 3])*1e3,
                               needle_direction_world=axes[j], arm_joints_deg=joints[j]),
-            feet=[dict(pad_centre_support_mm=grow(transform(np.r_[s['site_m'], 0.][None], q.material[k])[0])*1e3, leg_mm=s['leg_m']*1e3)
-                  for s in feet.get(r['id'], {}).get('feet') or []],
+            feet=[dict(tip_centre_support_mm=grow(np.asarray(s['site_support_m']))*1e3, leg_mm=s['leg_m']*1e3)
+                  for s in feet.get(r['id'], [])],
             checks=dict(paired_samples_held=proofs[r['id']]['samples'], continuous_outer_targets_held=proofs[r['id']]['outer'],
                         arm_link_faces_hit=proofs[r['id']]['arm_faces_hit'], pressure_hull_gap_mm=ground[r['id']]['pressure_hull_gap_m']*1e3,
                         arm_joints_within_limits=bool(((joints >= bounds[:, 0]-1e-6) & (joints <= bounds[:, 1]+1e-6)).all()))))
@@ -705,7 +628,7 @@ def package(c, group, model, q, support, row, out):
                      volume_cm3=row['volume_cm3'], membrane_cm3=row['membrane_cm3'], feet_cm3=row['feet_cm3'],
                      oriented_bbx_cm3=row['support_bbx_m3']*1e6, bounds_support_mm=np.asarray(row['bounds_m'])*1e3,
                      skin_least_width_mm=None if row['skin_width_m'] is None else row['skin_width_m']*1e3,
-                     skin_narrow_and_thin_cm2=row['too_thin_m2']*1e4, skin_thickened_cm2=row['peeled']['thickened_m2']*1e4,
+                     skin_narrow_and_thin_cm2=row['too_thin_m2']*1e4, peeled_cm3=row['frame']['peel']['removed_cm3'],
                      triangles=len(support.faces), watertight=bool(support.is_watertight),
                      step4=dict(file=row['step4_file'], samples=row['samples'])),
         station=dict(config=str(path.relative_to(ROOT)), id=config['id'], name=config['name'],
@@ -734,8 +657,9 @@ def figures(object_name='B', output_root=DEFAULT_OUTPUT):
     c = context(object_name); folder = ROOT/'whole_task_2/data'/object_name/FOLDER
     report = json.loads((folder/'report.json').read_text()); groups = {g['file']: g for g in distinct(object_name)}
     for row in report['results']:
+        g = groups[row['step4_file']]; step4_figure(c, g, output_root/object_name/'step4'/f"{row['name']}.png")
         if row['status'] != 'passed': continue
-        g = groups[row['step4_file']]; support = read_mesh(folder/f"{row['name']}.npz")
+        support = read_mesh(folder/f"{row['name']}.npz")
         model = ExitModel(c, g['slots'])
         render(g, model, model.layout(support), support, output_root/object_name/'step5'/f"{row['name']}.png")
         package(c, g, model, model.layout(support), support, row, output_root/object_name/'step5'/row['name'])

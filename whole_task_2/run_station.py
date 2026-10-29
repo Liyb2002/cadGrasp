@@ -17,13 +17,15 @@ STEPS = [('step1', ['whole_task_2.step1.run']),
          ('step4_keepout', ['whole_task_2.step4.keepout', '--workers', '6']),
          ('step4_combine', ['whole_task_2.step4.combine', '--workers', '22']),
          ('step5', ['whole_task_2.step5.combined']),
-         ('evaluation', ['whole_task_2.evaluation.combine', '--top', '40'])]
+         ('evaluation', ['whole_task_2.evaluation.combine', '--top', '40']),
+         ('step6', ['whole_task_2.step6.robot'])]
 
 
-def run(name, start='step1'):
+def run(name, start='step1', until=None):
     logs = ROOT/'whole_task_2/data'/name/'logs'; logs.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, OPENBLAS_NUM_THREADS='1', OMP_NUM_THREADS='1', PYTHONPATH=str(ROOT))
-    for step, command in STEPS[[s for s, _ in STEPS].index(start):]:
+    names = [s for s, _ in STEPS]
+    for step, command in STEPS[names.index(start):names.index(until)+1 if until else None]:
         began = time.monotonic()
         with (logs/f'{step}.log').open('w') as out:
             done = subprocess.run([sys.executable, '-m', *command, '--object', name], cwd=ROOT, env=env, stdout=out, stderr=subprocess.STDOUT)
@@ -34,4 +36,5 @@ def run(name, start='step1'):
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('name'); p.add_argument('--start', default='step1', choices=[s for s, _ in STEPS])
-    a = p.parse_args(); run(a.name, a.start)
+    p.add_argument('--until', default=None, choices=[s for s, _ in STEPS], help='the last step to run (default: every step)')
+    a = p.parse_args(); run(a.name, a.start, a.until)

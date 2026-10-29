@@ -143,7 +143,8 @@ def context():
 
 
 def normals(v,f):
-    tri=v[f];n=np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0]);n/=np.maximum(np.linalg.norm(n,axis=1)[:,None],1e-20)
+    # Area-weighted: a long thin face (a flat plate's) is not bent by the many small ones at its rounded rim.
+    tri=v[f];n=np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0])
     ids=f.ravel();result=np.column_stack([np.bincount(ids,weights=np.repeat(n[:,j],3),minlength=len(v)) for j in range(3)])
     return result/np.maximum(np.linalg.norm(result,axis=1)[:,None],1e-20)
 

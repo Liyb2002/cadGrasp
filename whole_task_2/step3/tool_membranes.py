@@ -69,6 +69,10 @@ def step1_tasks(object_name):
         certified = np.flatnonzero(assigned & a['reach'][:,j])
         records.append(dict(id=area['id'], direction_index=j, working_face_ids=faces.tolist(), certified_face_ids=certified.tolist(),
                             pose=W, axes=a['reach_axis'][certified,j], joints=a['joints'][certified,j], angle_deg=0))
+        # A plan may give the task's exit (object frame; Step2 seats: its seat's); else it leaves against the needle.
+        if 'exit_object' in area: records[-1]['exit'] = np.asarray(area['exit_object'], float)
+        # A robot-free area (step2/seats.py): no KUKA here, Step6 places the robot on the finished support.
+        if area.get('robot') is False: records[-1]['robot'] = False
     if not records:raise ValueError('Step1 has no assigned tasks to initialize')
     key = next(k for k in plan['input_sha256'] if k.startswith('robots_config/'))
     if sha256(ROOT/key) != plan['input_sha256'][key]: raise ValueError('Robot config changed since Step1')
@@ -155,6 +159,7 @@ class ToolMembraneModel(MembraneModel):
         """Certified faces at whose stored joints a KUKA link hull meets the support (world frame).
         Long triangles (a plate, a rail) are split first: the same surface, but Check's neighbour
         search radius grows with the longest triangle and would otherwise test every triangle."""
+        if record.get('robot') is False: return []             # robot-free: Step6 checks the robot
         edge = self.policy['arm_check_edge_fraction']*float(np.linalg.norm(self.source.extents))
         world = trimesh.Trimesh(*trimesh.remesh.subdivide_to_size(world.vertices, world.faces, edge, max_iter=20), process=False)
         if self.arm is None: self.arm = Check(world, self.setup)
@@ -184,6 +189,7 @@ def turned(record, source, setup, angle):
     again for every certified face (None: some face has no clear arm there).  The tilt to the nominal
     direction, and so the needle and head certificate, do not change under this turn."""
     P = spin_pose(record['pose'], setup['working_direction_world'], setup['work_point_m'], angle)
+    if record.get('robot') is False: return dict(record, pose=P, angle_deg=angle)
     arm = Check(source, setup); joints = []; previous = None
     for f, axis in zip(record['certified_face_ids'], record['axes']):
         code, Q = arm.pair(f, axis, P, previous)
@@ -331,7 +337,8 @@ def initialize_one(args):
             trace.append(dict(angle_deg=angle, status='rejected', reason='KUKA cannot hold every certified face'))
             print(record['id'], 'REJECT', angle, 'arm', flush=True); continue
         model = ToolMembraneModel(source, outer, [r], setup, physical, policy, name)
-        q = Layout(r['pose'][None], np.eye(4)[None], direction[None])
+        d = direction if 'exit' not in r else np.asarray(r['pose'])[:3, :3]@r['exit']
+        q = Layout(r['pose'][None], np.eye(4)[None], d[None])
         try:
             candidate = model.build(q, facewise=True); model.audit(candidate)
         except (ValueError, RuntimeError, np.linalg.LinAlgError) as ex:
@@ -356,6 +363,8 @@ def inputs_and_policy(object_name):
     policy = {}
     for p in POLICIES: policy.update(json.loads(p.read_text()))
     policy = resolve_policy(policy, load_config(files[-1])); policy['task_count'] = len(records)
+    # A robot-free plan's loads: the push within the tilt cone about each face's own needle axis (common/wrenches.py).
+    if plan.get('robot_free'): policy['force_direction_model'] = 'local_axis_cone'
     if abs(policy['direction_half_angle_deg']-setup['max_tilt_deg']) > 1e-12:
         raise ValueError("The load cone must be Step1's tilt cone")
     # The fitted outer shell and the object belong to the object, whatever station a run (B+<config>) uses.
@@ -392,24 +401,26 @@ def validate(folder):
     with np.load(folder/'initialization.npz') as z:
         for i, name in enumerate(model.ids):
             r = model.records[i]
-            if r['angle_deg'] != 0 and not all(arm.replay(f, a, r['pose'], Q) for f, a, Q in zip(r['certified_face_ids'], r['axes'], r['joints'])):
+            if r['angle_deg'] != 0 and r.get('robot', True) and not all(arm.replay(f, a, r['pose'], Q) for f, a, Q in zip(r['certified_face_ids'], r['axes'], r['joints'])):
                 raise ValueError(name+': turned pose arm replay failed')
             part = model.subset([i]); qi = Layout(q.poses[i:i+1], q.material[i:i+1], q.exits[i:i+1])
             support = trimesh.Trimesh(z[stem(name)+'_vertices'], z[stem(name)+'_faces'], process=False)
             proofs.append(part.audit(dict(layout=qi, support=support, tasks=part.prepare(qi))))
             print(name, 'DISK REPLAY PASS', flush=True)
         shells = [trimesh.Trimesh(z[stem(name)+'_vertices'], z[stem(name)+'_faces'], process=False) for name in model.ids]
-    # The joined support is rebuilt from the saved membranes and must be the saved one.
-    joined, shifts, tops = connected(model, q, shells)
-    with np.load(folder/'connected.npz') as c:
-        if not (np.array_equal(joined.vertices, c['vertices']) and np.array_equal(joined.faces, c['faces'])):
-            raise ValueError('The saved joined support is not the one built from the saved membranes')
-    joint = joined_audit(model, q, joined, shells, shifts, tops, [p['tasks'][0]['exit_length_m'] for p in proofs])
-    print('JOINED DISK REPLAY PASS', flush=True)
+    # The joined support is rebuilt from the saved membranes and must be the saved one (when Step3 built it).
+    joint = None
+    if report['connected'] is not None:
+        joined, shifts, tops = connected(model, q, shells)
+        with np.load(folder/'connected.npz') as c:
+            if not (np.array_equal(joined.vertices, c['vertices']) and np.array_equal(joined.faces, c['faces'])):
+                raise ValueError('The saved joined support is not the one built from the saved membranes')
+        joint = joined_audit(model, q, joined, shells, shifts, tops, [p['tasks'][0]['exit_length_m'] for p in proofs])
+        print('JOINED DISK REPLAY PASS', flush=True)
     result = dict(status='passed', independent_fixture_count=len(proofs), tasks=proofs, connected=joint,
                   task_partition=task_partition(report['tasks'], model.source),
-                  initialization_sha256=sha256(folder/'initialization.npz'), connected_sha256=sha256(folder/'connected.npz'),
-                  report_sha256=sha256(folder/'report.json'))
+                  initialization_sha256=sha256(folder/'initialization.npz'),
+                  connected_sha256=None if joint is None else sha256(folder/'connected.npz'), report_sha256=sha256(folder/'report.json'))
     write_json(folder/'validation.json', result); return result
 
 
@@ -442,9 +453,14 @@ def run(output_root=DEFAULT_OUTPUT, object_name='B', workers=6):
     np.savez_compressed(folder/'initialization.npz', **q.arrays(), **saved, source_vertices=source.vertices,
                         source_faces=source.faces, outer_vertices=outer.vertices, outer_faces=outer.faces)
     model = ToolMembraneModel(source, outer, records, setup, physical, policy, object_name)
-    joined, shifts, tops = connected(model, q, shells)
-    np.savez_compressed(folder/'connected.npz', vertices=joined.vertices, faces=joined.faces, shifts=shifts, tops=tops)
-    joint = joined_audit(model, q, joined, shells, shifts, tops, [r['audit']['tasks'][0]['exit_length_m'] for r in results])
+    # The joined row is Step3's figure; Step4 starts from the separate membranes, so a row that cannot be built
+    # (a Boolean left unresolved) is recorded, not fatal.
+    try:
+        joined, shifts, tops = connected(model, q, shells)
+        joint = joined_audit(model, q, joined, shells, shifts, tops, [r['audit']['tasks'][0]['exit_length_m'] for r in results])
+        np.savez_compressed(folder/'connected.npz', vertices=joined.vertices, faces=joined.faces, shifts=shifts, tops=tops)
+    except (ValueError, RuntimeError) as ex:
+        joined = None; skipped = str(ex)[:300]; print('STEP3 JOINED ROW NOT BUILT:', skipped, flush=True)
     uncertified = sum(len(r['working_face_ids'])-len(r['certified_face_ids']) for r in records)
     report = dict(status='passed', object=object_name, method='pose_contact_membranes_on_one_common_base',
         task_count=n, independent_fixture_count=n, tasks=[public(r) for r in records], task_results=results, setup=setup,
@@ -455,19 +471,23 @@ def run(output_root=DEFAULT_OUTPUT, object_name='B', workers=6):
         task_partition=task_partition(records, source),
         material_volume_cm3=sum(r['volume_cm3'] for r in results),
         tool_keepout=dict(model=policy['tool_keepout'], head_reach_m=model.reach, uncertified_faces_without_keepout=uncertified),
-        connected_initialization_required=True, common_floor_or_head_height_required=False,
+        connected_initialization_required=joined is not None, common_floor_or_head_height_required=False,
         original_sample_count=sum(r['audit']['tasks'][0]['force']['original_sample_count'] for r in results),
         continuous_outer_target_count=sum(r['audit']['tasks'][0]['force']['continuous_outer_target_count'] for r in results),
-        connected=dict(volume_cm3=float(joined.volume*1e6), installation_shifts_m=shifts.tolist(),
+        connected=None if joined is None else dict(volume_cm3=float(joined.volume*1e6), installation_shifts_m=shifts.tolist(),
             conditioning=model.connected_conditioning,
             plate_and_feet_cm3=float(joined.volume*1e6)-sum(r['volume_cm3'] for r in results),
             plate_thickness_m=policy['plate_thickness_m'], row_gap_m=policy['row_gap_m'], rule=policy['connected'],
             row_axis=row_axis(setup).tolist(), gaps_widened_for_arms_m=model.connected_gaps.tolist(),
             arm_seconds=joint['arm_seconds']),
+        **({} if joined is not None else dict(connected_not_built=skipped)),
         seconds=time.monotonic()-began)
     write_json(folder/'report.json', report)
     # Independent reload: tools from Step1, everything else from the saved arrays.
     validate(folder)
+    if joined is None:
+        print('STEP3 TOOL MEMBRANES PASS', report['material_volume_cm3'], 'joined row not built', flush=True)
+        return report
     from .render_tool_membranes import render_connected
     render_connected(model, q, joined, shifts, folder)
     joined.export(folder/'base.obj')

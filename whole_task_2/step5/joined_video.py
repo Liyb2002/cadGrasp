@@ -91,14 +91,16 @@ def shifted(v):
     M = np.eye(4); M[:3, 3] = v; return M
 
 
-def heading(M): return float(np.arctan2(M[1, 0], M[0, 0]))
-
-
 def between(A, B, u, pivot):
-    """Support transforms turned about the vertical: the pivot (support frame) moves straight, the heading turns."""
-    w = (heading(B)-heading(A)+np.pi) % (2*np.pi)-np.pi
-    if abs(abs(w)-np.pi) < 1e-9: w = np.pi
-    M = np.eye(4); M[:3, :3] = Rotation.from_euler('z', heading(A)+u*w).as_matrix()
+    """Support transforms from A to B: the pivot (support frame) moves straight while the support turns from A's
+    rotation to B's about the world vertical (any other relative rotation: the shortest way).  The support's own
+    frame need not be z-up."""
+    R = B[:3, :3]@A[:3, :3].T; M = np.eye(4)
+    if abs(R[2, 2]-1) < 1e-9:
+        w = (np.arctan2(R[1, 0], R[0, 0])+np.pi) % (2*np.pi)-np.pi
+        if abs(abs(w)-np.pi) < 1e-9: w = np.pi
+        M[:3, :3] = Rotation.from_euler('z', u*w).as_matrix()@A[:3, :3]
+    else: M[:3, :3] = Slerp([0, 1], Rotation.from_matrix([A[:3, :3], B[:3, :3]]))(u).as_matrix()
     M[:3, 3] = (1-u)*(A[:3, :3]@pivot+A[:3, 3])+u*(B[:3, :3]@pivot+B[:3, 3])-M[:3, :3]@pivot
     return M
 

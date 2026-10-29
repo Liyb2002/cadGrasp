@@ -51,7 +51,8 @@ def render_connected(model, q, joined, shifts, folder, width=4200, height=1050, 
         L = model.setup['needle_length_m']
         tops = [world[:3, 3]+world[:3, 2]*(L+.07) for _, world in tools[::2]]
         scene.fit(np.vstack([joined.vertices, *[moved_mesh(model.source, W).vertices for _, W in seated], tops, *cones]), 1.04)
-        rows = [image(scene, blue, [], None, seated+tools, [(np.vstack(cones), GOLD)]), image(scene, blue, [], None, [])]
+        # One cone per segment draw: Step1's studio line buffer holds 4096 points, about 19 cones at once.
+        rows = [image(scene, blue, [], None, seated+tools, [(c, GOLD) for c in cones]), image(scene, blue, [], None, [])]
     finally: scene.close()
     canvas = Image.new('RGB', (width, 2*height), 'white')
     for k, row in enumerate(rows): canvas.paste(row, (0, k*height))

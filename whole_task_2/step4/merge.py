@@ -37,6 +37,7 @@ from scipy.spatial import ConvexHull
 from scipy.spatial.transform import Rotation
 
 from whole_task_2.step1.common import ROOT, sha256, write_json
+from whole_task_2.operations.contact_cache import SHARED
 from whole_task_2.operations.geometry import moved_mesh
 from whole_task_2.operations.state import Layout
 from whole_task_2.step3 import independent_geometry as G
@@ -89,8 +90,16 @@ class PlacedModel(SeatModel):
     world_from_support = P_k X_k^-1, lowered so that its lowest point rests on the table (z = 0)."""
     def __init__(self, c, members, angles, X):
         rows = [c.record(i, a) for i, a in zip(members, angles)]
-        super().__init__(c.base, [r for r, _ in rows], [k for _, k in rows], [c.sweeps[i] for i in members])
+        # A task installed twice (Rotational reuse of its own seat at another turn) names its later rows by the turn.
+        seen = set(); records = []
+        for (r, _), a in zip(rows, angles):
+            records.append(dict(r, id=f"{r['id']}@{a:g}") if r['id'] in seen else r); seen.add(r['id'])
+        super().__init__(c.base, records, [k for _, k in rows], [c.sweeps[i] for i in members])
         self.X = [np.asarray(x, float) for x in X]; self.placed = {}
+        self.floors = [None]*len(self.X)            # the table's world z at the certified pose (m), when legs fix it
+        # Exact contact queries are shared across this process's models: a task whose body and nearby support are the same
+        # to the bit is not intersected again (step3/membranes.audit reads actual_contact_cache).
+        self.actual_contact_cache = SHARED
 
     def solids(self, k):
         if k not in self.placed:
@@ -102,7 +111,7 @@ class PlacedModel(SeatModel):
         poses, material = [], []
         for k, r in enumerate(self.records):
             P = np.asarray(r['pose']).copy(); W = P@np.linalg.inv(self.X[k])
-            P[2, 3] -= float((support.vertices@W[:3, :3].T+W[:3, 3])[:, 2].min())
+            P[2, 3] -= float((support.vertices@W[:3, :3].T+W[:3, 3])[:, 2].min()) if self.floors[k] is None else self.floors[k]
             poses.append(P); material.append(self.X[k]@np.linalg.inv(P))
         return Layout(np.asarray(poses), np.asarray(material), np.tile(self.exit, (len(poses), 1)))
 

@@ -23,7 +23,7 @@ from whole_task_2.step3.exit_geometry import (
     whole_object_sweep, grounded_material, condition_exit, refine_face_prisms,
     continuous_checks,
 )
-from whole_task_2.step3.run_independent import make_domain
+from whole_task_2.step3.run_independent import make_domain, face_axes
 from whole_task_2.step3.independent_physics import demands, certificate
 from .state import Layout, transform
 
@@ -188,6 +188,12 @@ class OperationModel:
             envelope.vertices=envelope.vertices@frame.T
             nearby=solid^G.solid(envelope)
             local,failures=continuous_checks(nearby,[(name,body,direction,length)],self.tolerance)
+            if not local[0]['passed']:
+                # The crop is a Boolean too: re-triangulating the support where it touches the object can leave a
+                # sliver inside it (B+whole_shape_seats E3 standing: 1.55 mm^3 cropped, 4e-18 m^3 whole).  A failure
+                # on the crop is judged again on the whole solid.
+                local,failures=continuous_checks(solid,[(name,body,direction,length)],self.tolerance)
+                local[0]['crop_failure_judged_on_whole_solid']=True
             local[0]['full_sweep_bounding_crop_m']=[low.tolist(),high.tolist()]
             local[0]['exit_aligned_crop']=dict(frame=frame.tolist(),
                 low_m=local_low.tolist(),high_m=local_high.tolist(),all_original_prisms_retained=True)
@@ -221,7 +227,7 @@ class OperationModel:
             if body.bounds[0, 2] < -1e-12:
                 raise ValueError(record['id'] + ': object crosses the world floor')
             ids = np.asarray(record['working_face_ids'])
-            domain = make_domain(self.source, pose, ids, record['id'], self.workspace, self.physical, self.policy)
+            domain = make_domain(self.source, pose, ids, record['id'], self.workspace, self.physical, self.policy, face_axes(record))
             endpoints, samples = demands(domain, self.policy)
             outer_world = moved_mesh(self.outer, pose)
             stock_world = G.casting_stock(outer_world, self.policy['plate_thickness_m'])

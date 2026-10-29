@@ -41,9 +41,21 @@ def load_inputs(output_root,object_name,count):
     return source,plan,arrays,config,physical,policy,inputs
 
 
-def make_domain(source,T,ids,id,workspace,physical,policy):
+def face_axes(record):
+    """Each working face's needle axis, object frame: the record's force_axes, else its axis per certified face, NaN
+    where none (the load model local_axis_cone reads them; the others ignore them)."""
+    if 'force_axes' in record:return np.asarray(record['force_axes'],float)
+    ids=np.asarray(record['working_face_ids']);out=np.full((len(ids),3),np.nan)
+    given=dict(zip(map(int,record.get('certified_face_ids',[])),np.asarray(record.get('axes',np.empty((0,3))),float).reshape(-1,3)))
+    for k,f in enumerate(ids):
+        if int(f) in given:out[k]=given[int(f)]
+    return out
+
+
+def make_domain(source,T,ids,id,workspace,physical,policy,axes=None):
     pose=dict(id=id,world_from_object=T.tolist(),working_face_ids=ids,filled_face_ids=[],
         geometry_audit=dict(geometrically_passed_face_ids=ids),status='mutable_initialization_seed')
+    if axes is not None:pose['force_axes_object']=np.asarray(axes,float)
     station=dict(world_gravity_m_s2=[0.,0.,-9.81],tool_to_surface_axis_world=workspace['nominal_axis_world'])
     return build_domain(source,pose,station,physical,policy)
 

@@ -10,6 +10,7 @@ import numpy as np
 from whole_task_2.step3 import independent_physics as physics
 
 _lock=RLock()
+SHARED={}   # one process's exact queries, shared by every model it builds (step4: a join's audits, their unsupported demands)
 
 
 def canonical_triangles(triangles):

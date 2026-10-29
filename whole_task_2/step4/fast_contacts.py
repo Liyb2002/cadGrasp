@@ -14,6 +14,7 @@ and the guidance's judgement are the kernel's.  The oracle's full audit keeps th
 import numpy as np
 import rtree
 from whole_task_2.step3.legacy import kernel as K
+from whole_task_2.step3.independent_physics import area_contacts
 
 TOL = 1e-10                      # the kernel's coplanarity tolerance (m)
 M = 6                            # a triangle clipped by three planes keeps at most six vertices
@@ -66,7 +67,7 @@ def contact_boundary(mesh, shell, allowed_faces):
 def contacts(body, support, work_ids, com):
     """step3.independent_physics.contacts on contact_boundary() above."""
     allowed = np.setdiff1d(np.arange(len(body.faces)), work_ids)
-    triangles, sources = contact_boundary(body, support, allowed)
+    triangles, sources = area_contacts(*contact_boundary(body, support, allowed))     # lines and points are no contact
     if not len(triangles): raise RuntimeError('No actual contact polygons remain')
     q = triangles.reshape(-1, 3); n = np.repeat(-body.face_normals[sources], 3, axis=0)
     scale = np.r_[np.ones(3), np.ones(3)/body.extents.max()]

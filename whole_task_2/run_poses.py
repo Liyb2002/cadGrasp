@@ -1,8 +1,8 @@
 """Step1 -> Step3 -> Step4 keep-out -> Step4 combine -> Step5 -> evaluation for one object at N tabletop
 poses, on a station from robots_config/, as an entry around the unchanged core (step1/plan_reach.py,
 step3/tool_membranes.py, step4/keepout.py, step4/combine.py, step5/combined.py, evaluation/combine.py).
-The run is <object>+<N>pose: data under data/<run>/, figures (and Step5's rNN/ packages) under
-output/<object>/<run>/.
+The run is <object>+<N>pose: data under data/<run>/, figures (and Step5's rNN/ packages) under output/<run>/,
+as run_station.py's.
 
   python -m whole_task_2.run_poses --poses 8 --config robots_config/random/06_so101.json
   python -m whole_task_2.run_poses --poses 8 --config robots_config/random/06_so101.json --start step4_keepout --until step4_keepout
@@ -158,7 +158,7 @@ STAGES = ('step1', 'step3', 'step4_keepout', 'step4_combine', 'step5', 'evaluati
 
 def run(n, config, object_name='B', workers=6, start='step1', until='step3', combine_workers=22):
     global EDGE
-    config = (ROOT/config).resolve(); name = f'{object_name}+{n}pose'; output = DEFAULT_OUTPUT/object_name
+    config = (ROOT/config).resolve(); name = f'{object_name}+{n}pose'; output = DEFAULT_OUTPUT
     EDGE = load_config(config)['task_constraint'].get('surface_workspace', {}).get('edge_m')
     P.VIEWS = sides(n); P.SIDES = tuple(f'S{k+1}' for k in range(n))
     # The tool-axis screen depends on the object and the tool only: the object's own screen is a valid cache (key checked).

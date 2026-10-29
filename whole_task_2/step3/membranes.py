@@ -19,7 +19,7 @@ from whole_task_2.operations.sweep_cache import sweep_mesh, implementation_key
 from . import independent_geometry as G
 from .exit_geometry import whole_object_sweep
 from .independent_physics import certificate, demands
-from .run_independent import make_domain
+from .run_independent import make_domain, face_axes
 
 
 def positive_components(value):
@@ -45,7 +45,7 @@ class MembraneModel(OperationModel):
         key=(record['id'],pose.tobytes())
         if key not in self.pose_cache:
             domain=make_domain(self.source,pose,np.asarray(record['working_face_ids']),
-                record['id'],self.workspace,self.physical,self.policy)
+                record['id'],self.workspace,self.physical,self.policy,face_axes(record))
             endpoints,samples=demands(domain,self.policy)
             self.pose_cache[key]=dict(body_world=moved_mesh(self.source,pose),domain=domain,
                 endpoints=endpoints,samples=samples,stock_world=moved_mesh(self.outer,pose))

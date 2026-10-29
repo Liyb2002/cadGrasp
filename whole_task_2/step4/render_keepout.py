@@ -33,13 +33,13 @@ def picture(model, i, meshes, size):
                           model.reach*HEAD_EXTENSION_SCALE, model.policy['tool_polygon_sides']))
     faces = np.asarray(r['certified_face_ids']); f = contact(model.source, faces, P); k = int(np.flatnonzero(faces == f)[0])
     tip = model.source.triangles_center[f]@P[:3, :3].T+P[:3, 3]; axis = P[:3, :3]@r['axes'][k]
-    links = matrices(work_arm(model.setup).forward(r['joints'][k][3], geometry=True)[2])   # test point 3: the centroid
+    links = None if r.get('robot') is False else matrices(work_arm(model.setup).forward(r['joints'][k][3], geometry=True)[2])   # test point 3: the centroid
     placed = moved_mesh(model.source, P); bunny = placed.vertices
     scene = Scene(placed, model.setup, size, size, arm=True)              # image() draws the scene body in place
     try:
         g = scene.r; colors = np.tile(g.GRAY, (len(model.source.faces), 1)); colors[r['working_face_ids']] = g.PINK
         shapes = [(g.Shape(scene.ctx, scene.shader, m.vertices, m.faces, color, metallic=.05, roughness=.7), P)
-                  for m, color in ((tool, TOOL), (arm, ARM))]
+                  for m, color in ((tool, TOOL), (arm, ARM)) if len(m.faces)]          # a robot-free area has no KUKA
         points = np.vstack([bunny, tool.vertices@P[:3, :3].T+P[:3, 3], arm.vertices@P[:3, :3].T+P[:3, 3]])
         scene.view = STATION_VIEW; scene.fit(points, 1.04); tools = [(tip, axis, False)]
         plain = image(scene, colors, tools, links, ()); covered = image(scene, colors, tools, links, shapes)

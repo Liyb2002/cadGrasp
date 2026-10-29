@@ -26,6 +26,7 @@ from are unchanged: each step reruns from the files of the one before it, whatev
 keep-out's own cache and its disk replay (validate) also bind its code.
 """
 import argparse
+import os
 import hashlib
 import json
 import time
@@ -102,7 +103,9 @@ def arm_pieces(model, r, points):
 
 
 def arm_solid(model, r):
-    """The KUKA keep-out of record r (object frame) and its record."""
+    """The KUKA keep-out of record r (object frame) and its record (none for a robot-free area: Step6 places the robot)."""
+    if r.get('robot') is False:
+        return md.Manifold(), dict(cell_size_m=0., pieces=0, pieces_per_link=[], link_spread_m=[], containment_residual_m=0., robot_free=True)
     pieces, record = arm_pieces(model, r, link_points(model, r))
     return G.union([md.Manifold.hull_points(p/G.SCALE) for p in pieces]), record
 
@@ -149,8 +152,11 @@ def turned_keepout(object_name, i, angle):
     arm, record = arm_solid(model, t); both = G.mesh(G.union([G.solid(model.tool(i)), arm]))
     record.update(status='passed', id=r['id'], angle_deg=float(angle), signature=key, keepout_cm3=both.volume*1e6,
                   seconds=time.monotonic()-began)
-    np.savez_compressed(path, pose=t['pose'], joints=t['joints'], keepout_vertices=both.vertices, keepout_faces=both.faces)
-    record['sha256'] = sha256(path); write_json(meta, record)
+    # Combine's workers may turn the same task at once: each writes its own temporary file, then replaces atomically.
+    tmp = path.with_name(f'{path.stem}.{os.getpid()}.tmp.npz')
+    np.savez_compressed(tmp, pose=t['pose'], joints=t['joints'], keepout_vertices=both.vertices, keepout_faces=both.faces)
+    os.replace(tmp, path); record['sha256'] = sha256(path)
+    tmp = meta.with_name(f'{meta.stem}.{os.getpid()}.tmp.json'); write_json(tmp, record); os.replace(tmp, meta)
     return t['pose'], t['joints'], both, record
 
 

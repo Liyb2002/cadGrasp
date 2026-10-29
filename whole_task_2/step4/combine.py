@@ -1,7 +1,7 @@
 """Step4: combine the Step3 supports into one, one task at a time, in random samples.
 
-Every task starts alone on its Step3 membrane in the object frame (seat X = I), its exit against the
-needle; Step4's keep-out (needle, head and KUKA, step4/keepout.py) is cut from it once.  A group is one
+Every task starts alone on its Step3 membrane in the object frame (seat X = I), its exit Step3's (against
+the needle unless the plan gives one, default_exit); Step4's keep-out (needle, head and KUKA, step4/keepout.py) is cut from it once.  A group is one
 support with seats; a seat holds the object at X (support <- object) for the tasks that use it.
 
 A sample starts from a task drawn at random; step by step it draws one more task T at random and joins it
@@ -17,9 +17,19 @@ to its group G with one of Step4's two operations:
                     half-way, or its work area's centre on that task's, at a few turns; the two supports are
                     joined, minus every task's body, keep-out and exit sweep.
 
+Before the samples, every task that stands alone is turned in its own seat (Rotational reuse with nothing new cut:
+its support turned about the needle to an installation resting on another face, a new base), and every other sample
+starts from it where that holds (user, 2026-10-28: "一上来就来个R", then every task grows on it).
+
 Each step a sample draws its operation: Rotational reuse with a share falling from 80% at the first step to
 50% at the last (it fails more often, so it is tried more), else Juxtaposition.  It tries only that operation,
-on at most policy['seats'] seats, those used by the fewest tasks first.  Every join passes the gate
+on at most policy['seats'] seats, those used by the fewest tasks first.  When Step2 made the tasks by seats
+(step2/seats.py: the plan gives each task its seat, one exit, its bases within reach of one shell), the draws
+follow them (user, 2026-10-28: a seat is Rotational reuse, perhaps on several bases; seats are juxtaposed): while
+a seat in the support has tasks left, one of them is drawn and joins by Rotational reuse, into its own seat's seats
+first, by Juxtaposition only once that failed there; a seat's task that failed both waits; a task of a seat with
+none in the support yet joins by Rotational reuse with share policy['other_group_reuse'] (subdivide_task's draws).
+Every join passes the gate
 bbx(G+T) <= gate (bbx(G)+bbx(T)), bbx the minimum-volume oriented box, so that a join shares material
 instead of laying T beside G.
 
@@ -33,27 +43,34 @@ the paired-load residual: every task's fixed set of paired demands classified on
 exact construction, the residual their mean normalized projection loss.  It is the only loss; the rest are
 binary: a construction outside the gate, or with a task's required pressure point below another installation's
 resting plane (its feet would cross the table there), is infeasible to the step, and skin narrower than
-skin.WIDTH holds nothing (its contacts do not count; the oracle prunes it).  In Rotational reuse the seat is
-fixed, so only T's exit direction moves; in Juxtaposition T's seat turns about T's needle direction (Pose
-rotation: the placing arm then turns the support about the object, which may rest the support on another face)
-and translates.  A demand the full audit finds unsupported joins the set and the descent goes on.
+skin.WIDTH (20 mm) holds nothing (its contacts do not count; the oracle cuts it once).  In Rotational reuse the
+seat is fixed, so only T's exit direction moves; in Juxtaposition T's seat turns about T's needle direction
+(Pose rotation: the placing arm then turns the support about the object, which may rest the support on another
+face) and translates.  A demand the full audit finds unsupported joins the set and the descent goes on.
 
 A join is accepted when -- after what is not joined to its largest piece and its skin narrower than
-skin.WIDTH along the object's surface are cut away, again while that leaves more (step4/skin.py's pruned;
-nothing is added) -- its skin is at least skin.WIDTH wide, every task passes the full audit
-(32,768 paired samples and the continuous outer targets, the continuous exit of every source face, body and
-keep-out, the KUKA at every stored joint set) and the support stands: with one pose the standing support
+skin.WIDTH along the object's surface are cut away, once (step4/skin.py's pruned; nothing is added, and narrow
+skin the cut leaves is Step5's to make thick) -- every task passes the full audit (more than 99% of
+the 32,768 paired samples hold, step3/independent_physics.HELD; the continuous exit of every source face, body
+and keep-out, the KUKA at every stored joint set) and the support stands: with one pose the standing support
 (post and plate) is built and audited, with several the foot-region oracle.  These checks are binary, so when
 one fails the join tries its next start that holds (at most policy['audits'] audits).
 
-The samples run on their own, none waiting for another: a sample whose task joins nowhere continues from a
-random state that has already succeeded at that step (else one at its own step) and draws again; it stops
-after policy['retries'] failures in a row while no state has reached the next step.  The search stops at
-policy['enough'] distinct supports holding every task.  The best support: the fewest seats, then the
+The samples run on their own, none waiting for another.  The next task is drawn with odds 1 + the number of
+its joins that have failed so far, so the tasks that are hard to join come early, while the group is small (most
+constrained first).  A sample whose task joins nowhere continues from a random state that has already succeeded
+at that step (else one at its own step), the odds halving with every seat it has more than the fewest (the most
+Rotational reuse), and draws again.  After policy['retries'] failures in a row while no state has reached the
+next step it goes back to a state one step earlier than its last time back (one, then two, ...), at most
+policy['backtracks'] times; then it stops.  The search stops at policy['enough'] distinct supports holding every
+task made with Rotational reuse, else when every sample has run out.  When every sample has stopped with none, the gate grows by policy['gate_step'] (at most to
+policy['gate_max']) and they go on from where they stopped: a join that passed stands, one that failed is tried
+again under the new gate.  The best support: the fewest seats, then the
 smallest bbx, then the least material.
 """
 import argparse
 import collections
+import hashlib
 import json
 import multiprocessing
 import os
@@ -68,19 +85,18 @@ from scipy.spatial.transform import Rotation
 
 from whole_task_2.step1.common import ROOT, DEFAULT_OUTPUT, sha256, write_json
 from whole_task_2.common.force_cone import tangent_frame
+from whole_task_2.operations.contact_cache import SHARED, cached_certificate_contacts
 from whole_task_2.operations.geometry import moved_mesh, contact_surface
 from whole_task_2.operations.state import Layout, transform
-from whole_task_2.operations.sweep_cache import sweep_mesh
 from whole_task_2.step3 import independent_geometry as G
-from whole_task_2.step3.exit_geometry import whole_object_sweep
-from whole_task_2.step3.independent_physics import certificate, contacts
+from whole_task_2.step3.independent_physics import certificate, contacts, HELD
 from whole_task_2.step3.legacy import kernel as K
 from whole_task_2.step3.membranes import positive_components
 from whole_task_2.step3.tool_membranes import stem
 from .gradient_repair import block_step
-from .seats import context, construction_length, read_mesh, settled, same_surface
+from .seats import context, construction_length, read_mesh, settled, same_surface, SAME_DOWN
 from .merge import PlacedModel, move, flat, downs, footprint, turn
-from .skin import WIDTH, pruned, measure, facts as skin_facts, piece, thin_cells, skin as skin_of
+from .skin import WIDTH, pruned, piece, thin_cells, largest_mesh, legal, skin as skin_of
 from .fast_contacts import contacts as guide_contacts
 
 FOLDER = 'step4_combine'
@@ -88,6 +104,9 @@ DOWN = np.array([0., 0., -1.])
 POLICY = dict(samples=32, seed=11,
               reuse_share=(.8, .5),     # the share of Rotational reuse draws at the first and the last step
               gate=.7,                  # bbx(G+T) <= gate (bbx(G) + bbx(T)), minimum-volume oriented boxes
+              gate_step=.1, gate_max=1.,  # every sample stopped with no support: the gate grows by gate_step, to gate_max
+              gate_after_reuse=.9,      # the gate of a Juxtaposition right after a Rotational reuse (user, 2026-10-28: R is
+                                        #     rewarded -- it leaves the support compact but harder to join beside)
               demands=24,               # guidance demands per task, of the samples and of the continuous targets
               rounds=4,                 # gradient rounds (every basic operation once per round)
               feedback=2,               # times an audit's unsupported demands join the guidance
@@ -99,9 +118,22 @@ POLICY = dict(samples=32, seed=11,
               exit_starts=((15., 30.), 8),                      # Rotational reuse starts from the best exit on these rings
               scales=3,                 # while a measured gradient is zero, the finite difference grows x4, this many times
               translation=(.004, .03),  # Translation, object diagonals: finite difference, first step
-              retries=6,                # a sample stops after this many failed joins in a row, none yet past them
+              retries=6,                # a sample goes back after this many failed joins in a row, none yet past them
+              backtracks=3,             # ... at most this many times, one step further each time; then it stops
               seats=3,                  # a join tries at most this many seats (those used by the fewest tasks first)
-              enough=3)                 # the search stops at this many distinct supports holding every task
+              enough=3,                 # the search stops at this many distinct supports holding every task made
+                                        #     with Rotational reuse (else when every sample has run out)
+              grouped=True,             # Step2's seats (step2/seats.py) steer the draws, when the plan has them: a seat
+                                        #     is finished by Rotational reuse before the next opens (user, 2026-10-28);
+              other_group_reuse=.2,     # ... a task of a seat with none in the support yet joins by Rotational reuse with
+                                        #     this share (subdivide_task/step4/combine.py's value)
+              own_seat_first=True)      # every task that stands alone is first turned in its own seat to another base
+                                        #     (Rotational reuse); every other sample starts from that
+
+
+# The reasons a support fails to stand (certify, stand): a task alone failing only these still joins (initial_one).
+STANCE = ('no foot region', 'a pressure hull leaves the plate', 'no membrane below the objects to stand on',
+          'standing support does not settle under manifold')
 
 
 def unit(v):
@@ -122,13 +154,17 @@ def about(Q, p):
 # A task: its pose turned about the needle, its exit, its keep-out, its work area's centre.
 
 def default_exit(object_name, i):
-    """Task i's exit against the needle, object frame (the same at every turn, which is about the needle)."""
-    return -needle(object_name, i)
+    """Task i's exit, object frame: its plan's when the plan gives one (Step2 seats: its seat's, which Step3 built its
+    membrane along), else against the needle (the same at every turn, which is about the needle)."""
+    r = context(object_name).base.records[i]
+    return unit(r['exit']) if 'exit' in r else -needle(object_name, i)
 
 
-def pose(object_name, i):
-    """World <- object: task i's certified pose."""
-    return np.asarray(context(object_name).base.records[i]['pose'], float)
+def pose(object_name, i, angle=0.):
+    """World <- object: task i's certified pose, turned by angle (deg) about the station's needle through the work
+    point (step4/keepout.turned_keepout: Pose rotation in Rotational reuse)."""
+    c = context(object_name)
+    return np.asarray(c.record(i, float(angle))[0]['pose'] if angle else c.base.records[i]['pose'], float)
 
 
 def needle(object_name, i):
@@ -136,24 +172,41 @@ def needle(object_name, i):
     c = context(object_name); return unit(pose(object_name, i)[:3, :3].T@c.base.axis)
 
 
-def rises(object_name, i, e, policy=POLICY):
-    """Does exit e (object frame) rise at least exit_rise_deg at task i's pose?"""
-    return bool((pose(object_name, i)[:3, :3]@e)[2] >= np.sin(np.radians(policy['exit_rise_deg']))-1e-12)
+def rises(object_name, i, e, policy=POLICY, angle=0.):
+    """Does exit e (object frame) rise at least exit_rise_deg at task i's pose (turned by angle)?"""
+    return bool((pose(object_name, i, angle)[:3, :3]@e)[2] >= np.sin(np.radians(policy['exit_rise_deg']))-1e-12)
 
 
 def direction_key(e):
     return tuple(float(x) for x in np.round(unit(e), 12))
 
 
+def exact_sweep(body, direction, length):
+    """body and every leading face's prism along length direction, step3/exit_geometry.whole_object_sweep exactly,
+    but each wall two neighbouring prisms share cut along the same diagonal on both sides (from the bottom corner of
+    the lower vertex index): the union glues identical triangles.  Step3's prisms cut each wall along their own
+    diagonal, and the union of thousands of such coplanar, differently cut walls dropped whole prisms (B+8pose S2:
+    80-380 mm^3, where Step5 then added material).  The sweep of a connected body is connected: its largest piece,
+    without the zero-volume shells the union leaves.  Built in memory (about 1 s): a round trip through Mesh64
+    re-cuts its long thin walls and drops prisms again (B+03_kuka +X: 0.5 cm^3)."""
+    d = np.asarray(direction, float); T = body.triangles; F = body.faces; parts = [G.solid(body)]
+    for f in np.flatnonzero(np.cross(T[:, 1]-T[:, 0], T[:, 2]-T[:, 0])@d > 0):
+        faces = [[2, 1, 0], [3, 4, 5]]
+        for p, q in ((0, 1), (1, 2), (2, 0)):
+            faces += [[p, q, q+3], [p, q+3, p+3]] if F[f, p] < F[f, q] else [[p, q, p+3], [q, q+3, p+3]]
+        points = np.vstack([T[f], T[f]+length*d])/G.SCALE
+        parts.append(md.Manifold(md.Mesh64(np.ascontiguousarray(points), np.asarray(faces, np.uint64))))
+    while len(parts) > 1: parts = [G.union(parts[i:i+8]) for i in range(0, len(parts), 8)]
+    return max(parts[0].decompose(), key=lambda p: p.volume())
+
+
 @lru_cache(maxsize=64)
 def _sweep(object_name, key):
-    c = context(object_name); v = np.asarray(key); length = construction_length(c.base)
-    return G.solid(sweep_mesh(ROOT/'whole_task_2/data'/object_name/FOLDER/'sweeps', c.base.source, v, length,
-                              lambda: G.mesh(whole_object_sweep(c.base.source, v, length)[0]), 'object_frame_v1'))
+    c = context(object_name); return exact_sweep(c.base.source, np.asarray(key), construction_length(c.base))
 
 
 def sweep(object_name, e):
-    """The exit sweep along direction e, object frame (cached on disk; the latest ones in memory)."""
+    """The exit sweep along direction e, object frame (the latest ones kept in memory)."""
     return _sweep(object_name, direction_key(e))
 
 
@@ -179,9 +232,10 @@ def centre(object_name, i):
     w = s.area_faces[ids]; return (s.triangles_center[ids]*w[:, None]).sum(0)/w.sum()
 
 
-def slot(i, X, e):
-    """Task i at its certified pose (no turn: the placing arm installs the support for it), seat X, exit e."""
-    return dict(members=[int(i)], angles=[0.], X=np.asarray(X, float).tolist(), exit=list(direction_key(e)))
+def slot(i, X, e, angle=0.):
+    """Task i at its certified pose turned by angle about the needle (0: the placing arm installs the support for it
+    as certified), seat X, exit e."""
+    return dict(members=[int(i)], angles=[float(angle)], X=np.asarray(X, float).tolist(), exit=list(direction_key(e)))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -191,7 +245,7 @@ class ExitModel(PlacedModel):
     """PlacedModel with each task's own exit (object frame), cut and checked at its slot."""
     def __init__(self, c, slots):
         super().__init__(c, *flat(dict(slots=slots)))
-        self.slots = slots; self.e = [unit(s['exit']) for s in slots]
+        self.slots = slots; self.e = [unit(s['exit']) for s in slots]; self.floors = [s.get('floor') for s in slots]
         self.sweeps = [sweep(c.object_name, e) for e in self.e]
         self.seats = [[k] for k in range(len(slots))]; self.seat_of = list(range(len(slots)))
 
@@ -321,6 +375,17 @@ def picks(n, count):
 
 
 _judged = {}
+_cells = {}
+
+
+def cells(c, near, P):
+    """The skin cell nearest each triangle of near (a task's world at pose P), kept per surface to the bit: between
+    guidance calls the support about most tasks does not change (a join moves only its own slot)."""
+    key = hashlib.sha1(np.ascontiguousarray(near.triangles).tobytes()+np.asarray(P, float).tobytes()).digest()
+    if key not in _cells:
+        if len(_cells) > 128: _cells.pop(next(iter(_cells)))
+        _cells[key] = skin_of(c)[0].tree.query(transform(near.triangles_center, np.linalg.inv(P)))[1]
+    return _cells[key]
 
 
 def signature(mesh):
@@ -344,7 +409,7 @@ def residual(object_name, slots, support, extra, thin=None, policy=POLICY):
     from continuous_support.projection import project_demands
     c = context(object_name); losses = []; rows = []
     for k, s in enumerate(slots):
-        i = s['members'][0]; r = c.base.records[i]; P = pose(object_name, i)
+        i = s['members'][0]; r = c.base.records[i]; P = pose(object_name, i, s['angles'][0])
         data = c.base.world_data(r, P); body = data['body_world']; domain = data['domain']
         world = moved_mesh(support, P@np.linalg.inv(np.asarray(s['X'], float)))
         S, E = data['samples']['need_wrench'], data['endpoints']['endpoint_need_wrench']
@@ -353,7 +418,7 @@ def residual(object_name, slots, support, extra, thin=None, policy=POLICY):
         ei = np.union1d(picks(len(E), policy['demands']), np.asarray(more[1], int))
         near = contact_surface(body, world)
         if thin is not None and thin[k].any():
-            cell = skin_of(c)[0].tree.query(transform(near.triangles_center, np.linalg.inv(P)))[1]
+            cell = cells(c, near, P)
             near = trimesh.Trimesh(near.vertices, near.faces[~thin[k][cell]], process=False)
         key = (i, signature(near), si.tobytes(), ei.tobytes())
         if key not in _judged:
@@ -362,11 +427,13 @@ def residual(object_name, slots, support, extra, thin=None, policy=POLICY):
                 _, _, rays, scale = guide_contacts(body, near, domain.work_ids, domain.com)
                 targets = np.vstack([S[si], E[ei]])*scale; held, _ = K.J.classify(rays, targets)
                 loss = 0. if held.all() else float(np.mean(project_demands(rays, K.J.C.U.target(targets, rays.shape[1]))['normalized_losses']))
-                _judged[key] = (loss, int(held.sum()), len(targets))
-            except RuntimeError: _judged[key] = (1., 0, len(si)+len(ei))
+                _judged[key] = (loss, int(held[:len(si)].sum()), len(si))
+            except RuntimeError: _judged[key] = (1., 0, len(si))
         loss, passed, count = _judged[key]
         losses.append(loss); rows.append(dict(task=r['id'], loss=loss, passed=passed, demands=count))
-    return float(np.mean(losses)), all(r['passed'] == r['demands'] for r in rows), rows
+    # Covered as the audit judges (step3/independent_physics.certificate): more than HELD of the guidance samples hold;
+    # the continuous targets only steer the loss.
+    return float(np.mean(losses)), all(r['passed'] > HELD*r['demands'] for r in rows), rows
 
 
 def unsupported(model, candidate, count=16):
@@ -375,7 +442,9 @@ def unsupported(model, candidate, count=16):
     out = {}
     for t, (i, s) in zip(candidate['tasks'], [(s['members'][0], s) for s in model.slots]):
         world = moved_mesh(candidate['support'], np.linalg.inv(t['material']))
-        try: proof, data = certificate(t['body_world'], contact_surface(t['body_world'], world), t['domain'], t['endpoints'], t['samples'])
+        try:
+            with cached_certificate_contacts(SHARED):       # the audit's own contacts, not intersected again
+                proof, data = certificate(t['body_world'], contact_surface(t['body_world'], world), t['domain'], t['endpoints'], t['samples'])
         except RuntimeError: continue
         if proof['passed']: continue
         bad_s, bad_e = np.flatnonzero(~data['sample_passed']), np.flatnonzero(~data['endpoint_passed'])
@@ -421,24 +490,101 @@ def stand(c, slots, membrane):
     F = (np.vstack([V[:, :2], *[r['ground_material'][:, :2] for r in rows]])[:, None]+ring[None]).reshape(-1, 2)
     post = md.Manifold.hull_points(np.vstack([np.c_[V[:, :2], np.zeros(len(V))], np.c_[V[:, :2], np.full(len(V), top)]])/G.SCALE)
     plate = md.Manifold.hull_points(np.vstack([np.c_[F, np.zeros(len(F))], np.c_[F, np.full(len(F), h)]])/G.SCALE)
-    support = steady(G.mesh(G.union([G.solid(placed), post, plate])))
+    # The union's largest piece: it can leave a loose crumb (B+big_01_seats F3: 0.2 mm^3 beside 214 cm^3), which the
+    # audit would count as a second body.
+    support = steady(largest_mesh(G.union([G.solid(placed), post, plate])))
     if support is None: raise ValueError('standing support does not settle under manifold')
     return support, table, model, q
 
 
-def certify(c, slots, membrane):
+def reached(row, sites, support, space, tries=6, samples=24):
+    """The support's point (support frame) a straight leg in the legal space space reaches each of sites (world xy of
+    row's table) from, NaN where none: the support's point nearest the site, else its next nearest vertices, each two
+    tips from those tried (step5/combined.strut); the leg's line probed (step5/peel.probed).  A site under another
+    seat's tool space has a legal tip and no leg."""
+    from whole_task_2.step5.combined import FOOT
+    from whole_task_2.step5.peel import probed
+    p = transform(np.c_[sites, np.full(len(sites), FOOT['thick']/2)], row['material']); out = np.full((len(sites), 3), np.nan)
+    if not len(sites): return out
+    f = np.linspace(.1, 1., samples)[None, :, None]
+    def legs(anchors, at): return probed(space, (anchors[:, None]+f*(p[at]-anchors)[:, None]).reshape(-1, 3)).reshape(len(at), samples).all(1)
+    anchor = trimesh.proximity.closest_point(support, p)[0]; ok = legs(anchor, np.arange(len(p))); out[ok] = anchor[ok]
+    for k in np.flatnonzero(~ok):
+        tried = [anchor[k]]
+        for v in np.argsort(np.linalg.norm(support.vertices-p[k], axis=1))[:512]:
+            q = support.vertices[v]
+            if min(np.linalg.norm(q-x) for x in tried) < 2*FOOT['tip']: continue
+            tried.append(q)
+            if legs(q[None], np.array([k]))[0]: out[k] = q; break
+            if len(tried) > tries: break
+    return out
+
+
+def foot_ring(c, slots, model, candidate):
+    """Step5's feet without building them (step5/combined.feet): on every table whose pressure hulls the support's own
+    ground faces do not enclose, Step5's candidate feet -- every FOOT['spacing'] on the rings FOOT['outward'] about
+    them, each tip in Step5's legal space (above every table, out of every slot's body, keep-out and exit sweep) and
+    reached there by a straight leg (reached) -- and the support's ground corners hold a cycle about the hulls.  Step4
+    so stands only what Step5 can stand (a region test let pass B+big_01 B1+C1+A1, whose other seat's tool space lay
+    under a hull), and Step5's peel keeps what the cycle's legs start from (step5/combined.grounds).
+    (the tables that fail, the support's points the cycles' legs start from, (n, 3) support frame)."""
+    from shapely.geometry import Polygon
+    from shapely.geometry.polygon import orient
+    from scipy.spatial import ConvexHull
+    from whole_task_2.step5.combined import FOOT, section, resample, enclosing, widths
+    from .ground_oracle import pressure_rows, ground_enclosure
+    q = candidate['layout']; support = candidate['support']; rows = pressure_rows(model, q, candidate['tasks'])
+    points = np.vstack([support.vertices, *[r['ground_material'] for r in rows]]); pad = max(FOOT['outward'])+FOOT['padding']
+    space = legal(points, pad, q.material, forbidden(c.object_name, slots, (points.min(0)-pad, points.max(0)+pad)))
+    disc = md.CrossSection.circle(FOOT['tip']/G.SCALE, 32); tables = []; failed = []; starts = [np.zeros((0, 3))]
+    for r in rows:
+        same = next((t for t in tables if np.allclose(t[0]['world_from_support'][2], r['world_from_support'][2], atol=1e-9)), None)
+        if same is None: tables.append([r])
+        else: same.append(r)
+    for same in tables:
+        r = same[0]; need = [s for s, g in zip(same, ground_enclosure(support, same)) if not g['passed']]
+        if not need: continue
+        hull = np.vstack([transform(s['ground_material'], r['world_from_support'])[:, :2] for s in need]); hull = hull[ConvexHull(hull).vertices]
+        corners = np.asarray(ground_enclosure(support, [r])[0]['ground_contact_hull_xy_m'], float).reshape(-1, 2)
+        sites = np.vstack([resample(np.asarray(g.exterior.coords)[:-1], FOOT['spacing']) for d in FOOT['outward']
+                           for ring in [orient(Polygon(hull).buffer(d, join_style=2), sign=1.)] for g in getattr(ring, 'geoms', [ring]) if not g.is_empty])
+        free = section(r, space, FOOT)
+        sites = sites[np.array([(disc.translate(tuple(s/G.SCALE))-free).area() <= 1e-6*disc.area() for s in sites], bool)]
+        anchors = reached(r, sites, support, space); ok = np.isfinite(anchors[:, 0]); sites, anchors = sites[ok], anchors[ok]
+        # The cheapest cycle, as Step5 prices a foot (its plate's area; the ground corners free), so the legs the peel
+        # keeps are the ones Step5 would build.
+        d = transform(anchors, r['world_from_support'])-np.c_[sites, np.zeros(len(sites))]; low, top = widths(d, FOOT)
+        cost = np.r_[np.zeros(len(corners)), np.maximum(np.linalg.norm(d, axis=1), FOOT['least'])*(low+top)+np.pi*low**2]
+        ground = np.vstack([corners, sites]); cycle = enclosing(ground, cost, hull) if len(ground) >= 3 else None
+        if cycle is None: failed.append(r['id']); continue
+        legs = [k-len(corners) for k in cycle if k >= len(corners)]; used = [k for k in cycle if k < len(corners)]
+        starts += [anchors[legs], transform(np.c_[corners[used], np.zeros(len(used))], r['material'])]
+    return failed, np.vstack(starts)
+
+
+def certify(c, slots, membrane, stance=True):
     """One pose: the standing support (membrane, post, plate) built, every task audited in full on it, its
     ground faces enclosing every pressure hull -- the post and plate stay below the objects, so its contacts
     are the membrane's.  Several poses: no pressure hull below another resting plane (checked first, it is
     cheap), the foot-region oracle (then: it costs less than the audit and fails more often -- at 8 poses most
     failed audits were this), every task audited in full on the membrane.  Returns facts."""
-    from .ground_oracle import pressure_rows, pressure_floor_gap, ground_enclosure, foot_regions
-    width = measure(c, slots, membrane)
-    if width[1] > 0: raise ValueError(f'skin narrower than {WIDTH*1000:.0f} mm: {skin_facts(width)}')
-    out = dict(poses=len(downs(c, dict(slots=slots))), membrane_cm3=float(membrane.volume*1e6), bbx_m3=obb(membrane.vertices),
-               skin=skin_facts(width))
+    from .ground_oracle import pressure_rows, ground_enclosure
+    out = dict(poses=len(downs(c, dict(slots=slots))), membrane_cm3=float(membrane.volume*1e6),
+               bbx_m3=standing_obb(c.object_name, slots, membrane.vertices), legs_m=float(slots[0].get('drop', 0.)))
+    built = None
+    if not stance:
+        # A task alone that cannot stand (initial_one): every check but the standing, on the membrane.
+        model = ExitModel(c, slots); candidate = dict(layout=model.layout(membrane), support=membrane, construction={})
+        candidate['tasks'] = model.prepare(candidate['layout']); model.exit_paths(candidate); model.audit(candidate)
+        return dict(out, stands=False)
     if out['poses'] == 1:
-        support, table, joined, q = stand(c, slots, membrane)
+        try: built = stand(c, slots, membrane)
+        except ValueError as ex:
+            # The post stands only under membrane below the objects (B+whole_shape_seats A3: not after the KUKA cut
+            # and the skin pruning); else the support stands on feet, judged as with several poses.
+            if 'no membrane below' not in str(ex): raise
+    if built is not None:
+        support, table, joined, q = built
         standing = dict(layout=q, support=support, tasks=joined.prepare(q), construction={})
         joined.audit(standing)
         rows = ground_enclosure(support, pressure_rows(joined, q, standing['tasks']))
@@ -448,25 +594,25 @@ def certify(c, slots, membrane):
     else:
         model = ExitModel(c, slots); candidate = dict(layout=model.layout(membrane), support=membrane, construction={})
         candidate['tasks'] = model.prepare(candidate['layout'])
-        if pressure_floor_gap(model, candidate['layout']) < -1e-8: raise ValueError('Required pressure hull crosses another resting plane')
+        if floor_gap(c.object_name, slots, membrane.vertices) < -1e-8: raise ValueError('Required pressure hull crosses another resting plane')
         model.exit_paths(candidate)             # every task's exit travel on this support, as the audit sets it
-        found = next(foot_regions(model, candidate), None)
-        if found is None: raise ValueError('no foot region')
+        failed, _ = foot_ring(c, slots, model, candidate)
+        if failed: raise ValueError('no foot region: no ring of feet on the tables of '+', '.join(failed))
         model.audit(candidate)
-        out.update(foot_padding_m=found[0])
+
     return out
 
 
-def accept(object_name, slots, keep, limit, file):
-    """One construction in full: settle, refine exits, gate, audit, stand.  Saves the group's file.  On a load
-    failure, also the demands the actual contacts do not hold."""
+def accept(object_name, slots, keep, limit, file, stance=True):
+    """One construction in full: settle, refine exits, gate, audit, stand (stance False: all but the standing).  Saves
+    the group's file.  On a load failure, also the demands the actual contacts do not hold."""
     c = context(object_name); began = time.monotonic(); out = dict(file=None)
     try:
         support = steady(G.mesh(keep.simplify(0.)))
         if support is None: raise ValueError('merged membrane does not settle under manifold')
         model = ExitModel(c, slots)
-        # What is not joined to the largest piece goes, and the skin narrower than WIDTH, again while that leaves
-        # more; then the oracle judges what is left.
+        # What is not joined to the largest piece goes, and the skin narrower than WIDTH, once; then the oracle
+        # judges what is left.
         support, out['skin_pruning'] = pruned(c, slots, support, forbidden(object_name, slots, support.bounds))
         candidate = dict(layout=model.layout(support), support=support, construction={})
         candidate['tasks'] = model.prepare(candidate['layout']); model.refine_exits(candidate)
@@ -484,11 +630,14 @@ def accept(object_name, slots, keep, limit, file):
                                             before_cm3=float(raw.volume*1e6),
                                             after_cm3=None if support is None else float(support.volume*1e6))
         if support is None: raise ValueError('refined membrane does not settle under manifold')
-        if obb(support.vertices) > limit: raise ValueError('the join does not pass the bbx gate')
-        try: facts = certify(c, slots, support)
+        slots = lowered(object_name, slots, support.vertices)        # the legs for the support as it is now
+        if standing_obb(object_name, slots, support.vertices) > limit: raise ValueError('the join does not pass the bbx gate')
+        try: facts = certify(c, slots, support, stance)
         except ValueError as ex:
             if 'force/moment' in str(ex):
-                candidate.update(support=support, layout=model.layout(support)); candidate['tasks'] = model.prepare(candidate['layout'])
+                # On the audit's own layout (its slots lowered), so the audit's contacts are reused.
+                model = ExitModel(c, slots); candidate = dict(layout=model.layout(support), support=support, construction={})
+                candidate['tasks'] = model.prepare(candidate['layout'])
                 out['unsupported'] = unsupported(model, candidate)
             raise
         arrays = dict(vertices=support.vertices, faces=support.faces)
@@ -537,12 +686,17 @@ def descend(evaluate, current, blocks, policy):
     return current, record
 
 
+def evaluator_key(params):
+    """The construction params name (to 1e-12): the same key, the same build."""
+    return tuple(np.round(np.r_[params[0], np.ravel(params[1])], 12)) if isinstance(params, tuple) else tuple(np.round(params, 12))
+
+
 def evaluator(build):
     """build(params) -> (keep, slots, rows...) wrapped for block_step, cached by params; None where it is
     infeasible (a broken constraint, or a Boolean the kernel cannot resolve), the reasons counted in .why."""
     cache = {}; why = collections.Counter()
     def evaluate(params):
-        key = tuple(np.round(np.r_[params[0], np.ravel(params[1])], 12)) if isinstance(params, tuple) else tuple(np.round(params, 12))
+        key = evaluator_key(params)
         if key not in cache:
             try: cache[key] = build(params)
             except (ValueError, RuntimeError) as ex: cache[key] = None; why[str(ex)[:100]] += 1
@@ -553,26 +707,80 @@ def evaluator(build):
 
 
 @lru_cache(maxsize=None)
-def wrenches(object_name, i):
-    """Task i's required wrenches about its centre of mass, in the world orientation of its certified pose."""
-    c = context(object_name); return c.base.world_data(c.base.records[i], pose(object_name, i))['endpoints']['endpoint_need_wrench']
+def wrenches(object_name, i, angle=0.):
+    """Task i's required wrenches about its centre of mass, in the world orientation of its certified pose (turned)."""
+    c = context(object_name); return c.base.world_data(c.base.records[i], pose(object_name, i, angle))['endpoints']['endpoint_need_wrench']
+
+
+@lru_cache(maxsize=None)
+def stance_wrenches(object_name, i, angle=0.):
+    """The wrenches of task i (turned) that can make a corner of its pressure hull at any height: a pressure point is
+    p0 + (x, y) - h (Fx, Fy)/Fz for the centre of mass at (x, y, h) over the table (G.pressure_points), so the corners
+    at every height are among the vertices of the hull of (p0, (Fx, Fy)/Fz)."""
+    from scipy.spatial import ConvexHull, QhullError
+    W = wrenches(object_name, i, angle); p = G.pressure_points(W, np.zeros(3))
+    try: return W[np.unique(ConvexHull(np.c_[p, W[:, :2]/W[:, 2:3]]).vertices)]
+    except QhullError: return W
+
+
+def stances(object_name, slots, points):
+    """Where every installation's feet stand: [(its required pressure hull grown by Step5's first ring of feet and a
+    foot's tip (step5/combined.FOOT: its feet stand that far out about it), on its table, support frame; world <-
+    support rotation; the table's height in that rotation)], the support (points) resting its lowest point the slot's
+    drop above its table."""
+    from shapely.geometry import MultiPoint
+    from whole_task_2.step5.combined import FOOT
+    com = context(object_name).base.source.center_mass; ring = FOOT['outward'][0]+FOOT['tip']; out = []
+    for s in slots:
+        i, a = s['members'][0], s['angles'][0]; X = np.asarray(s['X'], float); Q = pose(object_name, i, a)[:3, :3]@X[:3, :3].T   # world <- support
+        low = float((points@Q.T)[:, 2].min())-float(s.get('drop', 0.)); world = Q@(X[:3, :3]@com+X[:3, 3]); world[2] -= low
+        stance = np.asarray(MultiPoint(G.pressure_points(stance_wrenches(object_name, i, a), world)[:, :2]).convex_hull.buffer(ring, 8).exterior.coords)
+        out.append((np.c_[stance, np.full(len(stance), low)]@Q, Q, low))
+    return out
 
 
 def floor_gap(object_name, slots, points):
-    """The oracle's first condition without a layout (ground_oracle.pressure_floor_gap): the lowest height (m) of a
-    task's required pressure points above another installation's resting plane, the support (points) resting on its
-    lowest point in every installation; 0 when every task rests on one part of the support."""
-    com = context(object_name).base.source.center_mass; rows = []
-    for s in slots:
-        i = s['members'][0]; X = np.asarray(s['X'], float); Q = pose(object_name, i)[:3, :3]@X[:3, :3].T   # world <- support
-        rows.append((wrenches(object_name, i), Q, X[:3, :3]@com+X[:3, 3], float((points@Q.T)[:, 2].min())))
-    gap = 0.
-    for W, Q, centre, low in rows:
-        world = Q@centre; world[2] -= low
-        ground = np.c_[G.pressure_points(W, world), np.full(len(W), low)]@Q          # on the table, support frame
-        for _, Qj, _, lj in rows:
+    """The oracle's first condition without a layout (ground_oracle.pressure_floor_gap), where the feet stand
+    (stances): the lowest height (m) of an installation's feet above another installation's resting plane; 0 when
+    every task rests on one part of the support.  (The hull alone let B+big_01's B1 and C1 tables lose half their
+    feet's ring to another table.)"""
+    rows = stances(object_name, slots, points); gap = 0.
+    for ground, Q, _ in rows:
+        for _, Qj, lj in rows:
             if Qj[:, 2]@Q[:, 2] < 1-1e-9: gap = min(gap, float((ground@Qj.T)[:, 2].min()-lj))
     return gap
+
+
+def standing_obb(object_name, slots, points):
+    """The minimum-volume oriented box (m^3) of the support (points) with its legs: every installation's feet
+    (stances) with it, so that a join paying for another base with long legs pays in the gate."""
+    return obb(np.vstack([points]+[g for g, _, _ in stances(object_name, slots, points)]))
+
+
+def lowered(object_name, slots, points):
+    """slots on legs: every installation's table lowered by the least drop L (m), the same for all, below the support
+    (points) at which every task's feet stand above every other table (floor_gap).  Moving the tables out together
+    widens the ground each table leaves its feet (one moving alone makes its own feet worse); the pressure hulls widen
+    too as the object rises, so L is searched over the object's diagonal and bisected.  L = 0 on one base.  Each slot
+    keeps its table ('floor': its world z at the certified pose), so the feet built later reach it and the support
+    stays (merge.PlacedModel.layout).  ValueError when none does."""
+    def at(L):
+        out = []
+        for s in slots:
+            W = pose(object_name, s['members'][0], s['angles'][0])@np.linalg.inv(np.asarray(s['X'], float))
+            low = float((points@W[:3, :3].T+W[:3, 3])[:, 2].min())
+            out.append(dict(s, drop=float(L), floor=low-float(L)) if L > 0 else {k: v for k, v in s.items() if k not in ('drop', 'floor')})
+        return out
+    if floor_gap(object_name, at(0.), points) >= -1e-8: return at(0.)
+    grid = np.linspace(0., float(np.linalg.norm(context(object_name).base.source.extents)), 21)
+    for low, high in zip(grid[:-1], grid[1:]):
+        if floor_gap(object_name, at(high), points) < -1e-8: continue
+        for _ in range(8):
+            mid = (low+high)/2
+            if floor_gap(object_name, at(mid), points) >= -1e-8: high = mid
+            else: low = mid
+        return at(high)
+    raise ValueError('a required pressure point below another resting plane')
 
 
 def scored(object_name, slots, keep, limit, extra, params, policy):
@@ -580,51 +788,77 @@ def scored(object_name, slots, keep, limit, extra, params, policy):
     demands hold.  The rest are binary constraints, checked first since they are cheap: outside the gate, or with a
     task's required pressure point below another installation's resting plane (the oracle's first condition for
     standing: its feet would cross the table there), it is infeasible (ValueError).  Skin narrower than WIDTH
-    (step4/skin.py) holds nothing: contacts on it do not count, however wide the rest is; the oracle prunes it."""
-    c = context(object_name); mesh = G.mesh(keep); bbx = obb(mesh.vertices)
+    (step4/skin.py) holds nothing: contacts on it do not count, however wide the rest is; the oracle cuts it once."""
+    c = context(object_name); mesh = G.mesh(keep)
+    slots = lowered(object_name, slots, mesh.vertices); gap = floor_gap(object_name, slots, mesh.vertices)
+    bbx = standing_obb(object_name, slots, mesh.vertices)
     if bbx > limit: raise ValueError('outside the bbx gate')
-    gap = floor_gap(object_name, slots, mesh.vertices)
-    if gap < -1e-8: raise ValueError('a required pressure point below another resting plane')
     loss, held, rows = residual(object_name, slots, mesh, extra, thin_cells(c, slots, mesh), policy)
     return dict(params=params, keep=keep, slots=slots, loss=loss, covered=held, volume_cm3=float(mesh.volume*1e6),
                 bbx_m3=bbx, floor_gap_m=gap, rows=rows)
 
 
 def try_reuse(object_name, group, i, k, limit, file, policy):
-    """Rotational reuse into seat k; the loads restored by Exit redirection of task i."""
-    c = context(object_name); X = seats(group)[k][0]; extra = {}
+    """Rotational reuse into seat k; the loads restored by Exit redirection and Pose rotation of task i: its
+    installation turned about the station's needle (user, 2026-10-28), which keeps where and how the needle meets the
+    object -- the keep-out and the push, object frame -- and turns the weight, so the support may rest on another face
+    (a new base); Step3's turns are the starts."""
+    c = context(object_name); X = seats(group)[k][0]; extra = {}; turns = [float(a) for a in c.base.policy['initial_axial_angles_deg']]
     row = dict(operation='rotational_reuse', seat=k)
+    if any(i in group['slots'][j]['members'] for j in seats(group)[k][1]):
+        # Task i's own seat (user, 2026-10-28: "一上来就来个R"): its support turned to another installation, which
+        # cuts nothing new, so only a turn that rests the support on a new face (a new base) is one.
+        have = downs(c, group); turns = [a for a in turns if all(1-(X[:3, :3]@c.down(i, a))@h >= SAME_DOWN for h in have)]
+        row['own_seat'] = True
+        if not turns: return dict(row, passed=False, reason='no turn rests the support on a new face')
     # Every exit sweep only removes more than task i's keep-out does, and removed material (or skin it narrows)
-    # holds nothing more, so if the group's support opened by the keep-out alone cannot hold every task's loads,
-    # no exit direction will.  Only the loads bound it: the gate and the floors can still come right as the exit
-    # removes more, so they are judged on each exit.
+    # holds nothing more, so if the group's support opened by the keep-out alone cannot hold every task's loads at a
+    # turn, no exit direction will there.  Only the loads bound it: the gate and the floors can still come right as
+    # the exit removes more, so they are judged on each exit.
     s = group_solids(object_name, group)['s']; opened, _ = largest(s-clipped(move(X, body_and_keepout(object_name, i)), bounds(s)))
     if opened is None: return dict(row, passed=False, reason='the keep-out removes the whole seat')
-    try:
-        mesh = G.mesh(opened); opened_slots = group['slots']+[slot(i, X, default_exit(object_name, i))]
-        bound, held, _ = residual(object_name, opened_slots, mesh, extra, thin_cells(c, opened_slots, mesh), policy)
-    except (ValueError, RuntimeError) as ex: return dict(row, passed=False, reason='opened by the keep-out alone: '+str(ex)[:120])
-    row['bound_loss'] = bound
-    if not held: return dict(row, passed=False, reason='opened by the keep-out alone, the seat cannot hold every task')
+    mesh = G.mesh(opened); d = default_exit(object_name, i); holding = []; standing = []
+    for a in turns:
+        opened_slots = group['slots']+[slot(i, X, d, a)]
+        # The floor rule does not depend on the exit, which cuts where the object leaves, above it: a turn at which the
+        # group opened by the keep-out alone cannot stand on legs is never swept for (R joins failing so at every
+        # start were 38% of the workers' time, B+big_08 and B+big_20).
+        try: lowered(object_name, opened_slots, mesh.vertices)
+        except ValueError: continue
+        standing.append(a)
+        try: loss, held, _ = residual(object_name, opened_slots, mesh, extra, thin_cells(c, opened_slots, mesh), policy)
+        except (ValueError, RuntimeError): continue
+        if held: holding.append((loss, a))
+    row['holding_turns_deg'] = [a for _, a in holding]
+    if not standing: return dict(row, passed=False, reason='opened by the keep-out alone, the seat stands at no turn (floor rule)')
+    if not holding: return dict(row, passed=False, reason='opened by the keep-out alone, the seat cannot hold every task at any turn')
+    cut = {}                                             # the support for an exit does not depend on the turn
 
-    def build(e):
-        e = unit(e)
-        if not rises(object_name, i, e, policy): return None
-        keep, _ = reuse(object_name, group, i, X, e)
-        if keep is None: return None
-        return scored(object_name, group['slots']+[slot(i, X, e)], keep, limit, extra, e, policy)
+    def build(params):
+        e, a = unit(params[0]), float(params[1])
+        if not rises(object_name, i, e, policy, a): return None
+        key = direction_key(e)
+        if key not in cut: cut[key] = reuse(object_name, group, i, X, e)[0]
+        if cut[key] is None: return None
+        return scored(object_name, group['slots']+[slot(i, X, e, a)], cut[key], limit, extra, (e, a), policy)
 
-    def exit_redirection(e):
-        axes = tangent_frame(e)
-        return lambda v: unit(Rotation.from_rotvec(np.cross(e, v[0]*axes[0]+v[1]*axes[1])).apply(e))
-    blocks = [('exit_redirection', exit_redirection, 2, *np.radians(policy['exit_deg']))]
-    # Leaving through the seat's existing exit channel cuts nothing more, so the exits of the seat's tasks come
-    # first; then the default and rings about it (every one rising), in this order for restore.  The residual is
-    # flat in pieces under exit changes, so a start that already holds is worth more than a descent.
-    d = default_exit(object_name, i); u, v = tangent_frame(d); rings, azimuths = policy['exit_starts']
-    starts = [unit(group['slots'][j]['exit']) for j in seats(group)[k][1]]+[d]+[
+    def exit_redirection(p):
+        e = unit(p[0]); axes = tangent_frame(e)
+        return lambda v: (unit(Rotation.from_rotvec(np.cross(e, v[0]*axes[0]+v[1]*axes[1])).apply(e)), p[1])
+    def pose_rotation(p):
+        return lambda v: (p[0], p[1]+np.degrees(v[0]))
+    blocks = [('exit_redirection', exit_redirection, 2, *np.radians(policy['exit_deg'])),
+              ('pose_rotation', pose_rotation, 1, *np.radians(policy['pose_deg']))]
+    # Leaving through the seat's existing exit channel cuts nothing more (and needs no new sweep), so the exits of the
+    # seat's tasks come first, at every turn that holds (the least loss first); then the default and rings about it
+    # (every one rising), in this order for restore.  The residual is flat in pieces under exit changes, so a start
+    # that already holds is worth more than a descent.  (Turn by turn, every exit of the first turn was swept before
+    # the seat's channel at the next: 17 sweeps, 14 of an own-seat join's 37 s.)
+    u, v = tangent_frame(d); rings, azimuths = policy['exit_starts']
+    exits = [unit(group['slots'][j]['exit']) for j in seats(group)[k][1]]+[d]+[
         unit(np.cos(t)*d+np.sin(t)*(np.cos(f)*u+np.sin(f)*v)) for t in np.radians(rings) for f in 2*np.pi*np.arange(azimuths)/azimuths]
-    return restore(object_name, build, [e for e in starts if rises(object_name, i, e, policy)], blocks, extra, limit, file, row, policy)
+    starts = [(e, a) for e in exits for _, a in sorted(holding) if rises(object_name, i, e, policy, a)]
+    return restore(object_name, build, starts, blocks, extra, limit, file, row, policy)
 
 
 def try_juxtapose(object_name, group, i, k, limit, file, policy):
@@ -659,18 +893,25 @@ def restore(object_name, build, starts, blocks, extra, limit, file, row, policy)
     oracle's checks are binary, so when one fails (the support cannot stand, an exit, the skin), the next start is
     tried, at most policy['audits'] audits; when no start holds, the descent starts from the best feasible one.  On
     a load failure, the audit's unsupported demands join the guidance and the descent goes on.  Guidance demands
-    are some of the audit's on the same contacts, so a construction whose guidance does not hold is not audited."""
+    are some of the audit's on the same contacts; the audit needs more than HELD of all samples, so the descent's end
+    is audited even when a guidance demand does not hold."""
     began = time.monotonic(); evaluate = evaluator(build); row.update(gradient=[], audits=[]); built = []
+    audited = {}            # the failed audits by construction: a descent that ends where one did builds the same
 
     def attempt(current):
         nonlocal evaluate
         row.update(start_loss=current['loss'], start=current['params'], starts_tried=len(built))
         for turn_ in range(policy['feedback']+1):
             current, record = descend(evaluate, current, blocks, policy); row['gradient'].append(record)
-            if not current['covered']:
-                row['audits'].append(dict(passed=False, reason=f"the gradient leaves the guidance unresolved (loss {current['loss']:.3g})")); return None
-            result = accept(object_name, current['slots'], current['keep'], limit, file)
-            row['audits'].append(dict({k: v for k, v in result.items() if k not in ('slots', 'unsupported')}, guided_loss=current['loss']))
+            # A guidance sample that does not hold fails no audit by itself (more than HELD of all samples must), so
+            # the audit judges the descent's end whether or not its guidance holds.  The construction is the
+            # params' (evaluator, accept: no randomness), so one audited already keeps its verdict (B+whole_shape:
+            # the feedback's descent mostly ends where it began, and the audit failed again to the bit).
+            key = evaluator_key(current['params'])
+            result = audited.get(key) or accept(object_name, current['slots'], current['keep'], limit, file)
+            if not result['passed']: audited[key] = dict(result, seconds=0.)
+            row['audits'].append(dict({k: v for k, v in result.items() if k not in ('slots', 'unsupported')}, guided_loss=current['loss'],
+                                      guidance_held=current['covered']))
             if result['passed']:
                 return dict(row, passed=True, result=result, params=current['params'], end_loss=current['loss'], seconds=time.monotonic()-began)
             if not result.get('unsupported'): return None
@@ -698,12 +939,27 @@ def restore(object_name, build, starts, blocks, extra, limit, file, row, policy)
     return dict(row, passed=False, reason=row['audits'][-1]['reason'] if row['audits'] else 'unresolved', seconds=time.monotonic()-began)
 
 
+def task_groups(object_name, ids):
+    """Each task's seat from Step2 (data/<run>/step1_reach/plan.json, step2/seats.py), or None."""
+    path = ROOT/'whole_task_2/data'/object_name/'step1_reach/plan.json'
+    if not path.exists(): return None
+    group = {t['id']: t.get('seat') for t in json.loads(path.read_text())['areas']}
+    out = [group.get(i) for i in ids]
+    return None if any(g is None for g in out) else out
+
+
+def seated(group, groups):
+    """The Step2 seats with a task in the support."""
+    return {groups[m] for s in group['slots'] for m in s['members']}
+
+
 def join(args):
-    """Task i joins the group by the drawn operation, on at most policy['seats'] seats, those used by the fewest
-    tasks first.  The first accepted is the join."""
+    """Task i joins the group by the drawn operation, on at most policy['seats'] seats, those of its own Step2
+    seat first (when the plan has seats), then those used by the fewest tasks.  The first accepted is the join."""
     object_name, group, single, i, operation, file, seed, policy = args; began = time.monotonic(); rng = np.random.default_rng(seed)
-    limit = policy['gate']*(group['bbx_m3']+single['bbx_m3']); order = seats(group)
-    ranked = sorted(range(len(order)), key=lambda k: (len(order[k][1]), rng.random()))[:policy['seats']]
+    limit = policy['gate']*(group['bbx_m3']+single['bbx_m3']); order = seats(group); tg = policy.get('task_groups')
+    own = lambda k: tg is not None and any(tg[m] == tg[i] for j in order[k][1] for m in group['slots'][j]['members'])
+    ranked = sorted(range(len(order)), key=lambda k: (not own(k), len(order[k][1]), rng.random()))[:policy['seats']]
     attempts = []
     for attempt in [dict(rotational_reuse=try_reuse, juxtaposition=try_juxtapose)[operation]]:
         for k in ranked:
@@ -713,8 +969,9 @@ def join(args):
                   round(r.get('seconds', 0)), 's', flush=True)
             if r['passed']:
                 return dict(passed=True, task=i, operation=operation, seat=k, params=r['params'], result=r['result'], attempts=attempts,
-                            limit_m3=limit, seconds=time.monotonic()-began)
-    return dict(passed=False, task=i, operation=operation, attempts=attempts, limit_m3=limit, seconds=time.monotonic()-began)
+                            limit_m3=limit, gate=policy['gate'], seconds=time.monotonic()-began)
+    return dict(passed=False, task=i, operation=operation, attempts=attempts, limit_m3=limit, gate=policy['gate'],
+                seconds=time.monotonic()-began)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -728,22 +985,27 @@ def initial_one(args):
     file = Path(folder)/'groups'/(stem(r['id'])+'.npz'); file.parent.mkdir(parents=True, exist_ok=True)
     if keep is None: raise ValueError(r['id']+': the keep-out removes the initial membrane')
     facts = accept(object_name, slots, keep, np.inf, file)
+    if not facts['passed'] and facts['reason'].startswith(STANCE):
+        # It cannot stand alone; a group it joins must (every join is judged standing).  It joins, never starts.
+        why = facts['reason']; facts = accept(object_name, slots, keep, np.inf, file, stance=False); facts['stance_reason'] = why
     if not facts['passed']: raise ValueError(r['id']+': initial membrane: '+facts['reason'])
-    print('START', r['id'], round(facts['membrane_cm3'], 1), 'cm3, bbx', round(facts['bbx_m3']*1e6), 'cm3', flush=True)
+    print('START', r['id'], round(facts['membrane_cm3'], 1), 'cm3, bbx', round(facts['bbx_m3']*1e6), 'cm3',
+          '' if facts.get('stands', True) else '(does not stand alone: '+facts['stance_reason']+')', flush=True)
     return dict(name=stem(r['id']), slots=slots, file=str(file.relative_to(ROOT)), volume_cm3=facts['membrane_cm3'],
                 bbx_m3=facts['bbx_m3'], poses=1, chain=[], skin_pruning=facts['skin_pruning'],
-                mesh_conditioning=facts.get('mesh_conditioning'))
+                mesh_conditioning=facts.get('mesh_conditioning'), stands=facts.get('stands', True))
 
 
 def as_group(r, group, single):
     """An accepted join as a group; `chain` lists every join that made it, gate ratio included."""
     result = r['result']; name = group['name']+'+'+single['name']; X = np.asarray(result['slots'][-1]['X'])
-    step = dict(name=name, parents=[group['name'], single['name']], operation=r['operation'], seat=r['seat'],
+    step = dict(name=name, parents=[group['name'], single['name']], operation=r['operation'], seat=r['seat'], gate=r['gate'],
                 seat_tasks=len(seats(dict(slots=result['slots']))[r['seat']][1]) if r['operation'] == 'rotational_reuse' else 1,
                 bbx_ratio=result['bbx_m3']/(group['bbx_m3']+single['bbx_m3']), bbx_m3=result['bbx_m3'],
                 parent_bbx_m3=[group['bbx_m3'], single['bbx_m3']], volume_cm3=result['membrane_cm3'],
                 parent_cm3=[group['volume_cm3'], single['volume_cm3']], poses=result['poses'],
                 seat_turn_deg=float(r['params'][0]) if r['operation'] == 'juxtaposition' else 0.,
+                pose_turn_deg=float(r['params'][1]) if r['operation'] == 'rotational_reuse' else 0.,
                 exit_from_default_deg=float(np.degrees(np.arccos(np.clip(np.asarray(result['slots'][-1]['exit'])@default_exit_cached(single), -1, 1)))),
                 rotation_deg=float(np.degrees(Rotation.from_matrix(X[:3, :3]).magnitude())), translation_m=X[:3, 3].tolist(),
                 attempts=len(r['attempts']), file=result['file'], slots=result['slots'], parent_files=[group['file'], single['file']],
@@ -767,8 +1029,10 @@ def plain(x):
 
 
 def best_first(groups):
-    """The fewest seats (the most Rotational reuse) first, then the smallest bbx, then the least material."""
-    return sorted(groups, key=lambda g: (len(seats(g)), g['bbx_m3'], g['volume_cm3']))
+    """Made with Rotational reuse first (user, 2026-10-28: several bases are the goal), then the fewest seats, then the
+    smallest bbx, then the least material."""
+    return sorted(groups, key=lambda g: (not any(c['operation'] == 'rotational_reuse' for c in g.get('chain') or []),
+                                         len(seats(g)), g['bbx_m3'], g['volume_cm3']))
 
 
 def pin(cpus):
@@ -801,71 +1065,138 @@ def pinned_pool(workers):
 
 
 def run(object_name='B', workers=22, policy=POLICY):
-    """Every sample starts from a random task and joins one random task at a time, on its own: no sample waits
-    for another.  A join that succeeds goes on; one that fails continues from a random state that has already
-    succeeded at that step (else one at the sample's own step) and draws again.  A sample stops after
-    policy['retries'] failures in a row with no state yet at the next step.  Samples copy each other's states, so
+    """Every sample starts from a random task and joins one task at a time, on its own: no sample waits for
+    another.  A task is drawn with odds 1 + its failed joins so far.  A join that succeeds goes on; one that fails
+    continues from a state that has already succeeded at that step (else one at the sample's own step), the odds
+    halving with every seat more than the fewest, and draws again.  After policy['retries'] failures in a row with
+    no state yet at the next step a sample goes back one step further than its last time back, at most
+    policy['backtracks'] times, then stops.  Samples copy each other's states, so
     they often draw a join already made: a join is the same for the same group, task and operation, so it runs
     once and every later draw of it takes its result; a draw of a join still running draws again (only when every
-    join left is running does it wait for one).  The search stops at policy['enough'] distinct supports holding
-    every task; the joins still running then are dropped."""
+    join left is running does it wait for one).  When every sample has stopped with no support holding every task,
+    the gate grows by policy['gate_step'] (to at most policy['gate_max']) and the samples go on from where they
+    stopped; a join that failed under a smaller gate is made again.  The search stops at policy['enough'] distinct
+    supports holding every task made with Rotational reuse (else when every sample has run out); the joins still
+    running then are dropped."""
     began = time.monotonic(); c = context(object_name); folder = ROOT/'whole_task_2/data'/object_name/FOLDER
     folder.mkdir(parents=True, exist_ok=True); n = len(c.base.ids); rng = np.random.default_rng(policy['seed']); log = []
-    executor = pinned_pool(workers); done = {}                     # done: the distinct supports holding every task
+    executor = pinned_pool(workers); done = {}; reused = {}                     # done: the distinct supports holding every task
     try:
         start = list(executor.map(initial_one, [(object_name, i, folder) for i in range(n)]))
         samples, reached, running = [], {0: []}, {}               # reached[step]: (group, left, sample) that got there
         made, waiting, ready = {}, {}, []                          # (group file, task, operation): its result; samples waiting
+        failed = collections.Counter()                             # failed[task]: its distinct joins that failed
+        standing = [i for i in range(n) if start[i]['stands']]     # a sample starts from a task that stands alone
+        if not standing: raise ValueError('no task stands alone')
+        # Rotational reuse first (user, 2026-10-28: "一上来就来个R"): every task that stands alone, turned in its own
+        # seat to an installation on another face; every other sample starts from it where that holds.
+        turned = {}
+        if policy['own_seat_first']:
+            jobs = {i: executor.submit(join, (object_name, start[i], start[i], i, 'rotational_reuse', folder/'groups'/f"own_{start[i]['name']}.npz",
+                                              [policy['seed'], 0, i], dict(policy, task_groups=None))) for i in standing}
+            for i, job in jobs.items():
+                r = job.result(); log.append(dict({key: v for key, v in r.items() if key != 'result'}, sample=None, step=0, again=False,
+                                                  group=start[i]['name'], task=start[i]['name'], seconds_since_start=time.monotonic()-began))
+                print('OWN SEAT', start[i]['name'], 'rotational_reuse', 'ACCEPT' if r['passed'] else 'fails', round(time.monotonic()-began), 's', flush=True)
+                if r['passed']: turned[i] = as_group(r, start[i], start[i])
         for k in range(policy['samples']):
-            first = int(rng.integers(n)); samples.append(dict(id=k, group=start[first], left=[i for i in range(n) if i != first], step=0, attempts=0, fails=0))
+            first = int(rng.choice(standing)); group = turned.get(first, start[first]) if k % 2 == 0 else start[first]
+            samples.append(dict(id=k, group=group, left=[i for i in range(n) if i != first], step=0, attempts=0, fails=0, back=0))
             reached[0].append((samples[-1]['group'], samples[-1]['left'], k))
+
+        groups = task_groups(object_name, c.base.ids) if policy.get('grouped') else None
+        if groups: print('GROUPS', dict(zip(c.base.ids, groups)), flush=True)
+
+        def spent(group, i):
+            """Has task i failed both operations on group, under the current gate?"""
+            keys = [(group['file'], i, o) for o in ('rotational_reuse', 'juxtaposition')]
+            return all(k in made and not made[k]['passed'] and made[k]['gate'] == gate for k in keys)
+
+        def draw(left, group):
+            """A task to join, the hard ones first: while a Step2 seat in the support has tasks left that have not
+            failed both operations here, one of them -- a seat is finished before the next opens."""
+            if groups:
+                have = seated(group, groups); mates = [i for i in left if groups[i] in have and not spent(group, i)]
+                if mates: left = mates
+            w = np.array([1.+failed[i] for i in left]); return int(rng.choice(left, p=w/w.sum()))
+
+        def carry(at):
+            states = reached[at]; k = np.array([len(seats(g)) for g, _, _ in states], float); w = .5**(k-k.min())
+            return states[int(rng.choice(len(states), p=w/w.sum()))]
+
+        gate = policy['gate']
 
         def submit(s):
             first, last = policy['reuse_share']; share = first+(last-first)*s['step']/max(1, n-2)
             for _ in range(2*len(s['left'])):       # a join another sample is running: draw another (none waits)
-                i = int(rng.choice(s['left'])); o = 'rotational_reuse' if rng.random() < share else 'juxtaposition'
+                i = draw(s['left'], s['group'])
+                if groups and groups[i] in seated(s['group'], groups):
+                    # Its seat is finished by Rotational reuse; Juxtaposition only once that has failed here.
+                    r = made.get((s['group']['file'], i, 'rotational_reuse'))
+                    o = 'juxtaposition' if r is not None and not r['passed'] and r['gate'] == gate else 'rotational_reuse'
+                else:
+                    if groups: share = policy['other_group_reuse']
+                    o = 'rotational_reuse' if rng.random() < share else 'juxtaposition'
                 key = (s['group']['file'], i, o)
                 if key not in waiting: break
-            if key in made: ready.append((s, i, made[key], True)); return
+            chain = s['group'].get('chain') or []
+            g = max(gate, policy['gate_after_reuse']) if o == 'juxtaposition' and chain and chain[-1]['operation'] == 'rotational_reuse' else gate
+            if key in made and (made[key]['passed'] or made[key]['gate'] == g): ready.append((s, i, made[key], True)); return
             if key in waiting: waiting[key].append((s, i)); return
             s['attempts'] += 1; file = folder/'groups'/f"s{s['id']:02d}_step{s['step']+1}_a{s['attempts']}.npz"; waiting[key] = []
-            running[executor.submit(join, (object_name, s['group'], start[i], i, o, file, [policy['seed'], s['id'], s['step']+1, s['attempts']], policy))] = (s, i, key)
+            running[executor.submit(join, (object_name, s['group'], start[i], i, o, file, [policy['seed'], s['id'], s['step']+1, s['attempts']],
+                                           dict(policy, gate=g, task_groups=groups)))] = (s, i, key)
         for s in samples: submit(s)
-        while (running or ready) and len(done) < policy['enough']:
-            if not ready:
-                finished, _ = wait(running, return_when=FIRST_COMPLETED)
-                for job in finished:
-                    s, i, key = running.pop(job); made[key] = job.result()
-                    ready += [(s, i, made[key], False)]+[(w, j, made[key], True) for w, j in waiting.pop(key)]
-            while ready:
-                s, i, r, again = ready.pop(0); step = s['step']+1
-                log.append(dict({key: v for key, v in r.items() if key != 'result'}, sample=s['id'], step=step, again=again,
-                                group=s['group']['name'], task=start[i]['name'], seconds_since_start=time.monotonic()-began,
-                                **(dict(seconds=0.) if again else {})))
-                print('SAMPLE', s['id'], 'step', step, s['group']['name'], '+', start[i]['name'], r['operation'],
-                      'ACCEPT' if r['passed'] else 'fails', '(made before)' if again else '', round(time.monotonic()-began), 's', flush=True)
-                if r['passed']:
-                    s.update(group=as_group(r, s['group'], start[i]), left=[x for x in s['left'] if x != i], step=step, fails=0); s.pop('copied_from', None)
-                    reached.setdefault(step, []).append((s['group'], list(s['left']), s['id']))
-                else:
-                    # A state that already succeeded at this step carries the sample on (progress: its failures
-                    # start over); with none yet it draws again from a state at its own step, and stops after
-                    # policy['retries'] such failures in a row.
-                    at = step if reached.get(step) else s['step']; s['fails'] = 0 if at == step else s['fails']+1
-                    if s['fails'] > policy['retries']: s['stopped'] = True; continue
-                    g, left, source = reached[at][int(rng.integers(len(reached[at])))]
-                    s.update(group=g, left=list(left), step=at, copied_from=source)
-                if s['left']: submit(s)
-                else: done.setdefault(s['group']['file'], s['id'])
-            write_json(folder/'search.json', plain(dict(policy=policy, start=start, log=log, seconds=time.monotonic()-began,
-                       samples=[dict(id=s['id'], group=s['group'], left=s['left'], step=s['step'], copied_from=s.get('copied_from'),
-                                     stopped=s.get('stopped', False)) for s in samples])))
+        while True:
+            # Stopping early needs policy['enough'] distinct supports made with Rotational reuse (user, 2026-10-28: R
+            # is rewarded; it is slower than Juxtaposition and would be dropped running); else every sample runs out.
+            while (running or ready) and sum(reused.values()) < policy['enough']:
+                if not ready:
+                    finished, _ = wait(running, return_when=FIRST_COMPLETED)
+                    for job in finished:
+                        s, i, key = running.pop(job); made[key] = job.result(); failed[i] += not made[key]['passed']
+                        ready += [(s, i, made[key], False)]+[(w, j, made[key], True) for w, j in waiting.pop(key)]
+                while ready:
+                    s, i, r, again = ready.pop(0); step = s['step']+1
+                    log.append(dict({key: v for key, v in r.items() if key != 'result'}, sample=s['id'], step=step, again=again,
+                                    group=s['group']['name'], task=start[i]['name'], seconds_since_start=time.monotonic()-began,
+                                    **(dict(seconds=0.) if again else {})))
+                    print('SAMPLE', s['id'], 'step', step, s['group']['name'], '+', start[i]['name'], r['operation'],
+                          'ACCEPT' if r['passed'] else 'fails', '(made before)' if again else '', round(time.monotonic()-began), 's', flush=True)
+                    if r['passed']:
+                        s.update(group=as_group(r, s['group'], start[i]), left=[x for x in s['left'] if x != i], step=step, fails=0); s.pop('copied_from', None)
+                        reached.setdefault(step, []).append((s['group'], list(s['left']), s['id']))
+                    else:
+                        # A state that already succeeded at this step carries the sample on (progress: its failures
+                        # start over); with none yet it draws again from a state at its own step.  After
+                        # policy['retries'] such failures in a row it goes back further than last time, at most
+                        # policy['backtracks'] times, then stops.
+                        at = step if reached.get(step) else s['step']; s['fails'] = 0 if at == step else s['fails']+1
+                        if s['fails'] > policy['retries']:
+                            if s['back'] >= policy['backtracks'] or s['step'] == 0: s['stopped'] = True; continue
+                            s['back'] += 1; at = max(0, s['step']-s['back']); s['fails'] = 0
+                            print('SAMPLE', s['id'], 'back to step', at, flush=True)
+                        g, left, source = carry(at)
+                        s.update(group=g, left=list(left), step=at, copied_from=source)
+                    if s['left']: submit(s)
+                    else:
+                        done.setdefault(s['group']['file'], s['id'])
+                        reused[s['group']['file']] = any(c['operation'] == 'rotational_reuse' for c in s['group'].get('chain') or [])
+                write_json(folder/'search.json', plain(dict(policy=policy, start=start, log=log, seconds=time.monotonic()-began,
+                           samples=[dict(id=s['id'], group=s['group'], left=s['left'], step=s['step'], copied_from=s.get('copied_from'),
+                                         back=s['back'], stopped=s.get('stopped', False)) for s in samples], gate=gate)))
+            # Every sample stopped with no support holding every task: the gate grows and they go on from where
+            # they stopped (a join that failed is made again under it).
+            if done or gate >= policy['gate_max']-1e-9: break
+            gate = round(gate+policy['gate_step'], 6)
+            print('GATE', gate, round(time.monotonic()-began), 's', flush=True)
+            for s in samples: s.update(stopped=False, fails=0, back=0); submit(s)
     finally:                                                       # enough: the joins still running are dropped
         for process in list(getattr(executor, '_processes', {}).values()): process.terminate()
         executor.shutdown(wait=False, cancel_futures=True)
     finals = [dict(s['group'], sample=s['id']) for s in samples if not s['left']]
     report = dict(object=object_name, policy=policy, start=start, samples=len(samples), samples_done=len(finals),
-                  finals=best_first(finals), log=log, seconds=time.monotonic()-began)
+                  finals=best_first(finals), log=log, gate=gate, seconds=time.monotonic()-began)
     if finals:
         best = best_first(finals)[0]; report.update(status='combined', group=best)
         print('STEP4 COMBINED sample', best['sample'], 'bbx', round(best['bbx_m3']*1e6), 'cm3, membrane',
@@ -882,12 +1213,17 @@ def validate(object_name='B'):
     c = context(object_name); folder = ROOT/'whole_task_2/data'/object_name/FOLDER
     report = json.loads((folder/'report.json').read_text()); g = report['group']; policy = report['policy']
     for step in g['chain']:
-        if step['bbx_ratio'] > policy['gate']+1e-12: raise ValueError(step['name']+': gate not met')
+        if step['bbx_ratio'] > step.get('gate', policy['gate'])+1e-12: raise ValueError(step['name']+': gate not met')
         if step['operation'] not in ('juxtaposition', 'rotational_reuse'): raise ValueError('unknown operation')
         if step['operation'] == 'rotational_reuse':
             X = np.asarray(step['slots'][-1]['X']); before = [np.asarray(s['X']) for s in step['parent_slots'][0]]
             if not any(np.allclose(X, Y, atol=1e-9) for Y in before): raise ValueError(step['name']+': reuse outside an existing seat')
-    if sorted(i for s in g['slots'] for i in s['members']) != list(range(len(c.base.ids))): raise ValueError('not every task once')
+    # Every task once; a task twice only turned in its own seat (Rotational reuse checked above).
+    if sorted(set(i for s in g['slots'] for i in s['members'])) != list(range(len(c.base.ids))): raise ValueError('not every task')
+    twice = collections.defaultdict(list)
+    for s in g['slots']: twice[s['members'][0]].append((np.asarray(s['X']), s['angles'][0]))
+    if any(len({a for _, a in v}) < len(v) or any(not np.allclose(X, v[0][0], atol=1e-9) for X, _ in v) for v in twice.values()):
+        raise ValueError('a task twice outside its own seat or at one turn')
     support = read_mesh(ROOT/g['file']); facts = certify(c, g['slots'], support)
     if 'standing' in facts:
         with np.load(ROOT/g['file']) as z: saved = trimesh.Trimesh(z['standing_vertices'], z['standing_faces'], process=False)
