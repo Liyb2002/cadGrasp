@@ -469,7 +469,7 @@ def run(object_name='B', output_root=DEFAULT_OUTPUT):
         print('STEP5', name, 'PASS', round(support.volume*1e6, 1), 'cm3,', round(steps['frame']['peel']['removed_cm3'], 1), 'cm3 peeled (bbx',
               round(group['bbx_m3']*1e6), '->', round(row['peeled_bbx_m3']*1e6), 'cm3),',
               round(rows[-1]['feet_cm3'], 1), 'cm3 of feet, skin', 'over 40' if steps['skin_width_m'] is None else round(steps['skin_width_m']*1000, 1), 'mm wide,', round(time.monotonic()-t0), 's', flush=True)
-        render(group, model, q, support, output_root/object_name/'step5'/f'{name}.png')
+        render(group, model, q, support, output_root/object_name/'step5'/f'{name}.png', top=False)
         package(c, group, model, q, support, rows[-1], output_root/object_name/'step5'/name)
     report = dict(object=object_name, peel=dict(trim=P.TRIM, grids=P.GRIDS, budget=P.BUDGET), skin_width_m=WIDTH, least_width_m=P.THICK, foot=FOOT, results=rows, input_sha256=inputs(object_name), seconds=time.monotonic()-began)
     write_json(folder/'report.json', plain(report))
@@ -529,13 +529,14 @@ def overview(model, group, support, q, size, view=(.55, -1., .55)):
     finally: scene.close()
 
 
-def render(group, model, q, support, path, size=620, gap=40):
-    """One figure: the seats and the support alone, above every task's use of it."""
+def render(group, model, q, support, path, size=620, gap=40, top=True):
+    """One figure: every task's use of the support, below the seats and the support alone when top (Step4's figure;
+    Step5's keeps only the uses, user 2026-10-29: "只留下面这一行")."""
     from .render_joined import use
-    top = overview(model, group, support, q, size); bottom = [use(model, q, support, k, size) for k in range(len(model.records))]
-    columns = max(len(top), len(bottom))
-    sheet = Image.new('RGB', (columns*(size+gap)+gap, 2*(size+gap)+gap), 'white')
-    for r, panels in enumerate((top, bottom)):
+    rows = ([overview(model, group, support, q, size)] if top else [])+[[use(model, q, support, k, size) for k in range(len(model.records))]]
+    columns = max(len(r) for r in rows)
+    sheet = Image.new('RGB', (columns*(size+gap)+gap, len(rows)*(size+gap)+gap), 'white')
+    for r, panels in enumerate(rows):
         for k, panel in enumerate(panels): sheet.paste(panel, (gap+k*(size+gap), gap+r*(size+gap)))
     path.parent.mkdir(parents=True, exist_ok=True); sheet.save(path)
     print('STEP5 FIGURE', path, flush=True)
@@ -661,7 +662,7 @@ def figures(object_name='B', output_root=DEFAULT_OUTPUT):
         if row['status'] != 'passed': continue
         support = read_mesh(folder/f"{row['name']}.npz")
         model = ExitModel(c, g['slots'])
-        render(g, model, model.layout(support), support, output_root/object_name/'step5'/f"{row['name']}.png")
+        render(g, model, model.layout(support), support, output_root/object_name/'step5'/f"{row['name']}.png", top=False)
         package(c, g, model, model.layout(support), support, row, output_root/object_name/'step5'/row['name'])
 
 
